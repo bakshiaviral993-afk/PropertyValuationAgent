@@ -1,8 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { ValuationResult, ValuationRequest } from '../types';
 import { 
-  IndianRupee, MapPin, TrendingUp, TrendingDown, Minus, Info, 
-  Building, Car, Trees, Download, Loader2, Layers, Globe, Box
+  IndianRupee, MapPin, TrendingUp, Download, Loader2, Layers, Globe, Share2, Eye
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
@@ -34,41 +33,27 @@ const CostDial = ({
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
-
-  const radius = 36;
+  const radius = 32;
   const circumference = 2 * Math.PI * radius;
   const percentage = Math.min(Math.max((value - min) / (max - min), 0), 1);
   const strokeDashoffset = circumference - percentage * circumference;
 
   const handleInteraction = (e: React.MouseEvent | React.TouchEvent) => {
     if (!svgRef.current) return;
-    
     const rect = svgRef.current.getBoundingClientRect();
     const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-    
     const x = clientX - (rect.left + rect.width / 2);
     const y = clientY - (rect.top + rect.height / 2);
-    
-    // Calculate angle in degrees (0 at top)
     let angle = Math.atan2(y, x) * (180 / Math.PI) + 90;
     if (angle < 0) angle += 360;
-    
-    // Map angle to value
-    const newValue = Math.round(min + (angle / 360) * (max - min));
-    
-    // Haptic tick every 50k for demo (browser support varies, fallback to visual snap)
-    if (Math.abs(newValue - value) > 10000) {
-       if (navigator.vibrate) navigator.vibrate(5); 
-    }
-
-    onChange(newValue);
+    onChange(Math.round(min + (angle / 360) * (max - min)));
   };
 
   return (
     <div className="flex flex-col items-center">
       <div 
-        className="relative w-24 h-24 cursor-pointer"
+        className="relative w-20 h-20 cursor-pointer group"
         onMouseDown={() => setIsDragging(true)}
         onTouchStart={() => setIsDragging(true)}
         onMouseUp={() => setIsDragging(false)}
@@ -78,57 +63,66 @@ const CostDial = ({
         onTouchMove={(e) => isDragging && handleInteraction(e)}
         onClick={(e) => handleInteraction(e)}
       >
-        <svg ref={svgRef} className="w-full h-full transform -rotate-90">
-          <circle cx="48" cy="48" r={radius} stroke="#e2e8f0" strokeWidth="6" fill="transparent" />
-          <circle cx="48" cy="48" r={radius} stroke="#00D4AA" strokeWidth="6" fill="transparent" 
+        <svg ref={svgRef} className="w-full h-full transform -rotate-90 filter drop-shadow-[0_0_2px_rgba(0,0,0,0.8)]">
+          <circle cx="40" cy="40" r={radius} stroke="#1f2937" strokeWidth="4" fill="transparent" />
+          <circle cx="40" cy="40" r={radius} stroke="#B4FF5C" strokeWidth="4" fill="transparent" 
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
             strokeLinecap="round"
-            className="transition-all duration-75"
+            className="transition-all duration-75 filter drop-shadow-[0_0_4px_#B4FF5C]"
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="bg-white rounded-full p-1 shadow-sm border border-teal-100">
-             <div className="w-2 h-2 bg-teal-500 rounded-full" />
+          <div className="text-[10px] font-mono text-cyber-lime font-bold">
+            {(value/100000).toFixed(1)}L
           </div>
         </div>
       </div>
-      <span className="text-xs font-bold text-slate-500 uppercase mt-1">{label}</span>
-      <span className="text-sm font-mono font-bold text-slate-900">₹{(value/100000).toFixed(1)}L</span>
+      <span className="text-[10px] font-bold text-gray-500 uppercase mt-1 tracking-wider">{label}</span>
     </div>
   );
 };
 
-const LiquidConfidenceTube = ({ score }: { score: number }) => {
-  // Color Logic: 0-70 Coral, 70-90 Amber, 90+ Teal
-  let colorClass = 'bg-coral-500';
-  let colorHex = '#FF6B6B';
-  if (score >= 90) { colorClass = 'bg-teal-500'; colorHex = '#00D4AA'; }
-  else if (score >= 70) { colorClass = 'bg-amber-500'; colorHex = '#F59E0B'; }
+const CircularConfidenceGauge = ({ score }: { score: number }) => {
+  const radius = 45;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (score / 100) * circumference;
+  
+  // Dynamic color
+  const color = score > 85 ? '#00F6FF' : score > 60 ? '#B4FF5C' : '#FFAE42';
 
   return (
-    <div className="flex flex-col items-center">
-        <div className="relative w-12 h-32 bg-slate-100 rounded-[24px] border-4 border-white shadow-inner overflow-hidden liquid-tube">
-            {/* Liquid Fill */}
-            <div 
-                className={`absolute bottom-0 left-0 w-full transition-all duration-1000 ease-out ${colorClass}`}
-                style={{ height: `${score}%` }}
-            >
-                {/* Bubbles */}
-                <div className="absolute bottom-0 left-2 w-2 h-2 bg-white/30 rounded-full animate-bubble-rise" style={{ animationDelay: '0s' }}></div>
-                <div className="absolute bottom-0 right-3 w-3 h-3 bg-white/20 rounded-full animate-bubble-rise" style={{ animationDelay: '0.5s' }}></div>
-                <div className="absolute bottom-0 left-4 w-1 h-1 bg-white/40 rounded-full animate-bubble-rise" style={{ animationDelay: '1.2s' }}></div>
-            </div>
-            {/* Glare */}
-            <div className="absolute top-2 right-2 w-1.5 h-16 bg-white/40 rounded-full blur-[1px]"></div>
+    <div className="relative flex flex-col items-center justify-center w-32 h-32">
+        <svg className="w-full h-full transform -rotate-90">
+            <defs>
+                <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#13161B" />
+                    <stop offset="100%" stopColor={color} />
+                </linearGradient>
+            </defs>
+            {/* Background Track */}
+            <circle cx="64" cy="64" r={radius} stroke="#13161B" strokeWidth="6" fill="transparent" />
+            {/* Value Arc */}
+            <circle 
+                cx="64" cy="64" r={radius} 
+                stroke={color} 
+                strokeWidth="6" 
+                fill="transparent"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round"
+                className="transition-all duration-1000 ease-out"
+                style={{ filter: `drop-shadow(0 0 8px ${color})` }}
+            />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-2xl font-mono font-bold text-white drop-shadow-md">{score}%</span>
+            <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold">Confidence</span>
         </div>
-        <span className="mt-2 text-2xl font-mono font-bold text-slate-900">{score}%</span>
-        <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Confidence</span>
     </div>
   );
 };
 
-// Internal Map Component for Report
 const ReportMap = ({ lat, lng }: { lat: number, lng: number }) => {
     const mapRef = useRef<HTMLDivElement>(null);
     const [layerType, setLayerType] = useState<'map' | 'sat'>('map');
@@ -136,61 +130,28 @@ const ReportMap = ({ lat, lng }: { lat: number, lng: number }) => {
 
     useEffect(() => {
         if (!mapRef.current || !window.L) return;
-        
-        if (mapInstance.current) {
-            mapInstance.current.remove();
-        }
+        if (mapInstance.current) mapInstance.current.remove();
 
-        const map = window.L.map(mapRef.current, { 
-            zoomControl: false, 
-            dragging: false, 
-            scrollWheelZoom: false 
-        }).setView([lat, lng], 16);
-        
+        const map = window.L.map(mapRef.current, { zoomControl: false, dragging: false, scrollWheelZoom: false }).setView([lat, lng], 17);
         const tileUrl = layerType === 'map' 
-            ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+            ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
             : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 
-        const attribution = layerType === 'map'
-            ? '&copy; OpenStreetMap'
-            : '&copy; Esri';
-
-        window.L.tileLayer(tileUrl, { attribution }).addTo(map);
+        window.L.tileLayer(tileUrl, { attribution: '' }).addTo(map);
         window.L.marker([lat, lng]).addTo(map);
-
         mapInstance.current = map;
-
-        return () => {
-             if (mapInstance.current) {
-                mapInstance.current.remove();
-                mapInstance.current = null;
-            }
-        };
+        return () => { if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null; } };
     }, [lat, lng, layerType]);
 
     return (
-        <div className="relative w-full h-48 rounded-xl overflow-hidden shadow-sm border border-slate-200">
-            <div ref={mapRef} className="w-full h-full" />
-            
-            {/* Morph Toggle */}
-            <div className="absolute bottom-3 left-3 flex bg-white/90 backdrop-blur-sm rounded-lg p-1 shadow-lg border border-slate-200 z-[400]">
-                <button 
-                    onClick={() => setLayerType('map')}
-                    className={`p-1.5 rounded transition-colors ${layerType === 'map' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
-                >
-                    <Layers size={14} />
-                </button>
-                <button 
-                    onClick={() => setLayerType('sat')}
-                    className={`p-1.5 rounded transition-colors ${layerType === 'sat' ? 'bg-teal-500 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
-                >
-                    <Globe size={14} />
-                </button>
+        <div className="relative w-full h-full rounded-2xl overflow-hidden border border-cyber-border shadow-inner">
+            <div ref={mapRef} className="w-full h-full grayscale opacity-80 hover:opacity-100 transition-opacity duration-700" />
+            <div className="absolute top-3 left-3 flex gap-2">
+                <button onClick={() => setLayerType('map')} className={`p-1.5 rounded bg-black/50 backdrop-blur border border-white/10 ${layerType === 'map' ? 'text-cyber-teal' : 'text-gray-500'}`}><Layers size={14} /></button>
+                <button onClick={() => setLayerType('sat')} className={`p-1.5 rounded bg-black/50 backdrop-blur border border-white/10 ${layerType === 'sat' ? 'text-cyber-teal' : 'text-gray-500'}`}><Globe size={14} /></button>
             </div>
-            
-             {/* Fake 3D Badge (Simulated Feature) */}
-             <div className="absolute top-3 right-3 bg-black/60 backdrop-blur text-white text-[10px] px-2 py-1 rounded border border-white/20 font-mono">
-                 3D Massing (Pro)
+             <div className="absolute bottom-3 right-3 bg-cyber-teal/20 backdrop-blur text-cyber-teal text-[9px] px-2 py-1 rounded border border-cyber-teal/30 font-mono shadow-neon-teal">
+                 LIVE SATELLITE FEED
              </div>
         </div>
     );
@@ -198,250 +159,159 @@ const ReportMap = ({ lat, lng }: { lat: number, lng: number }) => {
 
 const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) => {
   const reportRef = useRef<HTMLDivElement>(null);
-  const [isExporting, setIsExporting] = useState(false);
-  
-  // Local State for Refinement
   const [parkingCost, setParkingCost] = useState(request.parkingCharges || 0);
   const [amenityCost, setAmenityCost] = useState(request.amenitiesCharges || 0);
   const [liveEstimatedValue, setLiveEstimatedValue] = useState(result.estimatedValue);
 
-  // Update total when dials change
   useEffect(() => {
       const baseValue = result.estimatedValue - (request.parkingCharges || 0) - (request.amenitiesCharges || 0);
       setLiveEstimatedValue(baseValue + parkingCost + amenityCost);
   }, [parkingCost, amenityCost, result.estimatedValue]);
 
   const formatCurrency = (val: number) => {
-    if (val >= 10000000) {
-        return `₹${(val / 10000000).toFixed(2)} Cr`;
-    }
+    if (val >= 10000000) return `₹${(val / 10000000).toFixed(2)} Cr`;
     return `₹${(val / 100000).toFixed(2)} L`;
   };
 
-  const formatNumber = (num: number) => {
-      return new Intl.NumberFormat('en-IN').format(num);
-  };
-
-  const getSentimentIcon = (score: number) => {
-      if (score > 0.3) return <TrendingUp className="text-teal-500" />;
-      if (score < -0.3) return <TrendingDown className="text-coral-500" />;
-      return <Minus className="text-slate-400" />;
-  };
-
-  // Adjust chart data based on live value
   const chartData = [
     { name: 'Low', value: result.rangeLow },
     { name: 'Valuation', value: liveEstimatedValue },
     { name: 'High', value: result.rangeHigh },
   ];
 
-  const TEAL_MAIN = '#00D4AA';
-  const SLATE_LIGHT = '#94a3b8';
-
-  const handleDownloadPdf = async () => {
-    if (!reportRef.current) return;
-    
-    setIsExporting(true);
-    try {
-      const element = reportRef.current;
-      const canvas = await html2canvas(element, {
-        scale: 2, 
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#F8F9FC'
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-
-      const imgWidth = 210; 
-      const pageHeight = 297; 
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
-      pdf.save(`QuantCasa_Valuation_${request.projectName || 'Report'}.pdf`);
-    } catch (error) {
-      console.error("PDF Export failed", error);
-      alert("Failed to export PDF. Please try again.");
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   return (
-    <div className="h-full flex flex-col font-sans">
-       {/* Actions Bar */}
-       <div className="p-4 md:px-6 flex justify-between items-center bg-white border-b border-slate-100 rounded-t-2xl shadow-sm z-10">
-          <span className="text-xs font-mono text-slate-400 uppercase tracking-widest">QuantCasa v1.5</span>
-          <button 
-            onClick={handleDownloadPdf}
-            disabled={isExporting}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg shadow-md transition-all disabled:opacity-70 text-sm font-semibold"
-          >
-            {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-            {isExporting ? 'Processing...' : 'Export PDF'}
-          </button>
-       </div>
-
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-canvas" ref={reportRef}>
-        
-        {/* Header Card */}
-        <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-100 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-slate-900 via-teal-500 to-slate-900"></div>
-          
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-              <div>
-                  <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                      {String(request.projectName)} 
-                      {request.bhk && <span className="text-xs font-bold text-slate-500 px-2 py-1 bg-slate-100 rounded uppercase tracking-wider">{String(request.bhk)}</span>}
-                  </h2>
-                  <div className="flex items-start text-slate-500 mt-1 space-x-1.5 text-sm">
-                      <MapPin size={14} className="mt-0.5 flex-shrink-0 text-teal-500" />
-                      <span>
-                          {String(request.area)}, {String(request.city)}, {String(request.state)}
-                      </span>
-                  </div>
-              </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mt-2">
-              {/* Main Value */}
-              <div className="md:col-span-5 flex flex-col justify-center border-r border-slate-100 pr-6">
-                  <p className="text-slate-500 text-sm font-medium mb-1 uppercase tracking-wide">Estimated Value</p>
-                  <div className="flex items-baseline space-x-1">
-                      <span className="text-4xl md:text-5xl font-mono font-bold text-slate-900 tracking-tighter transition-all duration-300">
-                        {formatCurrency(liveEstimatedValue)}
-                      </span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-3">
-                      <span className="px-2 py-0.5 bg-teal-50 text-teal-700 text-xs font-bold rounded border border-teal-100 animate-pulse">Live Updates Active</span>
-                  </div>
-              </div>
-
-              {/* Confidence Tube */}
-              <div className="md:col-span-3 flex justify-center border-r border-slate-100">
-                   <LiquidConfidenceTube score={result.confidenceScore} />
-              </div>
-              
-              {/* Refine Dials (Micro-Widget) */}
-              <div className="md:col-span-4 flex flex-row justify-around items-center pl-2 bg-slate-50/50 rounded-xl border border-slate-100/50 py-2">
-                   <CostDial 
-                      label="Parking" 
-                      value={parkingCost} 
-                      onChange={setParkingCost}
-                      max={1500000} 
-                   />
-                   <CostDial 
-                      label="Amenities" 
-                      value={amenityCost} 
-                      onChange={setAmenityCost}
-                      max={1000000} 
-                   />
-              </div>
-          </div>
-        </div>
-
-        {/* Map & Comparables Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div className="h-full flex flex-col font-sans gap-6" ref={reportRef}>
+       
+       {/* 1. Main Dashboard Grid */}
+       <div className="flex flex-col xl:flex-row gap-6 h-full">
             
-            {/* Left Column: Map & Analysis (7 cols) */}
-            <div className="lg:col-span-7 space-y-6">
-                 {/* Map Morph Toggle */}
-                 {request.latitude && request.longitude && (
-                     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-                         <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide flex items-center">
-                                <MapPin size={16} className="mr-2 text-teal-500"/> Location Context
-                            </h3>
-                         </div>
-                         <ReportMap lat={request.latitude} lng={request.longitude} />
-                     </div>
-                 )}
+            {/* Center Panel: Map & Valuation Core */}
+            <div className="flex-1 flex flex-col gap-6">
+                
+                {/* 3D Map / Hero Container */}
+                <div className="flex-1 min-h-[300px] glass-panel rounded-3xl p-1 relative group overflow-hidden">
+                    <ReportMap lat={request.latitude || 28.6139} lng={request.longitude || 77.2090} />
+                    
+                    {/* Floating Valuation Card Overlay */}
+                    <div className="absolute bottom-6 left-6 right-6 bg-cyber-black/80 backdrop-blur-xl border border-cyber-border rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center shadow-2xl">
+                        <div>
+                            <p className="text-xs font-mono text-gray-400 mb-1 uppercase tracking-widest">Estimated Market Value</p>
+                            <div className="text-4xl md:text-5xl font-mono font-bold text-cyber-orange text-glow-orange tracking-tighter">
+                                {formatCurrency(liveEstimatedValue)}
+                            </div>
+                            <div className="flex items-center gap-2 mt-2">
+                                <span className="w-2 h-2 rounded-full bg-cyber-teal animate-pulse"></span>
+                                <span className="text-[10px] font-mono text-cyber-teal uppercase">Algorithm Confidence High</span>
+                            </div>
+                        </div>
+                        <div className="mt-4 md:mt-0">
+                             <CircularConfidenceGauge score={result.confidenceScore} />
+                        </div>
+                    </div>
+                </div>
 
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                    <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center uppercase tracking-wide">
-                        <Info className="mr-2 text-teal-500" size={18} />
-                        Valuation Logic
-                    </h3>
-                    <div className="text-sm text-slate-600 leading-relaxed font-normal">
-                        {String(result.valuationJustification)}
+                {/* Secondary Metrics Row */}
+                <div className="h-[180px] grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Chart Card */}
+                    <div className="glass-panel rounded-2xl p-5 flex flex-col">
+                         <h3 className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <TrendingUp size={12} className="text-cyber-teal" /> Range Analysis
+                         </h3>
+                         <div className="flex-1">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
+                                    <XAxis type="number" hide />
+                                    <YAxis type="category" dataKey="name" hide />
+                                    <Tooltip 
+                                        cursor={{fill: 'transparent'}}
+                                        contentStyle={{ backgroundColor: '#13161B', border: '1px solid #333', color: '#fff', fontSize: '12px' }}
+                                    />
+                                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={12}>
+                                        {chartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={index === 1 ? '#FFAE42' : '#333'} className={index === 1 ? 'filter drop-shadow-[0_0_4px_#FFAE42]' : ''} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                         </div>
+                    </div>
+
+                    {/* Dials Card */}
+                    <div className="glass-panel rounded-2xl p-5 flex flex-col justify-center">
+                        <div className="flex justify-around items-center">
+                             <CostDial label="PARKING" value={parkingCost} onChange={setParkingCost} max={1500000} />
+                             <div className="h-12 w-px bg-white/10 mx-2"></div>
+                             <CostDial label="AMENITIES" value={amenityCost} onChange={setAmenityCost} max={1000000} />
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Right Column: Comps & Charts (5 cols) */}
-            <div className="lg:col-span-5 space-y-6">
+            {/* Right Panel: Comps & Details */}
+            <div className="w-full xl:w-[320px] flex flex-col gap-6">
                 
-                {/* Comparables */}
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                    <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center uppercase tracking-wide">
-                      <TrendingUp className="mr-2 text-teal-500" size={18} />
-                      Market Comparables
+                {/* Property Details Card */}
+                <div className="glass-panel rounded-2xl p-5 border-l-2 border-l-cyber-teal">
+                    <h3 className="text-white font-bold text-lg mb-1">{request.projectName}</h3>
+                    <div className="flex items-center text-xs text-gray-400 font-mono mb-4">
+                        <MapPin size={12} className="mr-1 text-cyber-teal" />
+                        {request.area}, {request.city}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                        <div className="p-2 bg-white/5 rounded border border-white/5">
+                            <span className="block text-gray-500 text-[10px]">CONFIG</span>
+                            <span className="text-white">{request.bhk || 'N/A'}</span>
+                        </div>
+                        <div className="p-2 bg-white/5 rounded border border-white/5">
+                            <span className="block text-gray-500 text-[10px]">SIZE</span>
+                            <span className="text-white">{request.superBuiltUpArea} sqft</span>
+                        </div>
+                        <div className="p-2 bg-white/5 rounded border border-white/5">
+                            <span className="block text-gray-500 text-[10px]">FLOOR</span>
+                            <span className="text-white">{request.floor}</span>
+                        </div>
+                         <div className="p-2 bg-white/5 rounded border border-white/5">
+                            <span className="block text-gray-500 text-[10px]">AGE</span>
+                            <span className="text-white">{new Date().getFullYear() - request.constructionYear} yrs</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Comparables Stack */}
+                <div className="flex-1 glass-panel rounded-2xl p-5 overflow-y-auto">
+                    <h3 className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-4 flex items-center">
+                        <Share2 size={12} className="mr-2 text-cyber-lime" /> Market Comps
                     </h3>
                     <div className="space-y-3">
                         {result.comparables.map((comp, idx) => (
-                            <div key={idx} className="p-3 border border-slate-100 rounded bg-slate-50/50 flex justify-between items-center group hover:border-teal-200 transition-colors">
-                                <div>
-                                    <span className="block font-bold text-slate-800 text-sm">{String(comp.projectName)}</span>
-                                    <span className="text-xs text-slate-500 font-mono">{comp.bhk} • {comp.area} sqft</span>
+                            <div key={idx} className="group relative p-4 bg-cyber-black border border-cyber-border rounded-xl hover:border-cyber-teal/50 transition-all duration-300 hover:shadow-neon-teal">
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="font-bold text-white text-sm">{comp.projectName}</span>
+                                    <span className="font-mono text-cyber-teal text-xs font-bold">{formatCurrency(comp.price)}</span>
                                 </div>
-                                <div className="text-right">
-                                    <span className="block font-mono font-bold text-teal-600 text-sm">{formatCurrency(comp.price)}</span>
-                                    <span className="text-[10px] text-slate-400 font-mono">₹{comp.pricePerSqft}/sqft</span>
+                                <div className="flex justify-between items-end">
+                                    <div className="text-[10px] text-gray-500 font-mono">
+                                        {comp.bhk} • {comp.area} sqft
+                                    </div>
+                                    <div className="px-2 py-0.5 rounded bg-white/5 text-[10px] text-gray-400 font-mono">
+                                        ₹{comp.pricePerSqft}/sqft
+                                    </div>
                                 </div>
                             </div>
                         ))}
                     </div>
                 </div>
 
-                {/* Chart Section */}
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                  <h3 className="text-base font-bold text-slate-900 mb-4 uppercase tracking-wide">Range Analysis</h3>
-                  <div style={{ width: '100%', height: '180px' }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
-                              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                              <XAxis type="number" hide />
-                              <YAxis type="category" dataKey="name" width={60} tick={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: '#64748b' }} axisLine={false} tickLine={false} />
-                              <Tooltip 
-                                  formatter={(value: number) => [formatCurrency(value), '']}
-                                  contentStyle={{ backgroundColor: '#0B1E3C', color: '#fff', borderRadius: '4px', border: 'none', fontFamily: 'JetBrains Mono', fontSize: '12px' }}
-                                  itemStyle={{ color: '#00D4AA' }}
-                              />
-                              <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
-                                  {chartData.map((entry, index) => (
-                                      <Cell key={`cell-${index}`} fill={index === 1 ? TEAL_MAIN : SLATE_LIGHT} />
-                                  ))}
-                              </Bar>
-                          </BarChart>
-                      </ResponsiveContainer>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-slate-100 flex items-start space-x-3">
-                      <div className="mt-0.5">{getSentimentIcon(result.sentimentScore)}</div>
-                      <div>
-                          <p className="text-xs text-slate-500 leading-tight">{String(result.sentimentAnalysis)}</p>
-                      </div>
-                  </div>
-                </div>
+                 {/* Logic / Sentiment Text */}
+                 <div className="glass-panel rounded-2xl p-5">
+                     <p className="text-[10px] text-gray-400 leading-relaxed font-mono">
+                         <span className="text-cyber-lime font-bold block mb-1">AI ANALYSIS LOG:</span>
+                         {result.valuationJustification.slice(0, 150)}...
+                     </p>
+                 </div>
+
             </div>
-        </div>
-      </div>
+       </div>
     </div>
   );
 };

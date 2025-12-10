@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -21,38 +21,35 @@
               mono: ['JetBrains Mono', 'monospace'],
             },
             colors: {
+              cyber: {
+                black: '#0D0F12', // Matte Black Background
+                card: '#13161B',  // Dark Cards
+                teal: '#00F6FF',  // Neon Teal
+                lime: '#B4FF5C',  // Lime Highlights
+                text: '#98A3B3',  // Soft Grey Text
+                orange: '#FFAE42', // Valuation Orange
+                glass: 'rgba(19, 22, 27, 0.6)',
+                border: 'rgba(255, 255, 255, 0.08)'
+              },
               slate: {
-                900: '#0B1E3C', // Deep Slate
+                900: '#0B1E3C', 
                 800: '#162A4C',
                 50: '#F0F4F8'
               },
-              teal: {
-                400: '#2dd4bf',
-                500: '#00D4AA', // Electric Teal
-                600: '#00B38F',
-                50: '#F0FDFA'
-              },
-              coral: {
-                500: '#FF6B6B', // Warm Coral
-              },
-              amber: {
-                500: '#F59E0B', // Warning/Mid Confidence
-              },
-              canvas: '#F8F9FC',
+            },
+            boxShadow: {
+              'neon-teal': '0 0 10px rgba(0, 246, 255, 0.2), 0 0 20px rgba(0, 246, 255, 0.1)',
+              'neon-orange': '0 0 15px rgba(255, 174, 66, 0.3)',
+              'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
             },
             animation: {
-              'bubble-rise': 'bubbleRise 2s infinite ease-in',
-              'morph-house': 'morphHouse 4s infinite ease-in-out'
+              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'glow': 'glow 2s ease-in-out infinite alternate',
             },
             keyframes: {
-              bubbleRise: {
-                '0%': { transform: 'translateY(100%) scale(0.5)', opacity: '0' },
-                '50%': { opacity: '1' },
-                '100%': { transform: 'translateY(-20%) scale(1.2)', opacity: '0' },
-              },
-              morphHouse: {
-                 '0%, 100%': { clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)', background: '#0B1E3C' }, // Triangle/Roof
-                 '50%': { clipPath: 'polygon(10% 100%, 10% 20%, 30% 20%, 30% 100%, 40% 100%, 40% 50%, 60% 50%, 60% 100%, 70% 100%, 70% 30%, 90% 30%, 90% 100%)', background: '#00D4AA' } // Bar Chart shape approximation
+              glow: {
+                '0%': { boxShadow: '0 0 5px rgba(0, 246, 255, 0.2)' },
+                '100%': { boxShadow: '0 0 20px rgba(0, 246, 255, 0.6), 0 0 10px rgba(0, 246, 255, 0.4)' },
               }
             }
           }
@@ -63,99 +60,43 @@
       body {
         font-feature-settings: "tnum" on;
         -webkit-font-smoothing: antialiased;
-        transition: background-color 0.3s ease;
+        background-color: #0D0F12;
+        color: #98A3B3;
       }
-      .bg-grid-pattern {
-        background-color: #F8F9FC;
-        background-image: linear-gradient(rgba(0, 212, 170, 0.03) 1px, transparent 1px),
-                          linear-gradient(90deg, rgba(0, 212, 170, 0.03) 1px, transparent 1px);
-        background-size: 20px 20px;
+      
+      /* Futuristic Scrollbar */
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: #0D0F12; }
+      ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: #00F6FF; }
+
+      .glass-panel {
+        background: rgba(19, 22, 27, 0.7);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
       }
-      ::-webkit-scrollbar { width: 8px; height: 8px; }
-      ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+      .text-glow-teal {
+        text-shadow: 0 0 10px rgba(0, 246, 255, 0.5);
+      }
+      
+      .text-glow-orange {
+        text-shadow: 0 0 15px rgba(255, 174, 66, 0.6);
+      }
+
+      .leaflet-container {
+        background: #0D0F12 !important;
+        font-family: 'JetBrains Mono', monospace;
+      }
       .leaflet-pane { z-index: 0 !important; }
       .leaflet-control-container .leaflet-top, 
       .leaflet-control-container .leaflet-bottom { z-index: 400 !important; }
-      
-      /* Liquid Gauge Styles */
-      .liquid-tube {
-        mask-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 200" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100" height="200" rx="50" /></svg>');
-        -webkit-mask-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 200" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100" height="200" rx="50" /></svg>');
-        mask-size: contain;
-        -webkit-mask-size: contain;
-        mask-repeat: no-repeat;
-        -webkit-mask-repeat: no-repeat;
-        mask-position: center;
-        -webkit-mask-position: center;
-      }
 
-      /* --- OLED Dark Mode Overrides --- */
-      
-      /* Pure Black Canvas */
-      html.dark body {
-        background-color: #000000 !important;
-        background-image: none !important;
-      }
-
-      html.dark .bg-canvas {
-        background-color: #000000 !important;
-      }
-
-      /* Deep Slate Cards with Elevation */
-      html.dark .bg-white {
-        background-color: #0B1E3C !important;
-        color: #F8F9FC;
-        border-color: rgba(255, 255, 255, 0.08) !important;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8); /* 2% elevation feel */
-      }
-
-      /* Secondary Backgrounds (Inputs/Chat Bubbles) merge into black or dark slate */
-      html.dark .bg-slate-50, html.dark .bg-slate-100,
-      html.dark .bg-gray-50, html.dark .bg-gray-100 {
-        background-color: #000000 !important;
-        border-color: rgba(255, 255, 255, 0.05) !important;
-      }
-      
-      html.dark .bg-slate-900 {
-         background-color: #050f1e !important; /* Slightly darker header */
-      }
-
-      /* Text Inversion */
-      html.dark .text-slate-900, html.dark .text-gray-900, html.dark .text-slate-800 {
-        color: #F8F9FC !important;
-      }
-      html.dark .text-slate-700, html.dark .text-gray-700 {
-        color: #E2E8F0 !important;
-      }
-      html.dark .text-slate-600, html.dark .text-gray-600 {
-        color: #94A3B8 !important;
-      }
-      html.dark .text-slate-500, html.dark .text-gray-500, html.dark .text-slate-400 {
-        color: #64748B !important;
-      }
-
-      /* Inputs & UI Controls */
-      html.dark input, html.dark select, html.dark textarea {
-        background-color: #050f1e !important;
-        border-color: #1e293b !important;
-        color: #F8F9FC !important;
-      }
-      
-      /* 400 Nit Brightness Simulation for Teal */
-      html.dark .text-teal-500, html.dark .text-teal-600 {
-        color: #00D4AA !important;
-        text-shadow: 0 0 12px rgba(0, 212, 170, 0.6);
-      }
-      html.dark .bg-teal-500 {
-        background-color: #00D4AA !important;
-        box-shadow: 0 0 15px rgba(0, 212, 170, 0.3);
-      }
-      
-      /* Animation color fix for dark mode */
-      html.dark .mask-house {
-        background-color: #F8F9FC !important;
+      /* Dark Map Tiles Filter */
+      .leaflet-tile-pane {
+        filter: grayscale(100%) invert(100%) contrast(1.2) brightness(0.8); 
       }
     </style>
   <script type="importmap">
@@ -173,7 +114,7 @@
 }
 </script>
 </head>
-  <body class="bg-canvas text-slate-900 antialiased bg-grid-pattern transition-colors duration-300">
+  <body class="bg-cyber-black text-cyber-text antialiased">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
