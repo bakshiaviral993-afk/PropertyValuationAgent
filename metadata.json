@@ -1,5 +1,7 @@
 {
-  "name": "Aviral ProValuate",
+  "name": "QuantCasa",
   "description": "A professional, AI-powered real estate valuation agent that estimates property prices based on market trends, location analysis, and sentiment.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "geolocation"
+  ]
 }

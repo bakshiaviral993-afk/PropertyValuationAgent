@@ -26,7 +26,7 @@ const VALUATION_SCHEMA: Schema = {
       },
       description: "List of 3 comparable property listings"
     },
-    valuationJustification: { type: Type.STRING, description: "Reason why this valuation is justified based on the inputs (amenities, location, FSI, etc.)" },
+    valuationJustification: { type: Type.STRING, description: "Reason why this valuation is justified based on inputs like floor rise, amenities, location, etc." },
     propertyStatus: { type: Type.STRING, description: "New Property or Old Property based on construction year" }
   },
   required: [
@@ -41,9 +41,9 @@ export const getValuationAnalysis = async (data: ValuationRequest): Promise<Valu
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const prompt = `
-      Act as an expert Real Estate Valuer for the "Valuation Tech" app.
-      Perform a detailed valuation for the following property based on user inputs:
-      
+      Act as "QuantCasa", an expert Real Estate Quantitative Analyst.
+      Perform a highly accurate, data-driven valuation for the following property.
+
       Location:
       - State: ${data.state}
       - City: ${data.city}
@@ -57,7 +57,7 @@ export const getValuationAnalysis = async (data: ValuationRequest): Promise<Valu
       - Builder: ${data.builderName}
       ${data.bhk ? `- Configuration: ${data.bhk}` : ''}
       - Facing: ${data.facing}
-      - Floor: ${data.floor} (Total Floors logic implies it is a ${data.floor} story building context)
+      - Floor Number: ${data.floor}
       - Construction Year: ${data.constructionYear}
       - FSI: ${data.fsi}
       
@@ -75,10 +75,15 @@ export const getValuationAnalysis = async (data: ValuationRequest): Promise<Valu
       - Car Parking: ${data.hasParking} (Charges: ${data.parkingCharges})
       - Amenities: ${data.hasAmenities} (Charges: ${data.amenitiesCharges})
 
-      Task:
-      1. Calculate Total Valuation considering the base rate per sqft for this location + Parking Charges + Amenities Charges + Road Advantage + Floor Rise.
-      2. Provide a specific "Valuation Justification" explaining how factors like the Road Type (${data.roadType}), Nearby locations (${data.nearbyLocations}), and Amenities influenced the final price.
-      3. Assign a Confidence Score and Sentiment Score.
+      Valuation Algorithm Tasks:
+      1. **Base Valuation**: Determine the base rate per sqft for this specific location (${data.area}, ${data.city}) and project quality.
+      2. **Floor Rise Logic**: Apply a "Floor Rise" premium. 
+         - Typically, for floors above the 4th floor, add a premium (e.g., ₹40 - ₹80 per sqft per floor OR 0.5% - 1% increase per floor).
+         - If the floor is high (e.g., > 10), the view and ventilation usually command a significantly higher price.
+      3. **Additions**: Add the explicit Parking Charges (${data.parkingCharges}) and Amenities Charges (${data.amenitiesCharges}) to the total.
+      4. **Adjustments**: Adjust for Road Type advantage and Age of property.
+      5. **Justification**: In the "valuationJustification" field, explicitly state how the Floor Rise (Floor ${data.floor}) and other quantitative factors impacted the final value. Provide a professional, analyst-style summary.
+      6. **Scores**: Assign Confidence and Sentiment scores based on data completeness and market trends.
       
       Return the data strictly in JSON format matching the schema.
     `;
