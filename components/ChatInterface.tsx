@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ValuationRequest, ChatMessage, StepField } from '../types';
 import { WIZARD_STEPS } from '../constants';
-import { Send, Bot, MapPin, Move, ExternalLink, LocateFixed, Cpu } from 'lucide-react';
+import { Send, Bot, MapPin, Move, ExternalLink, LocateFixed, Cpu, Mic, MicOff, XCircle, Pencil, RotateCcw } from 'lucide-react';
+import { GoogleGenAI, LiveServerMessage, Modality, Type, FunctionDeclaration } from "@google/genai";
+import { createBlob, decodeAudioData, decode } from '../utils/audioUtils';
 
 declare global {
   interface Window {
@@ -13,6 +15,41 @@ interface ChatInterfaceProps {
   onComplete: (data: ValuationRequest) => void;
   isLoading: boolean;
 }
+
+// --- TOOL DEFINITION FOR LIVE API ---
+const SUBMIT_VALUATION_TOOL: FunctionDeclaration = {
+  name: 'submit_valuation_data',
+  description: 'Submits the collected property details for valuation. Call this when you have gathered sufficient information like location, project, and configuration.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      state: { type: Type.STRING },
+      city: { type: Type.STRING },
+      pincode: { type: Type.STRING },
+      district: { type: Type.STRING },
+      area: { type: Type.STRING },
+      projectName: { type: Type.STRING },
+      builderName: { type: Type.STRING },
+      bhk: { type: Type.STRING },
+      facing: { type: Type.STRING },
+      floor: { type: Type.NUMBER },
+      totalFloors: { type: Type.NUMBER },
+      constructionYear: { type: Type.NUMBER },
+      distanceFromMainRoad: { type: Type.STRING },
+      roadType: { type: Type.STRING },
+      nearbyLocations: { type: Type.STRING },
+      carpetArea: { type: Type.NUMBER },
+      builtUpArea: { type: Type.NUMBER },
+      superBuiltUpArea: { type: Type.NUMBER },
+      hasParking: { type: Type.STRING, enum: ['Yes', 'No'] },
+      parkingCharges: { type: Type.NUMBER },
+      hasAmenities: { type: Type.STRING, enum: ['Yes', 'No'] },
+      amenitiesCharges: { type: Type.NUMBER },
+      fsi: { type: Type.NUMBER }
+    },
+    required: ['city', 'area', 'projectName']
+  }
+};
 
 // Internal Map Component (Dark Mode)
 const LeafletMap = ({ 
@@ -95,12 +132,29 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading }) 
   const [formData, setFormData] = useState<Partial<ValuationRequest>>({});
   const [inputValue, setInputValue] = useState('');
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  
+  // Voice Mode State
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [isVoiceConnected, setIsVoiceConnected] = useState(false);
+  const [voiceVolume, setVoiceVolume] = useState(0);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Audio Refs
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const inputContextRef = useRef<AudioContext | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const sessionRef = useRef<any>(null); // Live Session
+  const nextStartTimeRef = useRef<number>(0);
+  const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
 
   const currentStep = WIZARD_STEPS[currentStepIndex];
 
+  // --- STANDARD CHAT EFFECT ---
   useEffect(() => {
-    if (messages.length === 0) {
+    if (messages.length === 0 && !isVoiceMode) {
       setMessages([
         {
           id: 'welcome',
@@ -114,11 +168,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading }) 
         }
       ]);
     }
-  }, []);
+  }, [isVoiceMode]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading, isGettingLocation]);
+  }, [messages, isLoading, isGettingLocation, isVoiceConnected]);
 
   useEffect(() => {
     if (currentStep.field === StepField.Area && formData.area) {
@@ -135,6 +189,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading }) 
     }]);
   };
 
+  // --- LOCATION HELPERS ---
   const extractLocationFields = (addr: any) => {
     const safeStr = (val: any) => {
         if (val === null || val === undefined) return '';
@@ -245,7 +300,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading }) 
     if (!value.trim()) return;
     if (currentStep.type === 'number' && isNaN(Number(value))) return;
 
-    const newMessages: ChatMessage[] = [...messages, { id: `user-${Date.now()}`, sender: 'user', text: value }];
+    // Save current step index to the message for edit functionality
+    const stepRecorded = currentStepIndex;
+
+    const newMessages: ChatMessage[] = [...messages, { 
+        id: `user-${Date.now()}`, 
+        sender: 'user', 
+        text: value,
+        stepIndex: stepRecorded
+    }];
     setMessages(newMessages);
 
     const updatedData = { ...formData };
@@ -287,12 +350,260 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading }) 
     }
   };
 
+  const handleEdit = (messageIndex: number) => {
+      const targetMessage = messages[messageIndex];
+      
+      // Safety check
+      if (targetMessage.stepIndex === undefined) return;
+
+      // 1. Revert Step Index
+      setCurrentStepIndex(targetMessage.stepIndex);
+
+      // 2. Pre-fill input with the previous answer
+      setInputValue(targetMessage.text || '');
+
+      // 3. Truncate messages: Keep everything BEFORE the answer we are editing
+      setMessages(messages.slice(0, messageIndex));
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleNext(inputValue);
     }
   };
+
+  // --- GEMINI LIVE API IMPLEMENTATION ---
+
+  const connectToLiveAPI = async () => {
+    try {
+      setIsVoiceMode(true);
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      
+      // Initialize Audio Contexts
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      const inputCtx = new AudioContext({ sampleRate: 16000 });
+      const outputCtx = new AudioContext({ sampleRate: 24000 });
+      inputContextRef.current = inputCtx;
+      audioContextRef.current = outputCtx;
+
+      // Get Microphone Stream
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      const sessionPromise = ai.live.connect({
+        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+        callbacks: {
+          onopen: () => {
+            console.log('Gemini Live Connected');
+            setIsVoiceConnected(true);
+            
+            // Setup Input Processing
+            const source = inputCtx.createMediaStreamSource(stream);
+            const scriptProcessor = inputCtx.createScriptProcessor(4096, 1, 1);
+            
+            scriptProcessor.onaudioprocess = (e) => {
+              const inputData = e.inputBuffer.getChannelData(0);
+              
+              // Visualize Volume
+              let sum = 0;
+              for(let i=0; i<inputData.length; i++) sum += Math.abs(inputData[i]);
+              setVoiceVolume(Math.min(100, (sum / inputData.length) * 500));
+
+              const pcmBlob = createBlob(inputData);
+              sessionPromise.then(session => {
+                 session.sendRealtimeInput({ media: pcmBlob });
+              });
+            };
+
+            source.connect(scriptProcessor);
+            scriptProcessor.connect(inputCtx.destination);
+            
+            sourceRef.current = source;
+            processorRef.current = scriptProcessor;
+          },
+          onmessage: async (message: LiveServerMessage) => {
+             // Handle Function Calls
+             if (message.toolCall) {
+                console.log('Tool Call Received:', message.toolCall);
+                for (const fc of message.toolCall.functionCalls) {
+                   if (fc.name === 'submit_valuation_data') {
+                       // We got the data!
+                       const data = fc.args as any;
+                       const completeData = {
+                           ...INITIAL_VALUATION_REQUEST, // defaults
+                           ...data
+                       };
+                       // Ensure numbers are numbers
+                       ['floor','totalFloors','constructionYear','carpetArea','builtUpArea','superBuiltUpArea','parkingCharges','amenitiesCharges','fsi'].forEach(k => {
+                           if(completeData[k]) completeData[k] = Number(completeData[k]);
+                       });
+
+                       disconnectLiveAPI();
+                       onComplete(completeData as ValuationRequest);
+
+                       // Respond to model to close loop (optional since we disconnect)
+                       sessionPromise.then(s => s.sendToolResponse({
+                           functionResponses: {
+                               id: fc.id,
+                               name: fc.name,
+                               response: { result: "Valuation Submitted" }
+                           }
+                       }));
+                   }
+                }
+             }
+
+             // Handle Audio Output
+             const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+             if (base64Audio) {
+                 if (!outputCtx) return;
+                 nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outputCtx.currentTime);
+                 
+                 const audioBuffer = await decodeAudioData(
+                     decode(base64Audio),
+                     outputCtx,
+                     24000,
+                     1
+                 );
+                 
+                 const source = outputCtx.createBufferSource();
+                 source.buffer = audioBuffer;
+                 source.connect(outputCtx.destination);
+                 source.addEventListener('ended', () => {
+                     sourcesRef.current.delete(source);
+                 });
+                 source.start(nextStartTimeRef.current);
+                 nextStartTimeRef.current += audioBuffer.duration;
+                 sourcesRef.current.add(source);
+             }
+
+             // Handle Interruptions
+             if (message.serverContent?.interrupted) {
+                 sourcesRef.current.forEach(s => s.stop());
+                 sourcesRef.current.clear();
+                 nextStartTimeRef.current = 0;
+             }
+          },
+          onclose: () => {
+             console.log('Gemini Live Closed');
+             setIsVoiceConnected(false);
+          },
+          onerror: (err) => {
+             console.error('Gemini Live Error', err);
+             setIsVoiceConnected(false);
+          }
+        },
+        config: {
+            responseModalities: [Modality.AUDIO],
+            tools: [{ functionDeclarations: [SUBMIT_VALUATION_TOOL] }],
+            systemInstruction: `
+              You are QuantCasa, a professional Real Estate Valuation Surveyor. 
+              Your goal is to have a natural spoken conversation with the user to collect details about their property to perform a valuation.
+              
+              Start by briefly welcoming them and asking where the property is located.
+              Then, ask for:
+              1. Project Name & Builder
+              2. Configuration (BHK, Area in sqft)
+              3. Floor Number & Total Floors
+              4. Any Parking or Amenities?
+
+              Be concise. Do not ask for everything at once. Group questions naturally.
+              Once you have the Location, Project, and Size/Config, you can estimate the rest or ask one final check.
+              When you have sufficient data, call the "submit_valuation_data" tool immediately.
+            `
+        }
+      });
+      sessionRef.current = sessionPromise;
+
+    } catch (e) {
+      console.error("Failed to connect to Live API", e);
+      setIsVoiceMode(false);
+    }
+  };
+
+  const disconnectLiveAPI = () => {
+      // Stop Audio
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+      if (processorRef.current) processorRef.current.disconnect();
+      if (sourceRef.current) sourceRef.current.disconnect();
+      if (audioContextRef.current) audioContextRef.current.close();
+      if (inputContextRef.current) inputContextRef.current.close();
+      
+      // Close Session
+      if (sessionRef.current) {
+          sessionRef.current.then((s: any) => s.close());
+      }
+      
+      setIsVoiceMode(false);
+      setIsVoiceConnected(false);
+  };
+
+
+  // --- RENDER ---
+
+  if (isVoiceMode) {
+      return (
+          <div className="flex flex-col h-full glass-panel rounded-2xl overflow-hidden shadow-glass relative">
+              <button 
+                  onClick={disconnectLiveAPI}
+                  className="absolute top-4 right-4 text-gray-500 hover:text-white z-50"
+              >
+                  <XCircle size={24} />
+              </button>
+              
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative">
+                  {/* Background Pulse */}
+                  <div className={`absolute w-64 h-64 bg-cyber-teal/20 rounded-full blur-3xl transition-all duration-300 ${isVoiceConnected ? 'scale-100 opacity-100' : 'scale-50 opacity-0'}`} />
+                  
+                  <div className="relative z-10 mb-8">
+                       <div className={`w-24 h-24 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${isVoiceConnected ? 'border-cyber-teal shadow-neon-teal' : 'border-gray-600'}`}>
+                           <div className={`w-20 h-20 rounded-full bg-cyber-card flex items-center justify-center transition-transform ${isVoiceConnected ? 'animate-pulse' : ''}`}>
+                               <Mic size={32} className={isVoiceConnected ? 'text-cyber-teal' : 'text-gray-500'} />
+                           </div>
+                       </div>
+                  </div>
+
+                  <h2 className="text-xl font-mono font-bold text-white mb-2">
+                      {isVoiceConnected ? "QUANTCASA LIVE AGENT" : "CONNECTING..."}
+                  </h2>
+                  <p className="text-sm text-gray-400 max-w-xs mb-8">
+                      Speak naturally. Describe your property details (Location, Area, BHK, Floor) to get an instant valuation.
+                  </p>
+
+                  {/* Visualizer */}
+                  {isVoiceConnected && (
+                      <div className="flex items-center justify-center gap-1.5 h-12">
+                          {[...Array(5)].map((_, i) => (
+                             <div 
+                               key={i} 
+                               className="bar" 
+                               style={{ 
+                                   height: `${Math.max(10, Math.random() * voiceVolume + 10)}%`,
+                                   animationDuration: `${0.5 + Math.random() * 0.5}s`
+                               }} 
+                             />
+                          ))}
+                      </div>
+                  )}
+                  
+                  {!isVoiceConnected && (
+                       <div className="mt-4 flex gap-2">
+                           <div className="w-2 h-2 bg-cyber-lime rounded-full animate-bounce" />
+                           <div className="w-2 h-2 bg-cyber-lime rounded-full animate-bounce delay-100" />
+                           <div className="w-2 h-2 bg-cyber-lime rounded-full animate-bounce delay-200" />
+                       </div>
+                  )}
+              </div>
+              
+              <div className="p-4 border-t border-cyber-border bg-black/40 text-center">
+                  <p className="text-[10px] text-gray-500 font-mono uppercase tracking-widest">
+                      POWERED BY GEMINI 2.5 LIVE
+                  </p>
+              </div>
+          </div>
+      );
+  }
 
   return (
     <div className="flex flex-col h-full glass-panel rounded-2xl overflow-hidden shadow-glass">
@@ -307,19 +618,39 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading }) 
              <p className="text-cyber-lime text-[10px] tracking-wide animate-pulse">ACTIVE</p>
           </div>
         </div>
+        
+        {/* Voice Mode Toggle */}
+        <button 
+           onClick={connectToLiveAPI}
+           className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyber-card border border-cyber-border hover:border-cyber-teal text-cyber-teal hover:bg-cyber-teal/10 transition-all group"
+        >
+            <Mic size={14} className="group-hover:animate-pulse" />
+            <span className="text-[10px] font-mono font-bold tracking-wider">VOICE MODE</span>
+        </button>
       </div>
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin scrollbar-thumb-cyber-card scrollbar-track-transparent">
-        {messages.map((msg) => (
+        {messages.map((msg, idx) => (
           <div key={msg.id} className={`flex w-full ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] rounded-2xl px-5 py-3 text-sm leading-relaxed backdrop-blur-sm shadow-lg ${
+            <div className={`group relative max-w-[85%] rounded-2xl px-5 py-3 text-sm leading-relaxed backdrop-blur-sm shadow-lg ${
                 msg.sender === 'user'
                   ? 'bg-cyber-teal/10 border border-cyber-teal/30 text-cyber-teal rounded-br-none shadow-neon-teal'
                   : 'bg-cyber-card/80 border border-cyber-border text-cyber-text rounded-bl-none'
               }`}>
               {msg.text}
               {msg.component && <div className="mt-3 w-full">{msg.component}</div>}
+              
+              {/* Edit Button for User Messages */}
+              {msg.sender === 'user' && msg.stepIndex !== undefined && (
+                  <button 
+                    onClick={() => handleEdit(idx)}
+                    className="absolute -left-8 top-1/2 -translate-y-1/2 p-1.5 bg-cyber-card rounded-full border border-cyber-border text-gray-500 hover:text-cyber-teal hover:border-cyber-teal transition-all opacity-0 group-hover:opacity-100 shadow-lg"
+                    title="Edit answer"
+                  >
+                      <Pencil size={12} />
+                  </button>
+              )}
             </div>
           </div>
         ))}
@@ -391,6 +722,33 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading }) 
       </div>
     </div>
   );
+};
+
+// Initial Valuation Request for Type Safety in Voice Mode
+const INITIAL_VALUATION_REQUEST: ValuationRequest = {
+  state: '',
+  city: '',
+  pincode: '',
+  district: '',
+  area: '',
+  projectName: '',
+  builderName: '',
+  bhk: '',
+  facing: '',
+  floor: 0,
+  totalFloors: 0,
+  constructionYear: new Date().getFullYear(),
+  distanceFromMainRoad: '',
+  roadType: '',
+  nearbyLocations: '',
+  carpetArea: 0,
+  builtUpArea: 0,
+  superBuiltUpArea: 0,
+  hasParking: 'No',
+  parkingCharges: 0,
+  hasAmenities: 'No',
+  amenitiesCharges: 0,
+  fsi: 0
 };
 
 export default ChatInterface;

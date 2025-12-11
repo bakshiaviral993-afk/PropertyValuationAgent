@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { ValuationRequest, ValuationResult } from "../types";
+import { vectorService } from "./vectorDb";
 
 const VALUATION_SCHEMA: Schema = {
   type: Type.OBJECT,
@@ -40,9 +41,25 @@ export const getValuationAnalysis = async (data: ValuationRequest): Promise<Valu
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
+    // --- RAG: RETRIEVAL STEP ---
+    // Construct a query for the vector database based on the property location and type
+    const ragQuery = `Real estate trends in ${data.city} ${data.area} for ${data.bhk} apartments construction cost FSI`;
+    let retrievedContext: string[] = [];
+    try {
+        retrievedContext = await vectorService.search(ragQuery, 3);
+    } catch (e) {
+        console.warn("RAG Retrieval failed, proceeding without context", e);
+    }
+
+    const contextString = retrievedContext.length > 0 
+        ? `\nRELEVANT MARKET DATA (RAG Context):\n${retrievedContext.map(s => `- ${s}`).join('\n')}\n`
+        : '';
+    
     const prompt = `
       Act as "QuantCasa", an expert Real Estate Quantitative Analyst.
       Perform a highly accurate, data-driven valuation for the following property.
+
+      ${contextString}
 
       Location:
       - State: ${data.state}
@@ -76,13 +93,13 @@ export const getValuationAnalysis = async (data: ValuationRequest): Promise<Valu
       - Amenities: ${data.hasAmenities} (Charges: ${data.amenitiesCharges})
 
       Valuation Algorithm Tasks:
-      1. **Base Valuation**: Determine the base rate per sqft for this specific location (${data.area}, ${data.city}) and project quality.
+      1. **Base Valuation**: Determine the base rate per sqft for this specific location (${data.area}, ${data.city}) and project quality. Use the provided RAG Context if relevant to adjust base rates (e.g., FSI changes, Metro impact).
       2. **Floor Rise Logic**: Apply a "Floor Rise" premium. 
          - Typically, for floors above the 4th floor, add a premium (e.g., ₹40 - ₹80 per sqft per floor OR 0.5% - 1% increase per floor).
          - If the floor is high (e.g., > 10), the view and ventilation usually command a significantly higher price.
       3. **Additions**: Add the explicit Parking Charges (${data.parkingCharges}) and Amenities Charges (${data.amenitiesCharges}) to the total.
       4. **Adjustments**: Adjust for Road Type advantage and Age of property.
-      5. **Justification**: In the "valuationJustification" field, explicitly state how the Floor Rise (Floor ${data.floor}) and other quantitative factors impacted the final value. Provide a professional, analyst-style summary.
+      5. **Justification**: In the "valuationJustification" field, explicitly state how the Floor Rise (Floor ${data.floor}) and other quantitative factors impacted the final value. Cite any specific market trends from the RAG Context if applicable.
       6. **Scores**: Assign Confidence and Sentiment scores based on data completeness and market trends.
       
       Return the data strictly in JSON format matching the schema.

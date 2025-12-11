@@ -56,6 +56,7 @@ export interface ChatMessage {
   text?: string;
   component?: ReactNode;
   isTyping?: boolean;
+  stepIndex?: number;
 }
 
 export enum StepField {

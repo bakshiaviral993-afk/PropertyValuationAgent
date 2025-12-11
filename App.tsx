@@ -10,6 +10,8 @@ const App: React.FC = () => {
   const [requestData, setRequestData] = useState<ValuationRequest | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Add a session key to force re-mounting of ChatInterface on reset
+  const [sessionKey, setSessionKey] = useState(0);
 
   const handleValuationRequest = async (data: ValuationRequest) => {
     setIsLoading(true);
@@ -30,6 +32,8 @@ const App: React.FC = () => {
     setValuationData(null);
     setRequestData(null);
     setError(null);
+    // Increment session key to completely reset ChatInterface state (messages, wizard step)
+    setSessionKey(prev => prev + 1);
   };
 
   return (
@@ -82,7 +86,8 @@ const App: React.FC = () => {
 
         {/* Left Panel: Chat / Input */}
         <div className={`transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] flex-shrink-0 flex flex-col ${valuationData ? 'w-full md:w-[380px]' : 'w-full md:w-[600px] md:mx-auto'}`}>
-             <ChatInterface onComplete={handleValuationRequest} isLoading={isLoading} />
+             {/* Key ensures complete reset of internal state on new search */}
+             <ChatInterface key={sessionKey} onComplete={handleValuationRequest} isLoading={isLoading} />
              {error && (
                  <div className="mt-4 p-4 bg-red-500/10 text-red-400 rounded-xl border border-red-500/20 text-sm font-mono text-center shadow-lg">
                      ⚠ {error}
