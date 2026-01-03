@@ -102,19 +102,16 @@ const LAND_SCHEMA: Schema = {
 };
 
 export const getBuyAnalysis = async (data: any): Promise<BuyResult> => {
+  // Fresh instantiation to ensure process.env.API_KEY is latest
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const isSell = data.age !== undefined;
   const role = isSell ? "Liquidator/Asset Appraiser" : "Chief Acquisition Strategist";
   
-  const prompt = `Act as ${role}. 
-  Sector: ${data.address}, ${data.city} (${data.pincode}). Spec: ${data.bhk}, ${data.sqft} sqft.
-  
+  const prompt = `Act as ${role}. Sector: ${data.address}, ${data.city} (${data.pincode}). Spec: ${data.bhk}, ${data.sqft} sqft.
   TASK:
-  1. Provide a fair market valuation range.
-  2. Provide a 'valuationJustification' section explaining the logic.
-  3. Ground the results in real-world web data. 
-  4. Ensure every listing includes precise latitude and longitude coordinates.
-  
+  1. Provide market valuation and justification logic.
+  2. Ground results in real-world web data.
+  3. Every listing MUST have precise latitude/longitude coordinates.
   Return JSON per BUY_SCHEMA.`;
 
   const searchResponse = await ai.models.generateContent({
@@ -134,13 +131,8 @@ export const getBuyAnalysis = async (data: any): Promise<BuyResult> => {
 
 export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = `Act as Rental Strategist. Locality: ${data.address}, ${data.city}.
-  
-  TASK:
-  1. Estimate rent and deposit.
-  2. In 'valuationJustification', explain the rental demand logic for this specific sector.
-  
-  Return JSON per RENT_SCHEMA.`;
+  const prompt = `Act as Rental Strategist. Locality: ${data.address}, ${data.city}. 
+  Estimate rent and yield. Return JSON per RENT_SCHEMA.`;
 
   const searchResponse = await ai.models.generateContent({
     model: 'gemini-3-pro-preview', 
@@ -150,7 +142,7 @@ export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> =>
 
   const structResponse = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Structure this into valid RENT_SCHEMA JSON: ${searchResponse.text}`,
+    contents: `Structure into RENT_SCHEMA JSON: ${searchResponse.text}`,
     config: { responseMimeType: "application/json", responseSchema: RENT_SCHEMA }
   });
 
@@ -160,12 +152,7 @@ export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> =>
 export const getLandValuationAnalysis = async (data: LandRequest): Promise<LandResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const prompt = `Act as Expert Land Valuer. Plot: ${data.plotSize} ${data.unit} in ${data.address}, ${data.city}.
-  
-  TASK:
-  1. Provide precise land valuation.
-  2. In 'valuationJustification', explain the FSI and development potential math used.
-  
-  Return JSON per LAND_SCHEMA.`;
+  Analyze FSI and dev potential. Return JSON per LAND_SCHEMA.`;
 
   const searchResponse = await ai.models.generateContent({
     model: 'gemini-3-pro-preview', 
@@ -175,7 +162,7 @@ export const getLandValuationAnalysis = async (data: LandRequest): Promise<LandR
 
   const structResponse = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Translate into LAND_SCHEMA JSON: ${searchResponse.text}`,
+    contents: `Translate to LAND_SCHEMA JSON: ${searchResponse.text}`,
     config: { responseMimeType: "application/json", responseSchema: LAND_SCHEMA }
   });
 

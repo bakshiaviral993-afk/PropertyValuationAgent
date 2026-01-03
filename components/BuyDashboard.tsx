@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { BuyResult, SaleListing } from '../types';
 import { 
   ExternalLink, TrendingUp, Calculator, Globe, 
-  MessageSquare, ShieldCheck, Zap, Info, Database,
-  Percent, Clock, Wallet, Landmark, Building2, Map as MapIcon, LayoutDashboard, Layers, Navigation
+  Zap, Info, Database, Layers, Map as MapIcon, 
+  LayoutDashboard, Navigation, Home, Building2, Gem
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -12,6 +12,9 @@ interface BuyDashboardProps {
   result: BuyResult;
   buyType?: 'New Buy' | 'Resale';
 }
+
+// Waze Key provided by user
+const WAZE_API_KEY = "9b9817e604msh23232e7c48177ecp11f684jsnc32882321d9f";
 
 const DashboardMap = ({ listings }: { listings: SaleListing[] }) => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -55,10 +58,10 @@ const DashboardMap = ({ listings }: { listings: SaleListing[] }) => {
 
       const thumbUrl = `https://api.dicebear.com/7.x/identicon/svg?seed=${item.title}&backgroundColor=13161B&shapeColor=00F6FF`;
       const isVilla = item.title.toLowerCase().includes('villa');
-      const typeLabel = isVilla ? 'Villa' : 'Apartment';
-      const typeIcon = isVilla 
-        ? '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>'
-        : '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="18" x="3" y="3" rx="1"/><rect width="8" height="10" x="13" y="3" rx="1"/><rect width="8" height="6" x="13" y="15" rx="1"/></svg>';
+      const isPenthouse = item.title.toLowerCase().includes('penthouse');
+      
+      const typeLabel = isVilla ? 'Villa' : isPenthouse ? 'Penthouse' : 'Apartment';
+      const TypeIcon = isVilla ? Home : isPenthouse ? Gem : Building2;
 
       const tooltipContent = `
         <div class="flex gap-4 min-w-[280px] p-3 bg-cyber-black rounded-2xl border border-white/10 shadow-glass backdrop-blur-xl group">
@@ -68,7 +71,7 @@ const DashboardMap = ({ listings }: { listings: SaleListing[] }) => {
           <div class="flex-1 min-w-0">
              <div class="flex items-center justify-between mb-1.5">
                 <span class="text-[9px] font-mono font-bold uppercase text-cyber-teal flex items-center gap-1.5">
-                  ${typeIcon} ${typeLabel}
+                   LISTING_${typeLabel.toUpperCase()}
                 </span>
                 <span class="text-[9px] text-gray-600 font-mono tracking-tighter">IDX_${idx + 1}</span>
              </div>
@@ -96,7 +99,7 @@ const DashboardMap = ({ listings }: { listings: SaleListing[] }) => {
   }, [listings, layerType]);
 
   return (
-    <div className="relative w-full h-full rounded-3xl overflow-hidden border border-white/10 shadow-inner group">
+    <div className="relative w-full h-full rounded-3xl overflow-hidden border border-white/10 shadow-inner group bg-black/20">
       {layerType === 'waze' ? (
         <iframe 
           src={`https://embed.waze.com/iframe?zoom=14&lat=${listings[0]?.latitude || 19.0760}&lon=${listings[0]?.longitude || 72.8777}&ct=true&pin=1`}
@@ -107,25 +110,16 @@ const DashboardMap = ({ listings }: { listings: SaleListing[] }) => {
         <div ref={mapRef} className="w-full h-full grayscale opacity-90 transition-opacity hover:opacity-100 duration-700" />
       )}
       
-      {/* Map Layer Controls */}
       <div className="absolute top-4 left-4 flex flex-col gap-2 z-[1000]">
-        <button onClick={() => setLayerType('map')} className={`p-2 rounded-xl backdrop-blur-md border transition-all ${layerType === 'map' ? 'bg-cyber-teal text-cyber-black border-cyber-teal shadow-neon-teal' : 'bg-black/40 text-gray-500 border-white/10 hover:text-white'}`} title="Grid Matrix"><Layers size={16} /></button>
-        <button onClick={() => setLayerType('sat')} className={`p-2 rounded-xl backdrop-blur-md border transition-all ${layerType === 'sat' ? 'bg-cyber-teal text-cyber-black border-cyber-teal shadow-neon-teal' : 'bg-black/40 text-gray-500 border-white/10 hover:text-white'}`} title="Orbital Recon"><Globe size={16} /></button>
-        <button onClick={() => setLayerType('waze')} className={`p-2 rounded-xl backdrop-blur-md border transition-all ${layerType === 'waze' ? 'bg-cyber-orange text-cyber-black border-cyber-orange shadow-neon-orange' : 'bg-black/40 text-gray-500 border-white/10 hover:text-white'}`} title="Waze Traffic Live"><Navigation size={16} /></button>
+        <button onClick={() => setLayerType('map')} className={`p-2 rounded-xl backdrop-blur-md border transition-all ${layerType === 'map' ? 'bg-cyber-teal text-cyber-black border-cyber-teal shadow-neon-teal' : 'bg-black/40 text-gray-500 border-white/10 hover:text-white'}`}><Layers size={16} /></button>
+        <button onClick={() => setLayerType('sat')} className={`p-2 rounded-xl backdrop-blur-md border transition-all ${layerType === 'sat' ? 'bg-cyber-teal text-cyber-black border-cyber-teal shadow-neon-teal' : 'bg-black/40 text-gray-500 border-white/10 hover:text-white'}`}><Globe size={16} /></button>
+        <button onClick={() => setLayerType('waze')} className={`p-2 rounded-xl backdrop-blur-md border transition-all ${layerType === 'waze' ? 'bg-cyber-orange text-cyber-black border-cyber-orange shadow-neon-orange' : 'bg-black/40 text-gray-500 border-white/10 hover:text-white'}`}><Navigation size={16} /></button>
       </div>
 
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-xl border border-white/10 px-4 py-2 rounded-xl text-[10px] font-mono text-cyber-teal flex items-center gap-3 shadow-2xl z-[1000]">
           <div className="w-2 h-2 rounded-full bg-cyber-teal animate-pulse"></div>
-          {layerType === 'waze' ? 'WAZE_TRAFFIC_FEED: ACTIVE' : `GEOSPATIAL_GRID_LOCK: ${listings.length} ASSETS`}
+          {layerType === 'waze' ? 'WAZE_TRAFFIC_ACTIVE' : `SIGNAL_LOCKED: ${listings.length} ASSETS`}
       </div>
-
-      <a 
-        href={`https://waze.com/ul?ll=${listings[0]?.latitude},${listings[0]?.longitude}&navigate=yes`} 
-        target="_blank" 
-        className="absolute bottom-6 right-6 bg-cyber-teal/10 backdrop-blur text-cyber-teal text-[9px] px-3 py-1.5 rounded-lg border border-cyber-teal/30 font-mono shadow-neon-teal flex items-center gap-2 hover:bg-cyber-teal hover:text-black transition-all z-[1000]"
-      >
-        NAVIGATE <Navigation size={10} />
-      </a>
 
       <style>{`
         .custom-comp-tooltip {
@@ -142,16 +136,12 @@ const DashboardMap = ({ listings }: { listings: SaleListing[] }) => {
 
 const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType }) => {
   const [viewMode, setViewMode] = useState<'dashboard' | 'map'>('dashboard');
-  const [chartVisible, setChartVisible] = useState(false);
+  const [isRendered, setIsRendered] = useState(false);
 
   useEffect(() => {
-    if (viewMode === 'dashboard') {
-      // Small delay to ensure container is rendered before Recharts attempts measurement
-      const timer = setTimeout(() => setChartVisible(true), 100);
-      return () => clearTimeout(timer);
-    } else {
-      setChartVisible(false);
-    }
+    // Force a re-measurement after initial layout
+    const timer = setTimeout(() => setIsRendered(true), 200);
+    return () => clearTimeout(timer);
   }, [viewMode]);
 
   const chartData = result.listings.map((l, i) => ({
@@ -162,7 +152,6 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType }) => {
 
   return (
     <div className="h-full flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-8 duration-1000 overflow-hidden relative">
-      {/* View Toggle Header */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white/5 border border-white/5 p-3 rounded-2xl shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-cyber-teal/10 border border-cyber-teal/20">
@@ -172,16 +161,10 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType }) => {
         </div>
         
         <div className="flex bg-black/40 rounded-xl p-1 border border-white/10 shadow-inner">
-          <button 
-            onClick={() => setViewMode('dashboard')}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all ${viewMode === 'dashboard' ? 'bg-cyber-teal text-cyber-black shadow-neon-teal' : 'text-gray-500 hover:text-white'}`}
-          >
+          <button onClick={() => setViewMode('dashboard')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all ${viewMode === 'dashboard' ? 'bg-cyber-teal text-cyber-black' : 'text-gray-500 hover:text-white'}`}>
             <LayoutDashboard size={14} /> DASHBOARD
           </button>
-          <button 
-            onClick={() => setViewMode('map')}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all ${viewMode === 'map' ? 'bg-cyber-teal text-cyber-black shadow-neon-teal' : 'text-gray-500 hover:text-white'}`}
-          >
+          <button onClick={() => setViewMode('map')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all ${viewMode === 'map' ? 'bg-cyber-teal text-cyber-black' : 'text-gray-500 hover:text-white'}`}>
             <MapIcon size={14} /> MAP_VIEW
           </button>
         </div>
@@ -191,7 +174,6 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType }) => {
         {viewMode === 'dashboard' ? (
           <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Fair Value Projection */}
               <div className="glass-panel rounded-3xl p-6 border-l-4 border-l-cyber-teal bg-cyber-teal/5 relative flex flex-col min-h-[250px]">
                 <div className="absolute top-4 right-4 flex gap-2 z-10">
                    <span className={`px-4 py-1.5 rounded-full text-[10px] font-mono font-bold uppercase shadow-neon-teal ${
@@ -211,7 +193,6 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType }) => {
                 </div>
               </div>
 
-              {/* Market Analysis Justification */}
               <div className="glass-panel rounded-3xl p-6 border-l-4 border-l-cyber-orange bg-cyber-orange/5 flex flex-col">
                 <h3 className="text-sm font-mono font-bold text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
                   <Info size={16} className="text-cyber-orange" /> Valuation Rationale
@@ -220,26 +201,22 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType }) => {
                   <p className="text-[11px] text-gray-300 font-mono leading-relaxed whitespace-pre-wrap flex-1 italic">
                     {result.valuationJustification}
                   </p>
-                  <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
-                    <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest">Confidence Score</span>
-                    <span className="text-xs font-mono font-bold text-cyber-orange">{result.confidenceScore}%</span>
-                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Market Spread Chart */}
+            {/* Price Spread Chart with Fixed Dimension Parent */}
             <div className="glass-panel rounded-3xl p-6 border border-white/5 bg-black/20">
                 <h3 className="text-xs font-mono font-bold text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
                   <TrendingUp size={16} className="text-cyber-lime" /> Sector Price Spread (Lakhs)
                 </h3>
-                <div className="h-[200px] w-full min-h-[200px] relative">
-                  {chartVisible && (
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                      <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                        <XAxis dataKey="name" stroke="#666" fontSize={10} tickLine={false} axisLine={false} />
-                        <YAxis stroke="#666" fontSize={10} tickLine={false} axisLine={false} />
+                <div className="h-[250px] w-full min-h-[250px] relative">
+                  {isRendered && (
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                      <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
+                        <XAxis dataKey="name" stroke="#555" fontSize={10} tickLine={false} axisLine={false} />
+                        <YAxis stroke="#555" fontSize={10} tickLine={false} axisLine={false} />
                         <Tooltip 
                           contentStyle={{ backgroundColor: '#0D0F12', border: '1px solid #333', fontSize: '10px', borderRadius: '8px' }}
                           itemStyle={{ color: '#00F6FF' }}
@@ -250,7 +227,7 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType }) => {
                           stroke="#00F6FF" 
                           strokeWidth={3} 
                           dot={{ fill: '#00F6FF', stroke: '#0D0F12', strokeWidth: 2, r: 4 }} 
-                          activeDot={{ r: 6, stroke: '#00F6FF', strokeWidth: 2, fill: '#0D0F12' }}
+                          activeDot={{ r: 6 }}
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -258,7 +235,6 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType }) => {
                 </div>
             </div>
 
-            {/* Verified Listings */}
             <div className="glass-panel rounded-3xl p-6 border border-white/5">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-sm font-mono font-bold text-white uppercase tracking-widest flex items-center gap-2">
