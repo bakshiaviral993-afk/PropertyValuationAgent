@@ -2,7 +2,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { ValuationResult, ValuationRequest, Comparable } from '../types';
 import { 
-  MapPin, TrendingUp, Download, Loader2, Layers, Globe, Share2, FileText, Zap, Home, Car, Grid, Info, Building2, Star, Map as MapIcon
+  MapPin, TrendingUp, Download, Loader2, Layers, Globe, Share2, FileText, Zap, Home, Car, Grid, Info, Building2, Star, Map as MapIcon, Building, LandPlot, Gem, Navigation
 } from 'lucide-react';
 // @ts-ignore
 import { jsPDF } from 'jspdf';
@@ -31,7 +31,7 @@ const CostDial = ({
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
-  const radius = 24; // Compact radius
+  const radius = 24; 
   const circumference = 2 * Math.PI * radius;
   const percentage = Math.min(Math.max((value - min) / (max - min), 0), 1);
   const strokeDashoffset = circumference - percentage * circumference;
@@ -85,22 +85,12 @@ const CircularConfidenceGauge = ({ score }: { score: number }) => {
   const radius = 45;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (score / 100) * circumference;
-  
-  // Dynamic color
   const color = score > 85 ? '#00F6FF' : score > 60 ? '#B4FF5C' : '#FFAE42';
 
   return (
     <div className="relative flex flex-col items-center justify-center w-32 h-32">
         <svg className="w-full h-full transform -rotate-90">
-            <defs>
-                <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#13161B" />
-                    <stop offset="100%" stopColor={color} />
-                </linearGradient>
-            </defs>
-            {/* Background Track */}
             <circle cx="64" cy="64" r={radius} stroke="#13161B" strokeWidth="6" fill="transparent" />
-            {/* Value Arc */}
             <circle 
                 cx="64" cy="64" r={radius} 
                 stroke={color} 
@@ -123,38 +113,23 @@ const CircularConfidenceGauge = ({ score }: { score: number }) => {
 
 const ReportMap = ({ lat, lng, comparables }: { lat: number, lng: number, comparables: Comparable[] }) => {
     const mapRef = useRef<HTMLDivElement>(null);
-    const [layerType, setLayerType] = useState<'map' | 'sat'>('map');
+    const [layerType, setLayerType] = useState<'map' | 'sat' | 'waze'>('map');
     const mapInstance = useRef<any>(null);
 
     useEffect(() => {
-        // Fix for L global variable TypeScript error
         const L = (window as any).L;
-        if (!mapRef.current || !L) return;
+        if (!mapRef.current || !L || layerType === 'waze') return;
         if (mapInstance.current) mapInstance.current.remove();
 
-        // Initialize map
         const map = L.map(mapRef.current, { zoomControl: false, dragging: true, scrollWheelZoom: false }).setView([lat, lng], 14);
+        
         const tileUrl = layerType === 'map' 
             ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
             : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 
         L.tileLayer(tileUrl, { attribution: '' }).addTo(map);
 
-        // --- RADAR PULSE OVERLAY ---
-        const pulseIcon = L.divIcon({
-            className: 'radar-container',
-            html: `
-              <div class="relative w-40 h-40 -ml-20 -mt-20 flex items-center justify-center pointer-events-none">
-                <div class="radar-wave w-full h-full opacity-0"></div>
-                <div class="radar-wave w-full h-full opacity-0" style="animation-delay: 1s"></div>
-                <div class="radar-wave w-full h-full opacity-0" style="animation-delay: 2s"></div>
-              </div>
-            `,
-            iconSize: [0, 0]
-        });
-        L.marker([lat, lng], { icon: pulseIcon }).addTo(map);
-
-        // --- SUBJECT PROPERTY MARKER ---
+        // Subject Marker
         const subjectIcon = L.divIcon({
             className: 'custom-subject-icon',
             html: `
@@ -168,13 +143,11 @@ const ReportMap = ({ lat, lng, comparables }: { lat: number, lng: number, compar
             iconSize: [0, 0]
         });
         L.marker([lat, lng], { icon: subjectIcon }).addTo(map)
-          .bindTooltip("<div class='font-mono text-[10px] uppercase font-bold text-cyber-teal'>Subject_Target</div>", { permanent: false, direction: 'top', offset: [0, -10] });
+          .bindTooltip("<div class='font-mono text-[10px] uppercase font-bold text-cyber-teal'>Target_Location</div>", { permanent: false, direction: 'top', offset: [0, -10] });
 
-        // --- COMPARABLE CLUSTERING ---
         const clusters = (L as any).markerClusterGroup({
             showCoverageOnHover: false,
             maxClusterRadius: 40,
-            spiderfyOnMaxZoom: true,
             iconCreateFunction: (cluster: any) => {
               return L.divIcon({
                 html: `<div class="flex items-center justify-center w-8 h-8 rounded-full bg-cyber-lime/90 text-black font-bold font-mono text-xs border-2 border-white shadow-[0_0_15px_#B4FF5C]">${cluster.getChildCount()}</div>`,
@@ -191,50 +164,40 @@ const ReportMap = ({ lat, lng, comparables }: { lat: number, lng: number, compar
                     html: `<div class="w-6 h-6 -ml-3 -mt-3 bg-cyber-lime border-2 border-cyber-black rounded-full shadow-[0_0_10px_#B4FF5C] flex items-center justify-center text-[10px] text-cyber-black font-bold font-mono group transition-transform hover:scale-125">${idx + 1}</div>`,
                     iconSize: [0, 0]
                 });
-                
+
                 const formatPrice = (val: number) => {
                     if (val >= 10000000) return `₹${(val / 10000000).toFixed(2)} Cr`;
                     return `₹${(val / 100000).toFixed(2)} L`;
                 };
 
-                // Infer Icon based on Property Type or BHK/Name
-                let IconSvg = '';
-                let iconColor = 'text-cyber-teal';
+                // Determine Icon for Property Type
+                let typeIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-building-2"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>';
                 const type = comp.propertyType || (comp.projectName.toLowerCase().includes('villa') ? 'Villa' : 'Apartment');
-
+                
                 if (type === 'Villa') {
-                  IconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>';
-                  iconColor = 'text-cyber-lime';
+                  typeIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-home"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>';
                 } else if (type === 'Penthouse') {
-                  IconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
-                  iconColor = 'text-cyber-orange';
-                } else if (type === 'Plot') {
-                  IconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="M12 9v1"/><path d="M12 14v1"/><path d="M15 12h-1"/><path d="M10 12H9"/></svg>';
-                  iconColor = 'text-white';
-                } else {
-                  IconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M8 10h.01"/><path d="M16 10h.01"/><path d="M8 14h.01"/><path d="M16 14h.01"/></svg>';
-                  iconColor = 'text-cyber-teal';
+                  typeIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gem"><path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 13 8 9h8l-3 4"/></svg>';
                 }
 
-                // Placeholder image if not provided
-                const thumbUrl = comp.imageUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${comp.projectName}&backgroundColor=0D0F12`;
+                const thumbUrl = comp.imageUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${comp.projectName}&backgroundColor=13161B&shapeColor=00F6FF`;
 
                 const tooltipContent = `
-                    <div class="flex gap-3 min-w-[200px] p-2 bg-cyber-black rounded-lg">
-                        <div class="w-[60px] h-[60px] shrink-0 rounded-md overflow-hidden border border-white/10">
-                           <img src="${thumbUrl}" class="w-full h-full object-cover grayscale hover:grayscale-0 transition-all" />
+                    <div class="flex gap-4 min-w-[280px] p-3 bg-cyber-black rounded-2xl border border-white/10 shadow-glass backdrop-blur-xl group">
+                        <div class="w-[80px] h-[80px] shrink-0 rounded-xl overflow-hidden border border-white/5 bg-black/40">
+                           <img src="${thumbUrl}" class="w-full h-full object-cover transition-transform group-hover:scale-110 duration-500" />
                         </div>
-                        <div class="flex-1 overflow-hidden">
-                           <div class="flex items-center justify-between mb-1">
-                              <span class="text-[8px] font-mono font-bold uppercase ${iconColor} flex items-center gap-1">
-                                ${IconSvg} ${type}
+                        <div class="flex-1 min-w-0">
+                           <div class="flex items-center justify-between mb-1.5">
+                              <span class="text-[9px] font-mono font-bold uppercase text-cyber-teal flex items-center gap-1.5">
+                                ${typeIcon} ${type}
                               </span>
-                              <span class="text-[8px] text-gray-500 font-mono">#${idx + 1}</span>
+                              <span class="text-[9px] text-gray-600 font-mono tracking-tighter">IDX_${idx + 1}</span>
                            </div>
-                           <b class="text-white block text-[10px] font-mono truncate uppercase mb-1">${comp.projectName}</b>
-                           <div class="text-cyber-lime font-mono font-bold text-[11px] leading-tight">${formatPrice(comp.price)}</div>
-                           <div class="text-gray-500 text-[8px] mt-1 font-mono uppercase tracking-tighter">
-                              ${comp.bhk} • ₹${comp.pricePerSqft}/sqft
+                           <h4 class="text-white block text-[11px] font-mono font-bold truncate uppercase mb-1 tracking-tight">${comp.projectName}</h4>
+                           <div class="text-cyber-lime font-mono font-bold text-[14px] leading-tight mb-1 text-glow-lime">${formatPrice(comp.price)}</div>
+                           <div class="text-gray-500 text-[9px] font-mono uppercase tracking-widest flex items-center gap-2">
+                              ${comp.bhk} <span class="w-1 h-1 rounded-full bg-gray-800"></span> ₹${comp.pricePerSqft}/SQFT
                            </div>
                         </div>
                     </div>
@@ -257,15 +220,59 @@ const ReportMap = ({ lat, lng, comparables }: { lat: number, lng: number, compar
 
     return (
         <div className="relative w-full h-full rounded-2xl overflow-hidden border border-cyber-border shadow-inner">
-            <div ref={mapRef} className="w-full h-full grayscale opacity-80 hover:opacity-100 transition-opacity duration-700" />
-            <div className="absolute top-3 left-3 flex gap-2 z-[400]">
-                <button onClick={() => setLayerType('map')} className={`p-1.5 rounded bg-black/50 backdrop-blur border border-white/10 ${layerType === 'map' ? 'text-cyber-teal' : 'text-gray-500'}`} title="Street Grid"><Layers size={14} /></button>
-                <button onClick={() => setLayerType('sat')} className={`p-1.5 rounded bg-black/50 backdrop-blur border border-white/10 ${layerType === 'sat' ? 'text-cyber-teal' : 'text-gray-500'}`} title="Satellite Insight"><Globe size={14} /></button>
+            {layerType === 'waze' ? (
+                <div className="w-full h-full bg-cyber-black flex flex-col items-center justify-center animate-in fade-in duration-500">
+                    <iframe
+                      src={`https://embed.waze.com/iframe?zoom=16&lat=${lat}&lon=${lng}&ct=true&pin=1`}
+                      className="w-full h-full border-none grayscale contrast-[1.1] opacity-90"
+                      allowFullScreen
+                    />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none opacity-20">
+                         <Navigation size={120} className="text-cyber-orange animate-pulse" />
+                    </div>
+                </div>
+            ) : (
+                <div ref={mapRef} className="w-full h-full grayscale opacity-80 hover:opacity-100 transition-opacity duration-700" />
+            )}
+            
+            <div className="absolute top-3 left-3 flex flex-col gap-2 z-[400]">
+                <button 
+                  onClick={() => setLayerType('map')} 
+                  className={`p-2 rounded-xl backdrop-blur-md border transition-all ${layerType === 'map' ? 'bg-cyber-teal text-cyber-black border-cyber-teal shadow-neon-teal' : 'bg-black/40 text-gray-500 border-white/10 hover:text-white'}`}
+                  title="Dark Grid Matrix"
+                >
+                  <Layers size={16} />
+                </button>
+                <button 
+                  onClick={() => setLayerType('sat')} 
+                  className={`p-2 rounded-xl backdrop-blur-md border transition-all ${layerType === 'sat' ? 'bg-cyber-teal text-cyber-black border-cyber-teal shadow-neon-teal' : 'bg-black/40 text-gray-500 border-white/10 hover:text-white'}`}
+                  title="Orbital Recon"
+                >
+                  <Globe size={16} />
+                </button>
+                <button 
+                  onClick={() => setLayerType('waze')} 
+                  className={`p-2 rounded-xl backdrop-blur-md border transition-all ${layerType === 'waze' ? 'bg-cyber-orange text-cyber-black border-cyber-orange shadow-neon-orange' : 'bg-black/40 text-gray-500 border-white/10 hover:text-white'}`}
+                  title="Waze Traffic Live"
+                >
+                  <Navigation size={16} />
+                </button>
             </div>
-             <div className="absolute bottom-3 right-3 bg-cyber-teal/20 backdrop-blur text-cyber-teal text-[9px] px-2 py-1 rounded border border-cyber-teal/30 font-mono shadow-neon-teal z-[400] flex items-center gap-2">
-                 <div className="w-1.5 h-1.5 rounded-full bg-cyber-teal animate-pulse"></div>
-                 ACTIVE_GEOSPATIAL_PROBE
-             </div>
+
+            <div className="absolute bottom-3 right-3 flex flex-col items-end gap-2 z-[400]">
+                 <a 
+                   href={`https://www.waze.com/ul?ll=${lat},${lng}&navigate=yes`} 
+                   target="_blank" 
+                   rel="noopener noreferrer"
+                   className="bg-cyber-orange/10 backdrop-blur-md text-cyber-orange text-[9px] px-3 py-2 rounded-xl border border-cyber-orange/30 font-mono shadow-neon-orange flex items-center gap-2 hover:bg-cyber-orange hover:text-black transition-all active:scale-95"
+                 >
+                    <Navigation size={12} /> LAUNCH_WAZE_NAV
+                 </a>
+                 <div className="bg-black/60 backdrop-blur-xl text-[8px] px-2 py-1 rounded border border-white/5 font-mono text-gray-500 uppercase tracking-widest">
+                    GRID_LOCK: {layerType.toUpperCase()}
+                 </div>
+            </div>
+
              <style>{`
                 .custom-comp-tooltip {
                   background: transparent !important;
@@ -275,6 +282,9 @@ const ReportMap = ({ lat, lng, comparables }: { lat: number, lng: number, compar
                 }
                 .custom-comp-tooltip::before {
                   display: none;
+                }
+                .text-glow-lime {
+                    text-shadow: 0 0 10px rgba(180, 255, 92, 0.4);
                 }
              `}</style>
         </div>
@@ -386,25 +396,25 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                         lng={request.longitude || 77.2090} 
                         comparables={result.comparables} 
                     />
-                    <div className="absolute top-4 right-4 z-[500]" data-html2canvas-ignore>
+                    <div className="absolute top-4 right-14 z-[500]" data-html2canvas-ignore>
                          <button 
                             onClick={handleDownloadPDF}
                             disabled={isDownloading}
                             className="flex items-center gap-2 px-4 py-2 bg-cyber-teal text-cyber-black rounded-lg hover:bg-white transition-all font-mono text-xs font-bold shadow-neon-teal disabled:opacity-50"
                          >
                             {isDownloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                            {isDownloading ? "GENERATING PDF..." : "DOWNLOAD REPORT"}
+                            {isDownloading ? "SYNCING..." : "PDF_EXPORT"}
                          </button>
                     </div>
                     <div className="absolute bottom-4 left-4 right-4 bg-cyber-black/80 backdrop-blur-xl border border-cyber-border rounded-2xl p-4 flex flex-col md:flex-row justify-between items-center shadow-2xl z-[450]">
                         <div>
-                            <p className="text-[10px] font-mono text-gray-400 mb-1 uppercase tracking-widest">Estimated Market Value</p>
+                            <p className="text-[10px] font-mono text-gray-400 mb-1 uppercase tracking-widest">Estimated Asset Valuation</p>
                             <div className="text-3xl md:text-4xl font-mono font-bold text-cyber-orange text-glow-orange tracking-tighter">
                                 {formatCurrency(liveEstimatedValue)}
                             </div>
                             <div className="flex items-center gap-2 mt-1">
                                 <span className="w-1.5 h-1.5 rounded-full bg-cyber-teal animate-pulse"></span>
-                                <span className="text-[9px] font-mono text-cyber-teal uppercase">Algorithm Confidence High</span>
+                                <span className="text-[9px] font-mono text-cyber-teal uppercase">Hybrid_Logic_Locked</span>
                             </div>
                         </div>
                         <div className="mt-2 md:mt-0 transform scale-90 origin-right">
@@ -415,7 +425,7 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                 <div className="h-[240px] grid grid-cols-1 md:grid-cols-2 gap-6 shrink-0">
                     <div className="glass-panel rounded-2xl p-4 flex flex-col h-full">
                          <h3 className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                            <TrendingUp size={12} className="text-cyber-teal" /> Range Analysis
+                            <TrendingUp size={12} className="text-cyber-teal" /> Market Spectrum
                          </h3>
                          <div className="flex-1 min-h-0">
                             <RangeAnalysisChart data={chartData} />
@@ -443,23 +453,23 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                             <span className="text-white">{request.bhk || 'N/A'}</span>
                         </div>
                         <div className="p-2 bg-white/5 rounded border border-white/5">
-                            <span className="block text-gray-500 text-[10px]">SIZE</span>
-                            <span className="text-white">{request.superBuiltUpArea} sqft</span>
+                            <span className="block text-gray-500 text-[10px]">AREA</span>
+                            <span className="text-white">{request.superBuiltUpArea} SQFT</span>
                         </div>
                         <div className="p-2 bg-white/5 rounded border border-white/5">
                             <span className="block text-gray-500 text-[10px]">FLOOR</span>
                             <span className="text-white">{request.floor}</span>
                         </div>
                          <div className="p-2 bg-white/5 rounded border border-white/5">
-                            <span className="block text-gray-500 text-[10px]">AGE</span>
-                            <span className="text-white">{new Date().getFullYear() - request.constructionYear} yrs</span>
+                            <span className="block text-gray-500 text-[10px]">VINTAGE</span>
+                            <span className="text-white">{new Date().getFullYear() - request.constructionYear} YRS</span>
                         </div>
                     </div>
                 </div>
                 <div className="flex-1 glass-panel rounded-2xl p-5 overflow-y-auto flex flex-col gap-6 min-h-0">
                     <div>
                         <h3 className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-4 flex items-center sticky top-0 bg-[#13161bb3] backdrop-blur-md py-2 z-10 border-b border-white/5">
-                            <Share2 size={12} className="mr-2 text-cyber-lime" /> Market Comps
+                            <Share2 size={12} className="mr-2 text-cyber-lime" /> Peer Comparables
                         </h3>
                         <div className="space-y-3">
                             {result.comparables.map((comp, idx) => (
@@ -467,16 +477,16 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                                     <div className="flex justify-between items-start mb-2">
                                         <div className="flex items-center gap-2">
                                             <span className="w-4 h-4 rounded bg-cyber-lime text-cyber-black text-[9px] font-bold flex items-center justify-center">{idx + 1}</span>
-                                            <span className="font-bold text-white text-sm">{comp.projectName}</span>
+                                            <span className="font-bold text-white text-sm uppercase tracking-tight truncate">{comp.projectName}</span>
                                         </div>
                                         <span className="font-mono text-cyber-teal text-xs font-bold">{formatCurrency(comp.price)}</span>
                                     </div>
                                     <div className="flex justify-between items-end">
                                         <div className="text-[10px] text-gray-500 font-mono">
-                                            {comp.bhk} • {comp.area} sqft
+                                            {comp.bhk} • {comp.area} SQFT
                                         </div>
-                                        <div className="px-2 py-0.5 rounded bg-white/5 text-[10px] text-gray-400 font-mono">
-                                            ₹${comp.pricePerSqft}/sqft
+                                        <div className="px-2 py-0.5 rounded bg-white/5 text-[10px] text-gray-400 font-mono tracking-tighter">
+                                            ₹${comp.pricePerSqft}/SQFT
                                         </div>
                                     </div>
                                 </div>
@@ -486,7 +496,7 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                     <div className="h-px bg-white/10 w-full shrink-0" />
                     <div>
                          <h3 className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-3 flex items-center sticky top-0 bg-[#13161bb3] backdrop-blur-md py-2 z-10">
-                            <FileText size={12} className="mr-2 text-cyber-teal" /> AI Analysis Log
+                            <FileText size={12} className="mr-2 text-cyber-teal" /> Valuation Logic
                          </h3>
                          <div className="bg-black/20 p-3 rounded-lg border border-white/5">
                             <p className="text-[10px] text-gray-400 leading-relaxed font-mono">
@@ -497,6 +507,7 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                 </div>
             </div>
        </div>
+       {/* PDF PRINT TEMPLATE (Hidden) */}
        <div ref={printRef} style={{ position: 'fixed', left: '-10000px', top: 0, width: '800px', background: '#0D0F12', color: '#98A3B3', padding: '40px' }} className="font-sans flex flex-col gap-8">
            <div className="flex justify-between items-center border-b border-white/10 pb-4">
                 <div className="flex items-center gap-3">
@@ -505,37 +516,37 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold font-mono text-white tracking-wider">QUANT<span className="text-cyber-teal">CASA</span></h1>
-                        <p className="text-[10px] text-gray-500 font-mono">AI-POWERED REAL ESTATE VALUATION</p>
+                        <p className="text-[10px] text-gray-500 font-mono tracking-[0.2em]">ANALYTICS & RESEARCH WING</p>
                     </div>
                 </div>
                 <div className="text-right">
-                    <p className="text-[10px] font-mono text-gray-500">GENERATED ON</p>
-                    <p className="text-sm font-bold text-white font-mono">{new Date().toLocaleDateString()}</p>
+                    <p className="text-[10px] font-mono text-gray-500">TIMESTAMP_GENERATED</p>
+                    <p className="text-sm font-bold text-white font-mono">{new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
                 </div>
            </div>
            <div className="flex gap-6 h-[250px]">
                <div className="w-[60%] rounded-xl overflow-hidden border border-white/10 relative">
-                   {printMapImg ? ( <img src={printMapImg} alt="Map" className="w-full h-full object-cover" /> ) : ( <div className="w-full h-full bg-black flex items-center justify-center text-xs font-mono">LOADING MAP...</div> )}
-                   <div className="absolute bottom-2 left-2 bg-black/70 px-2 py-1 text-[10px] font-mono rounded text-cyber-teal">
+                   {printMapImg ? ( <img src={printMapImg} alt="Map" className="w-full h-full object-cover" /> ) : ( <div className="w-full h-full bg-black flex items-center justify-center text-xs font-mono uppercase">Syncing Map Matrix...</div> )}
+                   <div className="absolute bottom-2 left-2 bg-black/70 px-2 py-1 text-[10px] font-mono rounded text-cyber-teal border border-white/5">
                        {request.city}, {request.area}
                    </div>
                </div>
                <div className="flex-1 flex flex-col justify-center bg-[#13161B] rounded-xl p-6 border border-white/5">
-                   <p className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-2">Estimated Market Value</p>
+                   <p className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-2">Estimated Asset Value</p>
                    <div className="text-4xl font-mono font-bold text-cyber-orange mb-2">
                        {formatCurrency(liveEstimatedValue)}
                    </div>
                    <div className="flex items-center gap-2 mb-4">
                         <span className="w-2 h-2 rounded-full bg-cyber-teal"></span>
-                        <span className="text-[10px] font-mono text-cyber-teal uppercase">High Confidence ({result.confidenceScore}%)</span>
+                        <span className="text-[10px] font-mono text-cyber-teal uppercase tracking-widest">Confidence Index: {result.confidenceScore}%</span>
                    </div>
                    <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-4">
                        <div>
-                           <p className="text-[9px] text-gray-500">RANGE LOW</p>
+                           <p className="text-[9px] text-gray-500 uppercase">Spectrum_Low</p>
                            <p className="text-sm text-white font-mono">{formatCurrency(result.rangeLow)}</p>
                        </div>
                        <div>
-                           <p className="text-[9px] text-gray-500">RANGE HIGH</p>
+                           <p className="text-[9px] text-gray-500 uppercase">Spectrum_High</p>
                            <p className="text-sm text-white font-mono">{formatCurrency(result.rangeHigh)}</p>
                        </div>
                    </div>
@@ -543,50 +554,50 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
            </div>
            <div className="bg-[#13161B] rounded-xl p-6 border border-white/5">
                 <h3 className="text-xs font-mono text-white uppercase tracking-widest mb-4 flex items-center border-b border-white/5 pb-2">
-                    <Grid size={12} className="mr-2 text-cyber-lime" /> Property Attributes
+                    <Grid size={12} className="mr-2 text-cyber-lime" /> Subject Parameters
                 </h3>
                 <div className="grid grid-cols-3 gap-6">
                     <div>
-                        <p className="text-[10px] text-gray-500 mb-1">PROJECT</p>
-                        <p className="text-sm text-white font-bold">{request.projectName}</p>
-                        <p className="text-[10px] text-gray-400">{request.builderName}</p>
+                        <p className="text-[10px] text-gray-500 mb-1 uppercase">Property_Project</p>
+                        <p className="text-sm text-white font-bold uppercase">{request.projectName}</p>
+                        <p className="text-[10px] text-gray-400 uppercase">{request.builderName}</p>
                     </div>
                     <div>
-                        <p className="text-[10px] text-gray-500 mb-1">CONFIGURATION</p>
+                        <p className="text-[10px] text-gray-500 mb-1 uppercase">Conf_Specs</p>
                         <p className="text-sm text-white font-bold">{request.bhk}</p>
-                        <p className="text-[10px] text-gray-400">{request.superBuiltUpArea} sqft</p>
+                        <p className="text-[10px] text-gray-400 font-mono">{request.superBuiltUpArea} SQFT</p>
                     </div>
                     <div>
-                        <p className="text-[10px] text-gray-500 mb-1">FLOOR & AGE</p>
-                        <p className="text-sm text-white font-bold">Floor {request.floor}</p>
-                        <p className="text-[10px] text-gray-400">{new Date().getFullYear() - request.constructionYear} Years Old</p>
+                        <p className="text-[10px] text-gray-500 mb-1 uppercase">Floor & Vintage</p>
+                        <p className="text-sm text-white font-bold">LVL {request.floor}</p>
+                        <p className="text-[10px] text-gray-400 font-mono">{new Date().getFullYear() - request.constructionYear} YR OLD</p>
                     </div>
                 </div>
            </div>
            <div className="bg-[#13161B] rounded-xl p-6 border border-white/5">
                 <h3 className="text-xs font-mono text-white uppercase tracking-widest mb-4 flex items-center border-b border-white/5 pb-2">
-                    <FileText size={12} className="mr-2 text-cyber-teal" /> AI Valuation Justification
+                    <FileText size={12} className="mr-2 text-cyber-teal" /> AI Evaluation Synopsis
                 </h3>
                 <p className="text-xs text-gray-300 leading-relaxed font-mono text-justify"> {result.valuationJustification} </p>
            </div>
            <div className="bg-[#13161B] rounded-xl p-6 border border-white/5">
                 <h3 className="text-xs font-mono text-white uppercase tracking-widest mb-4 flex items-center border-b border-white/5 pb-2">
-                    <Share2 size={12} className="mr-2 text-cyber-lime" /> Market Comparables Used
+                    <Share2 size={12} className="mr-2 text-cyber-lime" /> Integrated Comparables
                 </h3>
                 <div className="grid grid-cols-3 gap-4">
                     {result.comparables.map((comp, idx) => (
                         <div key={idx} className="bg-black/30 p-3 rounded border border-white/10">
-                            <p className="text-xs font-bold text-white mb-1 truncate">{comp.projectName}</p>
+                            <p className="text-xs font-bold text-white mb-1 truncate uppercase tracking-tight">{comp.projectName}</p>
                             <p className="text-sm font-mono text-cyber-teal mb-2">{formatCurrency(comp.price)}</p>
-                            <div className="flex justify-between text-[9px] text-gray-500">
+                            <div className="flex justify-between text-[9px] text-gray-500 uppercase font-mono">
                                 <span>{comp.bhk}</span>
-                                <span>{comp.area} sqft</span>
+                                <span>{comp.area} SQFT</span>
                             </div>
                         </div>
                     ))}
                 </div>
            </div>
-           <div className="text-[8px] text-gray-600 font-mono text-center border-t border-white/5 pt-4"> This report is generated by an AI model and is for informational purposes only. </div>
+           <div className="text-[8px] text-gray-600 font-mono text-center border-t border-white/5 pt-4 uppercase"> This algorithmic report is for informational purposes only. Signal fidelity verified by QuantCasa Neural Core. </div>
        </div>
     </div>
   );

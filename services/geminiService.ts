@@ -17,6 +17,7 @@ const BUY_SCHEMA: Schema = {
     registrationEstimate: { type: Type.STRING },
     appreciationPotential: { type: Type.STRING },
     confidenceScore: { type: Type.NUMBER },
+    valuationJustification: { type: Type.STRING, description: "Detailed logic and market rationale for this valuation." },
     listings: {
       type: Type.ARRAY,
       items: {
@@ -28,13 +29,15 @@ const BUY_SCHEMA: Schema = {
           address: { type: Type.STRING },
           sourceUrl: { type: Type.STRING },
           bhk: { type: Type.STRING },
-          emiEstimate: { type: Type.STRING }
+          emiEstimate: { type: Type.STRING },
+          latitude: { type: Type.NUMBER },
+          longitude: { type: Type.NUMBER }
         },
-        required: ["title", "price", "priceValue", "address", "sourceUrl", "bhk"]
+        required: ["title", "price", "priceValue", "address", "sourceUrl", "bhk", "latitude", "longitude"]
       }
     }
   },
-  required: ["fairValue", "valuationRange", "recommendation", "negotiationScript", "listings", "confidenceScore"]
+  required: ["fairValue", "valuationRange", "recommendation", "negotiationScript", "listings", "confidenceScore", "valuationJustification"]
 };
 
 const RENT_SCHEMA: Schema = {
@@ -50,6 +53,7 @@ const RENT_SCHEMA: Schema = {
     confidenceScore: { type: Type.NUMBER },
     suggestRadiusExpansion: { type: Type.BOOLEAN },
     propertiesFoundCount: { type: Type.NUMBER },
+    valuationJustification: { type: Type.STRING, description: "Rationale for the suggested rent based on local demand and inventory." },
     listings: {
       type: Type.ARRAY,
       items: {
@@ -66,7 +70,7 @@ const RENT_SCHEMA: Schema = {
       }
     }
   },
-  required: ["rentalValue", "yieldPercentage", "negotiationScript", "listings", "confidenceScore", "suggestRadiusExpansion", "propertiesFoundCount"]
+  required: ["rentalValue", "yieldPercentage", "negotiationScript", "listings", "confidenceScore", "suggestRadiusExpansion", "propertiesFoundCount", "valuationJustification"]
 };
 
 const LAND_SCHEMA: Schema = {
@@ -78,6 +82,7 @@ const LAND_SCHEMA: Schema = {
     negotiationStrategy: { type: Type.STRING },
     confidenceScore: { type: Type.NUMBER },
     zoningAnalysis: { type: Type.STRING },
+    valuationJustification: { type: Type.STRING, description: "Expert explanation of land value based on FSI and zoning." },
     listings: {
       type: Type.ARRAY,
       items: {
@@ -93,26 +98,22 @@ const LAND_SCHEMA: Schema = {
       }
     }
   },
-  required: ["landValue", "perSqmValue", "devROI", "negotiationStrategy", "confidenceScore", "listings"]
+  required: ["landValue", "perSqmValue", "devROI", "negotiationStrategy", "confidenceScore", "listings", "valuationJustification"]
 };
 
 export const getBuyAnalysis = async (data: any): Promise<BuyResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
   const isSell = data.age !== undefined;
   const role = isSell ? "Liquidator/Asset Appraiser" : "Chief Acquisition Strategist";
-  const purchaseContext = data.purchaseType ? `Mode: ${data.purchaseType}. Possession: ${data.possessionStatus} (${data.possessionYear || 'Immediate'}).` : "";
-
+  
   const prompt = `Act as ${role}. 
-  Sector: ${data.address}, ${data.city} (${data.pincode}). 
-  Spec: ${data.bhk}, ${data.sqft} sqft. ${purchaseContext}
-  Target Value: ₹${data.expectedPrice}. 
-
-  VALUATION VECTORS:
-  1. SEARCH: Scan web for ${isSell ? 'resale' : 'new primary'} property rates in ${data.address}.
-  2. POSSESSION RISK: If Under Construction/Upcoming, adjust valuation for RERA compliance and entry-point discount.
-  3. COMPARABLES: Find listings under ${data.expectedPrice}.
-  4. NEW VS RESALE: If 'New Booking', focus on builder credibility. If 'Resale', focus on asset age and maintenance.
+  Sector: ${data.address}, ${data.city} (${data.pincode}). Spec: ${data.bhk}, ${data.sqft} sqft.
+  
+  TASK:
+  1. Provide a fair market valuation range.
+  2. Provide a 'valuationJustification' section explaining the logic.
+  3. Ground the results in real-world web data. 
+  4. Ensure every listing includes precise latitude and longitude coordinates.
   
   Return JSON per BUY_SCHEMA.`;
 
@@ -133,16 +134,11 @@ export const getBuyAnalysis = async (data: any): Promise<BuyResult> => {
 
 export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const searchScope = data.forceExpandRadius ? "unlimited" : "5km max";
-
-  const prompt = `Act as Rental Strategist. 
-  Locality: ${data.address}, ${data.city}. 
-  Subject: ${data.bhk}, ${data.sqft} sqft. 
+  const prompt = `Act as Rental Strategist. Locality: ${data.address}, ${data.city}.
   
-  RADIUS LOGIC PROTOCOL:
-  1. Search active listings within 2km-5km.
-  2. If < 5 found, set 'suggestRadiusExpansion' to TRUE.
-  3. Preference: ${searchScope}.
+  TASK:
+  1. Estimate rent and deposit.
+  2. In 'valuationJustification', explain the rental demand logic for this specific sector.
   
   Return JSON per RENT_SCHEMA.`;
 
@@ -163,11 +159,12 @@ export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> =>
 
 export const getLandValuationAnalysis = async (data: LandRequest): Promise<LandResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
   const prompt = `Act as Expert Land Valuer. Plot: ${data.plotSize} ${data.unit} in ${data.address}, ${data.city}.
-  Facing: ${data.facing}, FSI: ${data.fsi}, Potential: ${data.devPotential}, Approvals: ${data.approvals}.
-
-  Search active land plots in ${data.address} via web grounding. 
+  
+  TASK:
+  1. Provide precise land valuation.
+  2. In 'valuationJustification', explain the FSI and development potential math used.
+  
   Return JSON per LAND_SCHEMA.`;
 
   const searchResponse = await ai.models.generateContent({
@@ -178,7 +175,7 @@ export const getLandValuationAnalysis = async (data: LandRequest): Promise<LandR
 
   const structResponse = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Translate land analysis into valid LAND_SCHEMA JSON: ${searchResponse.text}`,
+    contents: `Translate into LAND_SCHEMA JSON: ${searchResponse.text}`,
     config: { responseMimeType: "application/json", responseSchema: LAND_SCHEMA }
   });
 

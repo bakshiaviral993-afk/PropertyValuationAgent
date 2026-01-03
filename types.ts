@@ -3,7 +3,6 @@ import { ReactNode } from 'react';
 
 export type AppMode = 'buy' | 'sell' | 'rent' | 'land';
 
-// Added StepField enum to fix the error in constants.ts
 export enum StepField {
   State = 'state',
   City = 'city',
@@ -97,6 +96,8 @@ export interface SaleListing {
   sourceUrl: string;
   bhk: string;
   emiEstimate: string;
+  latitude: number;
+  longitude: number;
 }
 
 export interface LandListing {
@@ -117,6 +118,7 @@ export interface BuyResult {
   registrationEstimate: string;
   appreciationPotential: string;
   confidenceScore: number;
+  valuationJustification: string;
 }
 
 export interface RentResult {
@@ -131,6 +133,7 @@ export interface RentResult {
   confidenceScore: number;
   suggestRadiusExpansion: boolean;
   propertiesFoundCount: number;
+  valuationJustification: string;
 }
 
 export interface LandResult {
@@ -141,6 +144,7 @@ export interface LandResult {
   confidenceScore: number;
   zoningAnalysis: string;
   listings: LandListing[];
+  valuationJustification: string;
 }
 
 export interface ChatMessage {
@@ -159,7 +163,6 @@ export interface WizardStep {
   placeholder?: string;
 }
 
-// Enhanced Comparable interface
 export interface Comparable {
   projectName: string;
   price: number;
@@ -172,7 +175,6 @@ export interface Comparable {
   propertyType?: 'Apartment' | 'Villa' | 'Penthouse' | 'Plot';
 }
 
-// Added ValuationResult interface to fix the error in ValuationReport.tsx
 export interface ValuationResult {
   estimatedValue: number;
   rangeLow: number;
@@ -182,7 +184,6 @@ export interface ValuationResult {
   comparables: Comparable[];
 }
 
-// Added ValuationRequest interface to fix the error in ValuationReport.tsx
 export interface ValuationRequest {
   state: string;
   city: string;
