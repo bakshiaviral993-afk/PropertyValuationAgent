@@ -1,11 +1,19 @@
 import { ReactNode } from 'react';
 
+export type AppMode = 'valuation' | 'rent';
+
+export interface UserProfile {
+  name: string;
+  mobile: string;
+  email: string;
+}
+
 export interface ValuationRequest {
   state: string;
   city: string;
   pincode: string;
   district: string;
-  area: string; // Locality
+  area: string;
   latitude?: number;
   longitude?: number;
   projectName: string;
@@ -28,6 +36,43 @@ export interface ValuationRequest {
   fsi: number;
 }
 
+export interface RentRequest {
+  state: string;
+  city: string;
+  area: string;
+  bhk: string;
+}
+
+export interface RentalListing {
+  title: string;
+  rent: string;
+  address: string;
+  sourceUrl: string;
+  bhk: string;
+  qualityScore: number;
+}
+
+export interface RentResult {
+  averageRent: string;
+  listings: RentalListing[];
+  marketSummary: string;
+  negotiationStrategy: string;
+  depositEstimate: string;
+  maintenanceEstimate: string;
+  relocationExpenses: string;
+  latitude?: number;
+  longitude?: number;
+  radiusUsed: string;
+  scanLogs: string[];
+  expertVerdict?: {
+    justifiedPrice: string;
+    maxThreshold: string;
+    whyJustified: string;
+    whyNoMoreThan: string;
+  };
+  premiumDrivers: { feature: string; impact: string }[];
+}
+
 export interface ValuationResult {
   estimatedValue: number;
   pricePerSqft: number;
@@ -48,6 +93,8 @@ export interface Comparable {
   area: number;
   bhk: string;
   pricePerSqft: number;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface ChatMessage {
@@ -85,7 +132,7 @@ export enum StepField {
 }
 
 export interface WizardStep {
-  field: StepField;
+  field: string;
   question: string;
   type: 'text' | 'number' | 'select';
   options?: string[];

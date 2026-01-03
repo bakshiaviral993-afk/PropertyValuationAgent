@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { ValuationResult, ValuationRequest } from '../types';
+import { ValuationResult, ValuationRequest, Comparable } from '../types';
 import { 
-  MapPin, TrendingUp, Download, Loader2, Layers, Globe, Share2, FileText, Zap, Home, Car, Grid
+  MapPin, TrendingUp, Download, Loader2, Layers, Globe, Share2, FileText, Zap, Home, Car, Grid, Info
 } from 'lucide-react';
 // @ts-ignore
 import { jsPDF } from 'jspdf';
@@ -120,7 +120,7 @@ const CircularConfidenceGauge = ({ score }: { score: number }) => {
   );
 };
 
-const ReportMap = ({ lat, lng }: { lat: number, lng: number }) => {
+const ReportMap = ({ lat, lng, comparables }: { lat: number, lng: number, comparables: Comparable[] }) => {
     const mapRef = useRef<HTMLDivElement>(null);
     const [layerType, setLayerType] = useState<'map' | 'sat'>('map');
     const mapInstance = useRef<any>(null);
@@ -129,26 +129,101 @@ const ReportMap = ({ lat, lng }: { lat: number, lng: number }) => {
         if (!mapRef.current || !window.L) return;
         if (mapInstance.current) mapInstance.current.remove();
 
-        const map = window.L.map(mapRef.current, { zoomControl: false, dragging: false, scrollWheelZoom: false }).setView([lat, lng], 17);
+        // Initialize map
+        const map = window.L.map(mapRef.current, { zoomControl: false, dragging: true, scrollWheelZoom: false }).setView([lat, lng], 14);
         const tileUrl = layerType === 'map' 
             ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
             : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 
         window.L.tileLayer(tileUrl, { attribution: '' }).addTo(map);
-        window.L.marker([lat, lng]).addTo(map);
+
+        // --- RADAR PULSE OVERLAY ---
+        const pulseIcon = window.L.divIcon({
+            className: 'radar-container',
+            html: `
+              <div class="relative w-40 h-40 -ml-20 -mt-20 flex items-center justify-center pointer-events-none">
+                <div class="radar-wave w-full h-full opacity-0"></div>
+                <div class="radar-wave w-full h-full opacity-0" style="animation-delay: 1s"></div>
+                <div class="radar-wave w-full h-full opacity-0" style="animation-delay: 2s"></div>
+              </div>
+            `,
+            iconSize: [0, 0]
+        });
+        window.L.marker([lat, lng], { icon: pulseIcon }).addTo(map);
+
+        // --- SUBJECT PROPERTY MARKER ---
+        const subjectIcon = window.L.divIcon({
+            className: 'custom-subject-icon',
+            html: `
+              <div class="w-10 h-10 -ml-5 -mt-5 flex items-center justify-center">
+                <div class="absolute w-8 h-8 bg-cyber-teal/20 border border-cyber-teal rounded-full animate-ping"></div>
+                <div class="relative w-5 h-5 bg-cyber-teal rounded-full border-2 border-white shadow-[0_0_15px_#00F6FF] flex items-center justify-center">
+                  <div class="w-1 h-1 bg-white rounded-full"></div>
+                </div>
+              </div>
+            `,
+            iconSize: [0, 0]
+        });
+        window.L.marker([lat, lng], { icon: subjectIcon }).addTo(map)
+          .bindTooltip("<div class='font-mono text-[10px] uppercase font-bold text-cyber-teal'>Subject_Target</div>", { permanent: false, direction: 'top', offset: [0, -10] });
+
+        // --- COMPARABLE CLUSTERING ---
+        const clusters = (window.L as any).markerClusterGroup({
+            showCoverageOnHover: false,
+            maxClusterRadius: 40,
+            spiderfyOnMaxZoom: true,
+            iconCreateFunction: (cluster: any) => {
+              return window.L.divIcon({
+                html: `<div class="flex items-center justify-center w-8 h-8 rounded-full bg-cyber-lime/90 text-black font-bold font-mono text-xs border-2 border-white shadow-[0_0_15px_#B4FF5C]">${cluster.getChildCount()}</div>`,
+                className: 'custom-cluster-icon',
+                iconSize: [32, 32]
+              });
+            }
+        });
+
+        comparables.forEach((comp, idx) => {
+            if (comp.latitude && comp.longitude) {
+                const compIcon = window.L.divIcon({
+                    className: 'comp-marker-icon',
+                    html: `<div class="w-6 h-6 -ml-3 -mt-3 bg-cyber-lime border-2 border-cyber-black rounded-full shadow-[0_0_10px_#B4FF5C] flex items-center justify-center text-[10px] text-cyber-black font-bold font-mono group transition-transform hover:scale-125">${idx + 1}</div>`,
+                    iconSize: [0, 0]
+                });
+                
+                const formatPrice = (val: number) => {
+                    if (val >= 10000000) return `₹${(val / 10000000).toFixed(2)} Cr`;
+                    return `₹${(val / 100000).toFixed(2)} L`;
+                };
+
+                const marker = window.L.marker([comp.latitude, comp.longitude], { icon: compIcon });
+                
+                const tooltipContent = `
+                    <div class="font-mono text-[10px] p-1">
+                        <b class="text-white block truncate uppercase mb-1">${comp.projectName}</b>
+                        <div class="text-cyber-lime font-bold">${formatPrice(comp.price)}</div>
+                        <div class="text-gray-500 text-[8px] mt-0.5">₹${comp.pricePerSqft}/sqft</div>
+                    </div>
+                `;
+
+                marker.bindTooltip(tooltipContent, { direction: 'top', offset: [0, -10] });
+                clusters.addLayer(marker);
+            }
+        });
+
+        map.addLayer(clusters);
         mapInstance.current = map;
         return () => { if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null; } };
-    }, [lat, lng, layerType]);
+    }, [lat, lng, layerType, comparables]);
 
     return (
         <div className="relative w-full h-full rounded-2xl overflow-hidden border border-cyber-border shadow-inner">
             <div ref={mapRef} className="w-full h-full grayscale opacity-80 hover:opacity-100 transition-opacity duration-700" />
             <div className="absolute top-3 left-3 flex gap-2 z-[400]">
-                <button onClick={() => setLayerType('map')} className={`p-1.5 rounded bg-black/50 backdrop-blur border border-white/10 ${layerType === 'map' ? 'text-cyber-teal' : 'text-gray-500'}`}><Layers size={14} /></button>
-                <button onClick={() => setLayerType('sat')} className={`p-1.5 rounded bg-black/50 backdrop-blur border border-white/10 ${layerType === 'sat' ? 'text-cyber-teal' : 'text-gray-500'}`}><Globe size={14} /></button>
+                <button onClick={() => setLayerType('map')} className={`p-1.5 rounded bg-black/50 backdrop-blur border border-white/10 ${layerType === 'map' ? 'text-cyber-teal' : 'text-gray-500'}`} title="Street Grid"><Layers size={14} /></button>
+                <button onClick={() => setLayerType('sat')} className={`p-1.5 rounded bg-black/50 backdrop-blur border border-white/10 ${layerType === 'sat' ? 'text-cyber-teal' : 'text-gray-500'}`} title="Satellite Insight"><Globe size={14} /></button>
             </div>
-             <div className="absolute bottom-3 right-3 bg-cyber-teal/20 backdrop-blur text-cyber-teal text-[9px] px-2 py-1 rounded border border-cyber-teal/30 font-mono shadow-neon-teal z-[400]">
-                 LIVE SATELLITE FEED
+             <div className="absolute bottom-3 right-3 bg-cyber-teal/20 backdrop-blur text-cyber-teal text-[9px] px-2 py-1 rounded border border-cyber-teal/30 font-mono shadow-neon-teal z-[400] flex items-center gap-2">
+                 <div className="w-1.5 h-1.5 rounded-full bg-cyber-teal animate-pulse"></div>
+                 ACTIVE_GEOSPATIAL_PROBE
              </div>
         </div>
     );
@@ -212,43 +287,34 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
     setIsDownloading(true);
 
     try {
-        // 1. Capture the Map first (since it's a canvas in a separate component)
         if (mapContainerRef.current) {
             const mapCanvas = await html2canvas(mapContainerRef.current, {
                 useCORS: true,
-                scale: 1, // Capture map at 1x to save memory
+                scale: 1,
                 logging: false,
                 backgroundColor: '#0D0F12'
             });
             setPrintMapImg(mapCanvas.toDataURL('image/jpeg', 0.8));
         }
-
-        // Wait a tick for the image to render in the print view
         await new Promise(r => setTimeout(r, 100));
-
-        // 2. Capture the Full Print Layout
         const canvas = await html2canvas(printRef.current, {
             useCORS: true,
-            scale: 1.5, // Reduced scale for file size optimization (23MB -> ~2MB)
+            scale: 1.5,
             backgroundColor: '#0D0F12',
             logging: false,
-            windowWidth: 800, // Force desktop width
+            windowWidth: 800,
         });
-        
-        // 3. Compress to JPEG
         const imgData = canvas.toDataURL('image/jpeg', 0.7);
-        
         const pdf = new jsPDF('p', 'mm', 'a4');
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-        
         pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
         pdf.save(`QuantCasa_Report_${request.projectName}.pdf`);
     } catch (e) {
         console.error("PDF Gen Error", e);
     } finally {
         setIsDownloading(false);
-        setPrintMapImg(null); // Cleanup
+        setPrintMapImg(null);
     }
   };
 
@@ -260,18 +326,14 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
 
   return (
     <div className="h-full flex flex-col font-sans gap-6 relative" ref={reportRef}>
-       
-       {/* --- MAIN DASHBOARD (Interactive) --- */}
        <div className="flex flex-col xl:flex-row gap-6 h-full">
-            
-            {/* Center Panel: Map & Valuation Core */}
             <div className="flex-1 flex flex-col gap-6">
-                
-                {/* 3D Map / Hero Container (Compact fixed height) */}
                 <div ref={mapContainerRef} className="h-[320px] glass-panel rounded-3xl p-1 relative group overflow-hidden shrink-0">
-                    <ReportMap lat={request.latitude || 28.6139} lng={request.longitude || 77.2090} />
-                    
-                    {/* PDF Download Button (Top Right Absolute) */}
+                    <ReportMap 
+                        lat={request.latitude || 28.6139} 
+                        lng={request.longitude || 77.2090} 
+                        comparables={result.comparables} 
+                    />
                     <div className="absolute top-4 right-4 z-[500]" data-html2canvas-ignore>
                          <button 
                             onClick={handleDownloadPDF}
@@ -282,8 +344,6 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                             {isDownloading ? "GENERATING PDF..." : "DOWNLOAD REPORT"}
                          </button>
                     </div>
-
-                    {/* Floating Valuation Card Overlay */}
                     <div className="absolute bottom-4 left-4 right-4 bg-cyber-black/80 backdrop-blur-xl border border-cyber-border rounded-2xl p-4 flex flex-col md:flex-row justify-between items-center shadow-2xl z-[450]">
                         <div>
                             <p className="text-[10px] font-mono text-gray-400 mb-1 uppercase tracking-widest">Estimated Market Value</p>
@@ -300,10 +360,7 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                         </div>
                     </div>
                 </div>
-
-                {/* Secondary Metrics Row (Compacted) */}
                 <div className="h-[240px] grid grid-cols-1 md:grid-cols-2 gap-6 shrink-0">
-                    {/* Chart Card */}
                     <div className="glass-panel rounded-2xl p-4 flex flex-col h-full">
                          <h3 className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                             <TrendingUp size={12} className="text-cyber-teal" /> Range Analysis
@@ -312,8 +369,6 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                             <RangeAnalysisChart data={chartData} />
                          </div>
                     </div>
-
-                    {/* Dials Card */}
                     <div className="glass-panel rounded-2xl p-4 flex flex-col justify-center h-full">
                         <div className="flex justify-around items-center">
                              <CostDial label="PARKING" value={parkingCost} onChange={setParkingCost} max={1500000} />
@@ -323,11 +378,7 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                     </div>
                 </div>
             </div>
-
-            {/* Right Panel: Comps & Details */}
             <div className="w-full xl:w-[320px] flex flex-col gap-6 min-h-0">
-                
-                {/* Property Details Card */}
                 <div className="glass-panel rounded-2xl p-5 border-l-2 border-l-cyber-teal shrink-0">
                     <h3 className="text-white font-bold text-lg mb-1">{request.projectName}</h3>
                     <div className="flex items-center text-xs text-gray-400 font-mono mb-4">
@@ -353,10 +404,7 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                         </div>
                     </div>
                 </div>
-
-                {/* Comparables & Analysis Stack */}
                 <div className="flex-1 glass-panel rounded-2xl p-5 overflow-y-auto flex flex-col gap-6 min-h-0">
-                    {/* Market Comps Section */}
                     <div>
                         <h3 className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-4 flex items-center sticky top-0 bg-[#13161bb3] backdrop-blur-md py-2 z-10 border-b border-white/5">
                             <Share2 size={12} className="mr-2 text-cyber-lime" /> Market Comps
@@ -365,7 +413,10 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                             {result.comparables.map((comp, idx) => (
                                 <div key={idx} className="group relative p-4 bg-cyber-black border border-cyber-border rounded-xl hover:border-cyber-teal/50 transition-all duration-300 hover:shadow-neon-teal">
                                     <div className="flex justify-between items-start mb-2">
-                                        <span className="font-bold text-white text-sm">{comp.projectName}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-4 h-4 rounded bg-cyber-lime text-cyber-black text-[9px] font-bold flex items-center justify-center">{idx + 1}</span>
+                                            <span className="font-bold text-white text-sm">{comp.projectName}</span>
+                                        </div>
                                         <span className="font-mono text-cyber-teal text-xs font-bold">{formatCurrency(comp.price)}</span>
                                     </div>
                                     <div className="flex justify-between items-end">
@@ -380,11 +431,7 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                             ))}
                         </div>
                     </div>
-                    
-                    {/* Divider */}
                     <div className="h-px bg-white/10 w-full shrink-0" />
-
-                    {/* AI Analysis Section */}
                     <div>
                          <h3 className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-3 flex items-center sticky top-0 bg-[#13161bb3] backdrop-blur-md py-2 z-10">
                             <FileText size={12} className="mr-2 text-cyber-teal" /> AI Analysis Log
@@ -396,18 +443,9 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                          </div>
                     </div>
                 </div>
-
             </div>
        </div>
-
-       {/* --- HIDDEN PDF PRINT LAYOUT --- */}
-       {/* This layout renders off-screen, expanding all sections without scrollbars for capture */}
-       <div 
-         ref={printRef} 
-         style={{ position: 'fixed', left: '-10000px', top: 0, width: '800px', background: '#0D0F12', color: '#98A3B3', padding: '40px' }}
-         className="font-sans flex flex-col gap-8"
-       >
-           {/* Header */}
+       <div ref={printRef} style={{ position: 'fixed', left: '-10000px', top: 0, width: '800px', background: '#0D0F12', color: '#98A3B3', padding: '40px' }} className="font-sans flex flex-col gap-8">
            <div className="flex justify-between items-center border-b border-white/10 pb-4">
                 <div className="flex items-center gap-3">
                     <div className="bg-cyber-teal/10 p-2 rounded-xl border border-cyber-teal/20 shadow-neon-teal">
@@ -423,22 +461,13 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                     <p className="text-sm font-bold text-white font-mono">{new Date().toLocaleDateString()}</p>
                 </div>
            </div>
-
-           {/* Map & Summary */}
            <div className="flex gap-6 h-[250px]">
-               {/* Static Map Image Placeholder */}
                <div className="w-[60%] rounded-xl overflow-hidden border border-white/10 relative">
-                   {printMapImg ? (
-                       <img src={printMapImg} alt="Map" className="w-full h-full object-cover" />
-                   ) : (
-                       <div className="w-full h-full bg-black flex items-center justify-center text-xs font-mono">LOADING MAP...</div>
-                   )}
+                   {printMapImg ? ( <img src={printMapImg} alt="Map" className="w-full h-full object-cover" /> ) : ( <div className="w-full h-full bg-black flex items-center justify-center text-xs font-mono">LOADING MAP...</div> )}
                    <div className="absolute bottom-2 left-2 bg-black/70 px-2 py-1 text-[10px] font-mono rounded text-cyber-teal">
                        {request.city}, {request.area}
                    </div>
                </div>
-
-               {/* Main Value */}
                <div className="flex-1 flex flex-col justify-center bg-[#13161B] rounded-xl p-6 border border-white/5">
                    <p className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-2">Estimated Market Value</p>
                    <div className="text-4xl font-mono font-bold text-cyber-orange mb-2">
@@ -460,8 +489,6 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                    </div>
                </div>
            </div>
-
-           {/* Property Attributes / Parameters */}
            <div className="bg-[#13161B] rounded-xl p-6 border border-white/5">
                 <h3 className="text-xs font-mono text-white uppercase tracking-widest mb-4 flex items-center border-b border-white/5 pb-2">
                     <Grid size={12} className="mr-2 text-cyber-lime" /> Property Attributes
@@ -482,32 +509,14 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                         <p className="text-sm text-white font-bold">Floor {request.floor}</p>
                         <p className="text-[10px] text-gray-400">{new Date().getFullYear() - request.constructionYear} Years Old</p>
                     </div>
-                    <div>
-                        <p className="text-[10px] text-gray-500 mb-1">PARKING</p>
-                        <p className="text-sm text-white">{request.hasParking === 'Yes' ? 'Available' : 'None'}</p>
-                    </div>
-                    <div>
-                        <p className="text-[10px] text-gray-500 mb-1">AMENITIES</p>
-                        <p className="text-sm text-white">{request.hasAmenities === 'Yes' ? 'Clubhouse etc.' : 'Standard'}</p>
-                    </div>
-                    <div>
-                        <p className="text-[10px] text-gray-500 mb-1">FSI</p>
-                        <p className="text-sm text-white">{request.fsi}</p>
-                    </div>
                 </div>
            </div>
-
-           {/* AI Justification (Full Text) */}
            <div className="bg-[#13161B] rounded-xl p-6 border border-white/5">
                 <h3 className="text-xs font-mono text-white uppercase tracking-widest mb-4 flex items-center border-b border-white/5 pb-2">
                     <FileText size={12} className="mr-2 text-cyber-teal" /> AI Valuation Justification
                 </h3>
-                <p className="text-xs text-gray-300 leading-relaxed font-mono text-justify">
-                    {result.valuationJustification}
-                </p>
+                <p className="text-xs text-gray-300 leading-relaxed font-mono text-justify"> {result.valuationJustification} </p>
            </div>
-
-           {/* Comparables */}
            <div className="bg-[#13161B] rounded-xl p-6 border border-white/5">
                 <h3 className="text-xs font-mono text-white uppercase tracking-widest mb-4 flex items-center border-b border-white/5 pb-2">
                     <Share2 size={12} className="mr-2 text-cyber-lime" /> Market Comparables Used
@@ -525,13 +534,8 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                     ))}
                 </div>
            </div>
-
-           {/* Footer Disclaimer */}
-           <div className="text-[8px] text-gray-600 font-mono text-center border-t border-white/5 pt-4">
-               This report is generated by an AI model and is for informational purposes only. QuantCasa does not guarantee the accuracy of this valuation.
-           </div>
+           <div className="text-[8px] text-gray-600 font-mono text-center border-t border-white/5 pt-4"> This report is generated by an AI model and is for informational purposes only. </div>
        </div>
-
     </div>
   );
 };

@@ -13,8 +13,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+    
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+
     <script>
       tailwind.config = {
         darkMode: 'class',
@@ -29,7 +34,9 @@
                 black: '#0D0F12', // Matte Black Background
                 card: '#13161B',  // Dark Cards
                 teal: '#00F6FF',  // Neon Teal
+                tealDark: '#00B8BF',
                 lime: '#B4FF5C',  // Lime Highlights
+                limeDark: '#86C442',
                 text: '#98A3B3',  // Soft Grey Text
                 orange: '#FFAE42', // Valuation Orange
                 glass: 'rgba(19, 22, 27, 0.6)',
@@ -38,7 +45,7 @@
               slate: {
                 900: '#0B1E3C', 
                 800: '#162A4C',
-                50: '#F0F4F8'
+                50: '#F8FAFC'
               },
             },
             boxShadow: {
@@ -50,6 +57,7 @@
               'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
               'glow': 'glow 2s ease-in-out infinite alternate',
               'wave': 'wave 1.2s ease-in-out infinite',
+              'radar': 'radar 4s cubic-bezier(0, 0, 0.2, 1) infinite',
             },
             keyframes: {
               glow: {
@@ -59,6 +67,10 @@
               wave: {
                 '0%, 100%': { height: '10%' },
                 '50%': { height: '60%' },
+              },
+              radar: {
+                '0%': { transform: 'scale(0.5)', opacity: '1' },
+                '100%': { transform: 'scale(4)', opacity: '0' }
               }
             }
           }
@@ -66,26 +78,47 @@
       }
     </script>
     <style>
+      :root {
+        --bg-primary: #0D0F12;
+        --bg-secondary: #13161B;
+        --text-primary: #FFFFFF;
+        --text-secondary: #98A3B3;
+        --border-color: rgba(255, 255, 255, 0.08);
+        --glass-bg: rgba(19, 22, 27, 0.7);
+      }
+
+      html:not(.dark) {
+        --bg-primary: #F8FAFC;
+        --bg-secondary: #FFFFFF;
+        --text-primary: #0F172A;
+        --text-secondary: #475569;
+        --border-color: rgba(0, 0, 0, 0.08);
+        --glass-bg: rgba(255, 255, 255, 0.8);
+      }
+
       body {
         font-feature-settings: "tnum" on;
         -webkit-font-smoothing: antialiased;
-        background-color: #0D0F12;
-        color: #98A3B3;
-        overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile */
+        background-color: var(--bg-primary);
+        color: var(--text-secondary);
+        overscroll-behavior-y: none;
+        transition: background-color 0.5s ease, color 0.5s ease;
       }
       
       /* Futuristic Scrollbar */
       ::-webkit-scrollbar { width: 6px; height: 6px; }
-      ::-webkit-scrollbar-track { background: #0D0F12; }
+      ::-webkit-scrollbar-track { background: var(--bg-primary); }
       ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+      html:not(.dark) ::-webkit-scrollbar-thumb { background: #CBD5E1; }
       ::-webkit-scrollbar-thumb:hover { background: #00F6FF; }
 
       .glass-panel {
-        background: rgba(19, 22, 27, 0.7);
+        background: var(--glass-bg);
         backdrop-filter: blur(18px);
         -webkit-backdrop-filter: blur(18px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--border-color);
         box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        transition: background-color 0.5s ease, border-color 0.5s ease;
       }
 
       .text-glow-teal {
@@ -96,19 +129,54 @@
         text-shadow: 0 0 15px rgba(255, 174, 66, 0.6);
       }
 
+      /* Advanced Map Styles */
       .leaflet-container {
-        background: #0D0F12 !important;
+        background: var(--bg-primary) !important;
         font-family: 'JetBrains Mono', monospace;
       }
       .leaflet-pane { z-index: 0 !important; }
-      .leaflet-control-container .leaflet-top, 
-      .leaflet-control-container .leaflet-bottom { z-index: 400 !important; }
-
+      
       /* Dark Map Tiles Filter */
-      .leaflet-tile-pane {
+      .dark .leaflet-tile-pane {
         filter: grayscale(100%) invert(100%) contrast(1.2) brightness(0.8); 
       }
       
+      /* Clustering Theme Overrides */
+      .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large {
+        background-color: rgba(0, 246, 255, 0.1);
+      }
+      .marker-cluster-small div, .marker-cluster-medium div, .marker-cluster-large div {
+        background-color: rgba(0, 246, 255, 0.8);
+        color: #000;
+        font-weight: bold;
+        font-family: 'JetBrains Mono';
+        box-shadow: 0 0 15px #00F6FF;
+      }
+
+      /* Custom Popup Design */
+      .leaflet-popup-content-wrapper {
+        background: #0D0F12 !important;
+        color: #FFF !important;
+        border: 1px solid rgba(0, 246, 255, 0.3) !important;
+        border-radius: 12px !important;
+        font-family: 'JetBrains Mono' !important;
+      }
+      .leaflet-popup-tip {
+        background: #0D0F12 !important;
+        border: 1px solid rgba(0, 246, 255, 0.3) !important;
+      }
+
+      /* Radar Pulse Animation */
+      .radar-wave {
+        position: absolute;
+        border: 2px solid #00F6FF;
+        border-radius: 50%;
+        animation: radar 4s cubic-bezier(0, 0, 0.2, 1) infinite;
+        pointer-events: none;
+      }
+      .radar-wave:nth-child(2) { animation-delay: 1s; }
+      .radar-wave:nth-child(3) { animation-delay: 2s; }
+
       /* Visualizer Bars */
       .bar {
         width: 6px;
@@ -117,11 +185,6 @@
         animation: wave 1s ease-in-out infinite;
       }
       .bar:nth-child(odd) { background: #B4FF5C; }
-      .bar:nth-child(1) { animation-delay: 0.1s; }
-      .bar:nth-child(2) { animation-delay: 0.2s; }
-      .bar:nth-child(3) { animation-delay: 0.3s; }
-      .bar:nth-child(4) { animation-delay: 0.4s; }
-      .bar:nth-child(5) { animation-delay: 0.5s; }
     </style>
   <script type="importmap">
 {
