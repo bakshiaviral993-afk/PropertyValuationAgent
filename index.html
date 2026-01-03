@@ -6,7 +6,11 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="QuantCasa">
     <meta name="theme-color" content="#0D0F12">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="https://img.icons8.com/fluency/192/lightning-bolt.png">
+    
     <title>QuantCasa</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Fonts: Inter and JetBrains Mono -->
@@ -132,7 +136,7 @@
       /* Advanced Map Styles */
       .leaflet-container {
         background: var(--bg-primary) !important;
-        font-family: 'JetBrains Mono', monospace;
+        font-family: 'Inter', sans-serif;
       }
       .leaflet-pane { z-index: 0 !important; }
       
@@ -203,6 +207,6 @@
 </head>
   <body class="bg-cyber-black text-cyber-text antialiased">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+    <script type="module" src="./index.tsx"></script>
   </body>
 </html>

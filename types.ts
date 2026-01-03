@@ -1,117 +1,15 @@
+
 import { ReactNode } from 'react';
 
-export type AppMode = 'valuation' | 'rent';
+export type AppMode = 'buy' | 'sell' | 'rent' | 'land';
 
-export interface UserProfile {
-  name: string;
-  mobile: string;
-  email: string;
-}
-
-export interface ValuationRequest {
-  state: string;
-  city: string;
-  pincode: string;
-  district: string;
-  area: string;
-  latitude?: number;
-  longitude?: number;
-  projectName: string;
-  builderName: string;
-  bhk?: string;
-  facing: string;
-  floor: number;
-  totalFloors: number; 
-  constructionYear: number;
-  distanceFromMainRoad: string;
-  roadType: string;
-  nearbyLocations: string;
-  carpetArea: number;
-  builtUpArea: number;
-  superBuiltUpArea: number;
-  hasParking: 'Yes' | 'No';
-  parkingCharges: number;
-  hasAmenities: 'Yes' | 'No';
-  amenitiesCharges: number;
-  fsi: number;
-}
-
-export interface RentRequest {
-  state: string;
-  city: string;
-  area: string;
-  bhk: string;
-}
-
-export interface RentalListing {
-  title: string;
-  rent: string;
-  address: string;
-  sourceUrl: string;
-  bhk: string;
-  qualityScore: number;
-}
-
-export interface RentResult {
-  averageRent: string;
-  listings: RentalListing[];
-  marketSummary: string;
-  negotiationStrategy: string;
-  depositEstimate: string;
-  maintenanceEstimate: string;
-  relocationExpenses: string;
-  latitude?: number;
-  longitude?: number;
-  radiusUsed: string;
-  scanLogs: string[];
-  expertVerdict?: {
-    justifiedPrice: string;
-    maxThreshold: string;
-    whyJustified: string;
-    whyNoMoreThan: string;
-  };
-  premiumDrivers: { feature: string; impact: string }[];
-}
-
-export interface ValuationResult {
-  estimatedValue: number;
-  pricePerSqft: number;
-  rangeLow: number;
-  rangeHigh: number;
-  confidenceScore: number;
-  locationScore: number;
-  sentimentScore: number;
-  sentimentAnalysis: string;
-  comparables: Comparable[];
-  valuationJustification: string;
-  propertyStatus: string;
-}
-
-export interface Comparable {
-  projectName: string;
-  price: number;
-  area: number;
-  bhk: string;
-  pricePerSqft: number;
-  latitude?: number;
-  longitude?: number;
-}
-
-export interface ChatMessage {
-  id: string;
-  sender: 'user' | 'bot';
-  text?: string;
-  component?: ReactNode;
-  isTyping?: boolean;
-  stepIndex?: number;
-}
-
+// Added StepField enum to fix the error in constants.ts
 export enum StepField {
   State = 'state',
   City = 'city',
   Pincode = 'pincode',
   District = 'district',
-  Area = 'area', 
+  Area = 'area',
   ProjectName = 'projectName',
   BuilderName = 'builderName',
   BHK = 'bhk',
@@ -131,10 +29,181 @@ export enum StepField {
   FSI = 'fsi'
 }
 
+export interface UserProfile {
+  name: string;
+  mobile: string;
+  email: string;
+}
+
+export interface GlobalContext {
+  address: string;
+  pincode: string;
+  city: string;
+  photos: string[];
+}
+
+export interface BuyRequest extends GlobalContext {
+  purchaseType: 'New Booking' | 'Resale Purchase';
+  possessionStatus: 'Ready to Move' | 'Under Construction' | 'Upcoming Project';
+  possessionYear?: string;
+  bhk: string;
+  sqft: number;
+  amenities: string[];
+  expectedPrice: number;
+}
+
+export interface SellRequest extends GlobalContext {
+  bhk: string;
+  sqft: number;
+  age: number;
+  floor: number;
+  amenities: string[];
+  furnishing: string;
+  expectedPrice: number;
+}
+
+export interface RentRequest extends GlobalContext {
+  bhk: string;
+  sqft: number;
+  expectedRent: number;
+  leaseTerm: string;
+  securityDepositMonths: number;
+  forceExpandRadius?: boolean;
+}
+
+export interface LandRequest extends GlobalContext {
+  plotSize: number;
+  unit: 'sqft' | 'sqyd' | 'sqmt' | 'acre';
+  facing: string;
+  fsi: number;
+  devPotential: 'residential' | 'commercial';
+  approvals: 'NA' | 'RERA' | 'None';
+}
+
+export interface RentalListing {
+  title: string;
+  rent: string;
+  address: string;
+  sourceUrl: string;
+  bhk: string;
+  qualityScore: number;
+}
+
+export interface SaleListing {
+  title: string;
+  price: string;
+  priceValue: number;
+  address: string;
+  sourceUrl: string;
+  bhk: string;
+  emiEstimate: string;
+}
+
+export interface LandListing {
+  title: string;
+  price: string;
+  size: string;
+  address: string;
+  sourceUrl: string;
+}
+
+export interface BuyResult {
+  fairValue: string;
+  valuationRange: string;
+  recommendation: 'Good Buy' | 'Fair Price' | 'Overpriced';
+  negotiationScript: string;
+  listings: SaleListing[];
+  marketSentiment: string;
+  registrationEstimate: string;
+  appreciationPotential: string;
+  confidenceScore: number;
+}
+
+export interface RentResult {
+  rentalValue: string;
+  yieldPercentage: string;
+  rentOutAlert: string;
+  depositCalc: string;
+  negotiationScript: string;
+  listings: RentalListing[];
+  marketSummary: string;
+  tenantDemandScore: number;
+  confidenceScore: number;
+  suggestRadiusExpansion: boolean;
+  propertiesFoundCount: number;
+}
+
+export interface LandResult {
+  landValue: string;
+  perSqmValue: string;
+  devROI: string;
+  negotiationStrategy: string;
+  confidenceScore: number;
+  zoningAnalysis: string;
+  listings: LandListing[];
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: 'user' | 'bot';
+  text?: string;
+  component?: ReactNode;
+  isTyping?: boolean;
+}
+
 export interface WizardStep {
   field: string;
   question: string;
-  type: 'text' | 'number' | 'select';
+  type: 'text' | 'number' | 'select' | 'multi-select' | 'city-picker' | 'locality-picker';
   options?: string[];
   placeholder?: string;
+}
+
+// Added Comparable interface to fix the error in ValuationReport.tsx
+export interface Comparable {
+  projectName: string;
+  price: number;
+  pricePerSqft: number;
+  area: number;
+  bhk: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+// Added ValuationResult interface to fix the error in ValuationReport.tsx
+export interface ValuationResult {
+  estimatedValue: number;
+  rangeLow: number;
+  rangeHigh: number;
+  confidenceScore: number;
+  valuationJustification: string;
+  comparables: Comparable[];
+}
+
+// Added ValuationRequest interface to fix the error in ValuationReport.tsx
+export interface ValuationRequest {
+  state: string;
+  city: string;
+  pincode: string;
+  district: string;
+  area: string;
+  projectName: string;
+  builderName: string;
+  bhk: string;
+  facing: string;
+  floor: number;
+  constructionYear: number;
+  distanceFromMainRoad: string;
+  roadType: string;
+  nearbyLocations: string;
+  carpetArea: number;
+  builtUpArea: number;
+  superBuiltUpArea: number;
+  hasParking: string;
+  parkingCharges: number;
+  hasAmenities: string;
+  amenitiesCharges: number;
+  fsi: number;
+  latitude?: number;
+  longitude?: number;
 }

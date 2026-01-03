@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { ValuationResult, ValuationRequest, Comparable } from '../types';
 import { 
@@ -126,19 +127,21 @@ const ReportMap = ({ lat, lng, comparables }: { lat: number, lng: number, compar
     const mapInstance = useRef<any>(null);
 
     useEffect(() => {
-        if (!mapRef.current || !window.L) return;
+        // Fix for L global variable TypeScript error
+        const L = (window as any).L;
+        if (!mapRef.current || !L) return;
         if (mapInstance.current) mapInstance.current.remove();
 
         // Initialize map
-        const map = window.L.map(mapRef.current, { zoomControl: false, dragging: true, scrollWheelZoom: false }).setView([lat, lng], 14);
+        const map = L.map(mapRef.current, { zoomControl: false, dragging: true, scrollWheelZoom: false }).setView([lat, lng], 14);
         const tileUrl = layerType === 'map' 
             ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
             : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 
-        window.L.tileLayer(tileUrl, { attribution: '' }).addTo(map);
+        L.tileLayer(tileUrl, { attribution: '' }).addTo(map);
 
         // --- RADAR PULSE OVERLAY ---
-        const pulseIcon = window.L.divIcon({
+        const pulseIcon = L.divIcon({
             className: 'radar-container',
             html: `
               <div class="relative w-40 h-40 -ml-20 -mt-20 flex items-center justify-center pointer-events-none">
@@ -149,10 +152,10 @@ const ReportMap = ({ lat, lng, comparables }: { lat: number, lng: number, compar
             `,
             iconSize: [0, 0]
         });
-        window.L.marker([lat, lng], { icon: pulseIcon }).addTo(map);
+        L.marker([lat, lng], { icon: pulseIcon }).addTo(map);
 
         // --- SUBJECT PROPERTY MARKER ---
-        const subjectIcon = window.L.divIcon({
+        const subjectIcon = L.divIcon({
             className: 'custom-subject-icon',
             html: `
               <div class="w-10 h-10 -ml-5 -mt-5 flex items-center justify-center">
@@ -164,16 +167,16 @@ const ReportMap = ({ lat, lng, comparables }: { lat: number, lng: number, compar
             `,
             iconSize: [0, 0]
         });
-        window.L.marker([lat, lng], { icon: subjectIcon }).addTo(map)
+        L.marker([lat, lng], { icon: subjectIcon }).addTo(map)
           .bindTooltip("<div class='font-mono text-[10px] uppercase font-bold text-cyber-teal'>Subject_Target</div>", { permanent: false, direction: 'top', offset: [0, -10] });
 
         // --- COMPARABLE CLUSTERING ---
-        const clusters = (window.L as any).markerClusterGroup({
+        const clusters = (L as any).markerClusterGroup({
             showCoverageOnHover: false,
             maxClusterRadius: 40,
             spiderfyOnMaxZoom: true,
             iconCreateFunction: (cluster: any) => {
-              return window.L.divIcon({
+              return L.divIcon({
                 html: `<div class="flex items-center justify-center w-8 h-8 rounded-full bg-cyber-lime/90 text-black font-bold font-mono text-xs border-2 border-white shadow-[0_0_15px_#B4FF5C]">${cluster.getChildCount()}</div>`,
                 className: 'custom-cluster-icon',
                 iconSize: [32, 32]
@@ -183,7 +186,7 @@ const ReportMap = ({ lat, lng, comparables }: { lat: number, lng: number, compar
 
         comparables.forEach((comp, idx) => {
             if (comp.latitude && comp.longitude) {
-                const compIcon = window.L.divIcon({
+                const compIcon = L.divIcon({
                     className: 'comp-marker-icon',
                     html: `<div class="w-6 h-6 -ml-3 -mt-3 bg-cyber-lime border-2 border-cyber-black rounded-full shadow-[0_0_10px_#B4FF5C] flex items-center justify-center text-[10px] text-cyber-black font-bold font-mono group transition-transform hover:scale-125">${idx + 1}</div>`,
                     iconSize: [0, 0]
@@ -194,7 +197,7 @@ const ReportMap = ({ lat, lng, comparables }: { lat: number, lng: number, compar
                     return `₹${(val / 100000).toFixed(2)} L`;
                 };
 
-                const marker = window.L.marker([comp.latitude, comp.longitude], { icon: compIcon });
+                const marker = L.marker([comp.latitude, comp.longitude], { icon: compIcon });
                 
                 const tooltipContent = `
                     <div class="font-mono text-[10px] p-1">

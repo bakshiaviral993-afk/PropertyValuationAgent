@@ -1,75 +1,55 @@
-import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { ValuationRequest, ValuationResult, RentRequest, RentResult, RentalListing } from "../types";
-import { vectorService } from "./vectorDb";
 
-const VALUATION_SCHEMA: Schema = {
+import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { 
+  BuyRequest, BuyResult, 
+  RentRequest, RentResult, 
+  LandRequest, LandResult
+} from "../types";
+
+const BUY_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
-    estimatedValue: { type: Type.NUMBER },
-    pricePerSqft: { type: Type.NUMBER },
-    rangeLow: { type: Type.NUMBER },
-    rangeHigh: { type: Type.NUMBER },
+    fairValue: { type: Type.STRING },
+    valuationRange: { type: Type.STRING },
+    recommendation: { type: Type.STRING, enum: ['Good Buy', 'Fair Price', 'Overpriced'] },
+    negotiationScript: { type: Type.STRING },
+    marketSentiment: { type: Type.STRING },
+    registrationEstimate: { type: Type.STRING },
+    appreciationPotential: { type: Type.STRING },
     confidenceScore: { type: Type.NUMBER },
-    locationScore: { type: Type.NUMBER },
-    sentimentScore: { type: Type.NUMBER },
-    sentimentAnalysis: { type: Type.STRING },
-    comparables: {
+    listings: {
       type: Type.ARRAY,
       items: {
         type: Type.OBJECT,
         properties: {
-          projectName: { type: Type.STRING },
-          price: { type: Type.NUMBER },
-          area: { type: Type.NUMBER },
+          title: { type: Type.STRING },
+          price: { type: Type.STRING },
+          priceValue: { type: Type.NUMBER },
+          address: { type: Type.STRING },
+          sourceUrl: { type: Type.STRING },
           bhk: { type: Type.STRING },
-          pricePerSqft: { type: Type.NUMBER },
-          latitude: { type: Type.NUMBER },
-          longitude: { type: Type.NUMBER }
+          emiEstimate: { type: Type.STRING }
         },
-        required: ["projectName", "price", "area", "bhk", "pricePerSqft", "latitude", "longitude"]
+        required: ["title", "price", "priceValue", "address", "sourceUrl", "bhk"]
       }
-    },
-    valuationJustification: { type: Type.STRING },
-    propertyStatus: { type: Type.STRING }
+    }
   },
-  required: [
-    "estimatedValue", "pricePerSqft", "rangeLow", "rangeHigh",
-    "confidenceScore", "locationScore", "sentimentScore",
-    "comparables", "valuationJustification", "propertyStatus"
-  ]
+  required: ["fairValue", "valuationRange", "recommendation", "negotiationScript", "listings", "confidenceScore"]
 };
 
 const RENT_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
-    averageRent: { type: Type.STRING },
+    rentalValue: { type: Type.STRING },
+    yieldPercentage: { type: Type.STRING },
+    rentOutAlert: { type: Type.STRING },
+    depositCalc: { type: Type.STRING },
+    negotiationScript: { type: Type.STRING },
     marketSummary: { type: Type.STRING },
-    negotiationStrategy: { type: Type.STRING },
-    depositEstimate: { type: Type.STRING },
-    maintenanceEstimate: { type: Type.STRING },
-    relocationExpenses: { type: Type.STRING },
-    radiusUsed: { type: Type.STRING },
-    expertVerdict: {
-      type: Type.OBJECT,
-      properties: {
-        justifiedPrice: { type: Type.STRING },
-        maxThreshold: { type: Type.STRING },
-        whyJustified: { type: Type.STRING },
-        whyNoMoreThan: { type: Type.STRING }
-      },
-      required: ["justifiedPrice", "maxThreshold", "whyJustified", "whyNoMoreThan"]
-    },
-    premiumDrivers: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          feature: { type: Type.STRING },
-          impact: { type: Type.STRING }
-        },
-        required: ["feature", "impact"]
-      }
-    },
+    tenantDemandScore: { type: Type.NUMBER },
+    confidenceScore: { type: Type.NUMBER },
+    suggestRadiusExpansion: { type: Type.BOOLEAN },
+    propertiesFoundCount: { type: Type.NUMBER },
     listings: {
       type: Type.ARRAY,
       items: {
@@ -82,118 +62,125 @@ const RENT_SCHEMA: Schema = {
           bhk: { type: Type.STRING },
           qualityScore: { type: Type.NUMBER }
         },
-        required: ["title", "rent", "address", "sourceUrl", "bhk", "qualityScore"]
+        required: ["title", "rent", "address", "sourceUrl", "bhk"]
       }
     }
   },
-  required: [
-    "averageRent", "marketSummary", "negotiationStrategy", 
-    "depositEstimate", "maintenanceEstimate", "relocationExpenses", 
-    "listings", "radiusUsed", "expertVerdict", "premiumDrivers"
-  ]
+  required: ["rentalValue", "yieldPercentage", "negotiationScript", "listings", "confidenceScore", "suggestRadiusExpansion", "propertiesFoundCount"]
 };
 
-const verifyDeepLink = (urlStr: string): boolean => {
-  try {
-    const url = new URL(urlStr);
-    const path = url.pathname.toLowerCase();
-    const genericPaths = ['/rent', '/flats-for-rent', '/residential-rent', '/properties-for-rent', '/index.html', '/flats-in-'];
-    if (genericPaths.some(p => path === p || path === p + '/')) return false;
-    if (path.length < 15) return false;
-    if (url.hostname.includes('housing.com')) return /-p[0-9]+$/i.test(path);
-    if (url.hostname.includes('nobroker.in')) return path.includes('/property/') || /[0-9a-f]{20,}/i.test(path);
-    if (url.hostname.includes('magicbricks.com')) return path.includes('propertydetails');
-    if (url.hostname.includes('99acres.com')) return path.includes('-npid-') || path.length > 50;
-    return path.split('/').length > 2;
-  } catch {
-    return false;
-  }
+const LAND_SCHEMA: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    landValue: { type: Type.STRING },
+    perSqmValue: { type: Type.STRING },
+    devROI: { type: Type.STRING },
+    negotiationStrategy: { type: Type.STRING },
+    confidenceScore: { type: Type.NUMBER },
+    zoningAnalysis: { type: Type.STRING },
+    listings: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          price: { type: Type.STRING },
+          size: { type: Type.STRING },
+          address: { type: Type.STRING },
+          sourceUrl: { type: Type.STRING }
+        },
+        required: ["title", "price", "size", "address", "sourceUrl"]
+      }
+    }
+  },
+  required: ["landValue", "perSqmValue", "devROI", "negotiationStrategy", "confidenceScore", "listings"]
 };
 
-export const getValuationAnalysis = async (data: ValuationRequest): Promise<ValuationResult> => {
+export const getBuyAnalysis = async (data: any): Promise<BuyResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = `Act as Lead Property Analyst. Subject: ${data.area}, ${data.city}. Analyze market trends and provide 3 comparable listings with estimated coordinates. Property specs: ${data.superBuiltUpArea} sqft, ${data.bhk}.`;
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+  
+  const isSell = data.age !== undefined;
+  const role = isSell ? "Liquidator/Asset Appraiser" : "Chief Acquisition Strategist";
+  const purchaseContext = data.purchaseType ? `Mode: ${data.purchaseType}. Possession: ${data.possessionStatus} (${data.possessionYear || 'Immediate'}).` : "";
+
+  const prompt = `Act as ${role}. 
+  Sector: ${data.address}, ${data.city} (${data.pincode}). 
+  Spec: ${data.bhk}, ${data.sqft} sqft. ${purchaseContext}
+  Target Value: ₹${data.expectedPrice}. 
+
+  VALUATION VECTORS:
+  1. SEARCH: Scan web for ${isSell ? 'resale' : 'new primary'} property rates in ${data.address}.
+  2. POSSESSION RISK: If Under Construction/Upcoming, adjust valuation for RERA compliance and entry-point discount.
+  3. COMPARABLES: Find listings under ${data.expectedPrice}.
+  4. NEW VS RESALE: If 'New Booking', focus on builder credibility. If 'Resale', focus on asset age and maintenance.
+  
+  Return JSON per BUY_SCHEMA.`;
+
+  const searchResponse = await ai.models.generateContent({
+    model: 'gemini-3-pro-preview', 
     contents: prompt,
-    config: { responseMimeType: "application/json", responseSchema: VALUATION_SCHEMA }
+    config: { tools: [{ googleSearch: {} }] }
   });
-  return JSON.parse(response.text!) as ValuationResult;
+
+  const structResponse = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: `Translate to BUY_SCHEMA JSON: ${searchResponse.text}`,
+    config: { responseMimeType: "application/json", responseSchema: BUY_SCHEMA }
+  });
+
+  return JSON.parse(structResponse.text!) as BuyResult;
 };
 
 export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const scanLogs: string[] = ["Activating Research Wing Analysis...", "Establishing Lead Tester Security Layer..."];
-  let currentRadius = 2;
-  let attempts = 0;
-  let finalResult: RentResult | null = null;
+  const searchScope = data.forceExpandRadius ? "unlimited" : "5km max";
 
-  while (attempts < 3) {
-    scanLogs.push(`Precision Scan Initialized: Radius ${currentRadius}km around ${data.area}.`);
-    const searchPrompt = `LEAD TESTER & MARKET EXPERT PROTOCOL: 
-    Find 5 current rental listings for ${data.bhk} in ${data.area}, ${data.city} (Radius: ${currentRadius}km).
-    STRICT URL GATE: Only direct property detail pages.
-    Specifically identify:
-    1. Property age trends in this sector.
-    2. Premium amenities available (Swimming pool, Clubhouse, Automation).
-    3. Distance from key landmarks (IT Parks, Metros, Schools).
-    Explain why the current price is justified or inflated.`;
+  const prompt = `Act as Rental Strategist. 
+  Locality: ${data.address}, ${data.city}. 
+  Subject: ${data.bhk}, ${data.sqft} sqft. 
+  
+  RADIUS LOGIC PROTOCOL:
+  1. Search active listings within 2km-5km.
+  2. If < 5 found, set 'suggestRadiusExpansion' to TRUE.
+  3. Preference: ${searchScope}.
+  
+  Return JSON per RENT_SCHEMA.`;
 
-    const searchResponse = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview', 
-      contents: searchPrompt,
-      config: { tools: [{ googleSearch: {} }] }
-    });
+  const searchResponse = await ai.models.generateContent({
+    model: 'gemini-3-pro-preview', 
+    contents: prompt,
+    config: { tools: [{ googleSearch: {} }] }
+  });
 
-    const extractionPrompt = `
-      Analyze findings: "${searchResponse.text}"
-      Radius: ${currentRadius}km in ${data.area}, ${data.city}. Target: ${data.bhk}.
-      
-      ACT AS A PROFESSIONAL MARKET APPRAISER:
-      - justifiedPrice: Based on property age and landmark proximity, what IS the fair monthly rent?
-      - maxThreshold: What is the absolute "Do Not Pay More" limit?
-      - whyJustified: Explain why the 'justifiedPrice' is fair (list 3 specific factors like age, school proximity, road access).
-      - whyNoMoreThan: List deal-breakers or diminishing returns (e.g., "Lack of dedicated parking", "Old construction").
-      - premiumDrivers: Array of objects {feature: string, impact: string} (e.g., {feature: "Metro Proximity", impact: "+15%"}).
-      - marketSummary: Concise overview.
-      - averageRent: Overall market average for current listings.
-      - maintenanceEstimate: Society charges.
-      - depositEstimate: Typical security deposit.
-      - relocationExpenses: One-time cost estimate.
-      
-      Structure into JSON according to RENT_SCHEMA.
-    `;
+  const structResponse = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: `Structure this into valid RENT_SCHEMA JSON: ${searchResponse.text}`,
+    config: { responseMimeType: "application/json", responseSchema: RENT_SCHEMA }
+  });
 
-    const structResponse = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: extractionPrompt,
-      config: { responseMimeType: "application/json", responseSchema: RENT_SCHEMA }
-    });
+  return JSON.parse(structResponse.text!) as RentResult;
+};
 
-    const candidate = JSON.parse(structResponse.text!) as RentResult;
-    const verifiedListings = candidate.listings.filter(listing => verifyDeepLink(listing.sourceUrl));
-    
-    if (verifiedListings.length >= 2 || attempts === 2) {
-      scanLogs.push(`Signal Stabilized. Negotiation Matrix Prepared.`);
-      finalResult = { ...candidate, listings: verifiedListings, scanLogs, radiusUsed: `${currentRadius}km` };
-      break;
-    } else {
-      scanLogs.push(`Signal Low. Expanding Dynamic Radius to ${currentRadius + 3}km...`);
-      currentRadius += 3;
-      attempts++;
-    }
-  }
+export const getLandValuationAnalysis = async (data: LandRequest): Promise<LandResult> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  const prompt = `Act as Expert Land Valuer. Plot: ${data.plotSize} ${data.unit} in ${data.address}, ${data.city}.
+  Facing: ${data.facing}, FSI: ${data.fsi}, Potential: ${data.devPotential}, Approvals: ${data.approvals}.
 
-  if (!finalResult) throw new Error("Intelligence wing could not stabilize the data cluster.");
+  Search active land plots in ${data.address} via web grounding. 
+  Return JSON per LAND_SCHEMA.`;
 
-  try {
-    const geoResponse = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(`${data.area}, ${data.city}`)}&format=json&limit=1`);
-    const geoData = await geoResponse.json();
-    if (geoData.length > 0) {
-      finalResult.latitude = parseFloat(geoData[0].lat);
-      finalResult.longitude = parseFloat(geoData[0].lon);
-    }
-  } catch (e) {}
+  const searchResponse = await ai.models.generateContent({
+    model: 'gemini-3-pro-preview', 
+    contents: prompt,
+    config: { tools: [{ googleSearch: {} }] }
+  });
 
-  return finalResult;
+  const structResponse = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: `Translate land analysis into valid LAND_SCHEMA JSON: ${searchResponse.text}`,
+    config: { responseMimeType: "application/json", responseSchema: LAND_SCHEMA }
+  });
+
+  return JSON.parse(structResponse.text!) as LandResult;
 };

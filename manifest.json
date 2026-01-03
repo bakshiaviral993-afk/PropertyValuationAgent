@@ -1,0 +1,23 @@
+{
+  "name": "QuantCasa Research Wing",
+  "short_name": "QuantCasa",
+  "description": "Professional AI-powered real estate valuation and rental search engine.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0D0F12",
+  "theme_color": "#0D0F12",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/fluency/512/lightning-bolt.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://img.icons8.com/fluency/192/lightning-bolt.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
