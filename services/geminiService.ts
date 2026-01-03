@@ -6,6 +6,16 @@ import {
   LandRequest, LandResult
 } from "../types";
 
+// Validation helper to provide clear feedback for deployment issues
+const getAIClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.error("CRITICAL: process.env.API_KEY is undefined. Ensure Vercel environment variables are correctly configured.");
+    throw new Error("QuantCasa Intelligence: API Key missing. Verify production environment configuration.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
 const BUY_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
@@ -102,8 +112,7 @@ const LAND_SCHEMA: Schema = {
 };
 
 export const getBuyAnalysis = async (data: any): Promise<BuyResult> => {
-  // Fresh instantiation to ensure process.env.API_KEY is latest
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAIClient();
   const isSell = data.age !== undefined;
   const role = isSell ? "Liquidator/Asset Appraiser" : "Chief Acquisition Strategist";
   
@@ -130,7 +139,7 @@ export const getBuyAnalysis = async (data: any): Promise<BuyResult> => {
 };
 
 export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAIClient();
   const prompt = `Act as Rental Strategist. Locality: ${data.address}, ${data.city}. 
   Estimate rent and yield. Return JSON per RENT_SCHEMA.`;
 
@@ -150,7 +159,7 @@ export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> =>
 };
 
 export const getLandValuationAnalysis = async (data: LandRequest): Promise<LandResult> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAIClient();
   const prompt = `Act as Expert Land Valuer. Plot: ${data.plotSize} ${data.unit} in ${data.address}, ${data.city}.
   Analyze FSI and dev potential. Return JSON per LAND_SCHEMA.`;
 

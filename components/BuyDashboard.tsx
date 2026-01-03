@@ -13,7 +13,7 @@ interface BuyDashboardProps {
   buyType?: 'New Buy' | 'Resale';
 }
 
-// Waze Key provided by user
+// Waze Key provided by user for enhanced routing
 const WAZE_API_KEY = "9b9817e604msh23232e7c48177ecp11f684jsnc32882321d9f";
 
 const DashboardMap = ({ listings }: { listings: SaleListing[] }) => {
@@ -61,7 +61,9 @@ const DashboardMap = ({ listings }: { listings: SaleListing[] }) => {
       const isPenthouse = item.title.toLowerCase().includes('penthouse');
       
       const typeLabel = isVilla ? 'Villa' : isPenthouse ? 'Penthouse' : 'Apartment';
-      const TypeIcon = isVilla ? Home : isPenthouse ? Gem : Building2;
+      const typeIcon = isVilla 
+        ? '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>'
+        : '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="18" x="3" y="3" rx="1"/><rect width="8" height="10" x="13" y="3" rx="1"/><rect width="8" height="6" x="13" y="15" rx="1"/></svg>';
 
       const tooltipContent = `
         <div class="flex gap-4 min-w-[280px] p-3 bg-cyber-black rounded-2xl border border-white/10 shadow-glass backdrop-blur-xl group">
@@ -71,7 +73,7 @@ const DashboardMap = ({ listings }: { listings: SaleListing[] }) => {
           <div class="flex-1 min-w-0">
              <div class="flex items-center justify-between mb-1.5">
                 <span class="text-[9px] font-mono font-bold uppercase text-cyber-teal flex items-center gap-1.5">
-                   LISTING_${typeLabel.toUpperCase()}
+                   ${typeIcon} LISTING_${typeLabel.toUpperCase()}
                 </span>
                 <span class="text-[9px] text-gray-600 font-mono tracking-tighter">IDX_${idx + 1}</span>
              </div>
@@ -139,8 +141,8 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType }) => {
   const [isRendered, setIsRendered] = useState(false);
 
   useEffect(() => {
-    // Force a re-measurement after initial layout
-    const timer = setTimeout(() => setIsRendered(true), 200);
+    // Settling delay ensures Recharts doesn't measure dimensions during CSS transitions
+    const timer = setTimeout(() => setIsRendered(true), 300);
     return () => clearTimeout(timer);
   }, [viewMode]);
 
@@ -205,15 +207,15 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType }) => {
               </div>
             </div>
 
-            {/* Price Spread Chart with Fixed Dimension Parent */}
-            <div className="glass-panel rounded-3xl p-6 border border-white/5 bg-black/20">
+            {/* Price Spread Chart with Fixed Dimension Parent Guard */}
+            <div className="glass-panel rounded-3xl p-6 border border-white/5 bg-black/20 overflow-hidden">
                 <h3 className="text-xs font-mono font-bold text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
                   <TrendingUp size={16} className="text-cyber-lime" /> Sector Price Spread (Lakhs)
                 </h3>
                 <div className="h-[250px] w-full min-h-[250px] relative">
                   {isRendered && (
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                      <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                      <LineChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
                         <XAxis dataKey="name" stroke="#555" fontSize={10} tickLine={false} axisLine={false} />
                         <YAxis stroke="#555" fontSize={10} tickLine={false} axisLine={false} />
@@ -228,6 +230,7 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType }) => {
                           strokeWidth={3} 
                           dot={{ fill: '#00F6FF', stroke: '#0D0F12', strokeWidth: 2, r: 4 }} 
                           activeDot={{ r: 6 }}
+                          isAnimationActive={false}
                         />
                       </LineChart>
                     </ResponsiveContainer>

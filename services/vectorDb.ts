@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { REAL_ESTATE_KNOWLEDGE_BASE } from "../data/knowledgeBase";
 
@@ -10,10 +11,19 @@ interface VectorDocument {
 let cachedDb: VectorDocument[] | null = null;
 
 export class VectorService {
-    private ai: GoogleGenAI;
+    private _ai: GoogleGenAI | null = null;
 
-    constructor() {
-        this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // Lazy initializer for the AI client
+    private get ai(): GoogleGenAI {
+        if (!this._ai) {
+            const apiKey = process.env.API_KEY;
+            if (!apiKey) {
+                console.error("VectorService: process.env.API_KEY is missing.");
+                throw new Error("Intelligence Core: API Key required for vector search.");
+            }
+            this._ai = new GoogleGenAI({ apiKey });
+        }
+        return this._ai;
     }
 
     private async getEmbedding(text: string): Promise<number[]> {

@@ -9,6 +9,9 @@ import { jsPDF } from 'jspdf';
 // @ts-ignore
 import html2canvas from 'html2canvas';
 
+// Waze Key provided by user for advanced routing
+const WAZE_API_KEY = "9b9817e604msh23232e7c48177ecp11f684jsnc32882321d9f";
+
 interface ValuationReportProps {
   result: ValuationResult;
   request: ValuationRequest;
