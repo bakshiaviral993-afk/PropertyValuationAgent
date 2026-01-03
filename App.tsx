@@ -16,11 +16,12 @@ import {
   getBuyAnalysis, getRentAnalysis, getLandValuationAnalysis 
 } from './services/geminiService';
 import { REAL_ESTATE_KNOWLEDGE_BASE } from './data/knowledgeBase';
-import { Zap, ShieldAlert, Database, User, ShoppingBag, Search, Map as MapIcon, Layers, ArrowLeft, Tag } from 'lucide-react';
+import { Zap, ShieldAlert, Database, User, ShoppingBag, Search, Map as MapIcon, Layers, ArrowLeft, Tag, Building2, Landmark } from 'lucide-react';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [mode, setMode] = useState<AppMode>('buy');
+  const [buyType, setBuyType] = useState<'New Buy' | 'Resale'>('New Buy');
   
   const [buyData, setBuyData] = useState<BuyResult | null>(null);
   const [rentData, setRentData] = useState<RentResult | null>(null);
@@ -51,7 +52,9 @@ const App: React.FC = () => {
     setSuggestExpansion(false);
     try {
       if (mode === 'buy' || mode === 'sell') {
-        const result = await getBuyAnalysis(data as BuyRequest);
+        // Inject current buyType into the request
+        const requestData = { ...data, purchaseType: buyType === 'New Buy' ? 'New Booking' : 'Resale Purchase' };
+        const result = await getBuyAnalysis(requestData as BuyRequest);
         setBuyData(result);
       } else if (mode === 'rent') {
         const result = await getRentAnalysis(data as RentRequest);
@@ -132,6 +135,23 @@ const App: React.FC = () => {
         </div>
         
         <div className="flex items-center justify-between w-full md:w-auto gap-4">
+          {(mode === 'buy' || mode === 'sell') && !isAnyResult && (
+            <div className="flex bg-cyber-black border border-white/10 rounded-xl p-1 shadow-inner">
+               <button 
+                onClick={() => { setBuyType('New Buy'); resetMode(); }}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[9px] font-mono font-bold transition-all ${buyType === 'New Buy' ? 'bg-cyber-teal/20 text-cyber-teal border border-cyber-teal/30' : 'text-gray-600 hover:text-gray-400'}`}
+               >
+                 <Building2 size={12} /> NEW BUY
+               </button>
+               <button 
+                onClick={() => { setBuyType('Resale'); resetMode(); }}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[9px] font-mono font-bold transition-all ${buyType === 'Resale' ? 'bg-cyber-teal/20 text-cyber-teal border border-cyber-teal/30' : 'text-gray-600 hover:text-gray-400'}`}
+               >
+                 <Landmark size={12} /> RESALE
+               </button>
+            </div>
+          )}
+
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 font-mono text-[9px] text-gray-400">
              <User size={10} className="text-cyber-teal" /> {user.name.toUpperCase()}
           </div>
@@ -163,8 +183,9 @@ const App: React.FC = () => {
           <div className={`transition-all duration-700 flex-shrink-0 flex flex-col ${isAnyResult ? 'w-full md:w-[420px]' : 'w-full md:w-[600px] md:mx-auto'}`}>
                <div className="flex-1 min-h-[400px] md:min-h-0">
                  <ChatInterface 
-                    key={`${sessionKey}-${mode}`} 
+                    key={`${sessionKey}-${mode}-${buyType}`} 
                     mode={mode} 
+                    buyType={buyType}
                     onComplete={handleComplete} 
                     isLoading={isLoading} 
                     suggestExpansion={suggestExpansion}
@@ -180,7 +201,7 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex-1 min-h-0 relative">
-            {(buyData || mode === 'sell' && buyData) && <BuyDashboard result={buyData} />}
+            {(buyData || mode === 'sell' && buyData) && <BuyDashboard result={buyData} buyType={buyType} />}
             {rentData && mode === 'rent' && <RentDashboard result={rentData} />}
             {landData && mode === 'land' && <LandReport result={landData} />}
             

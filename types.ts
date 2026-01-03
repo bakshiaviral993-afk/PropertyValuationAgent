@@ -159,7 +159,7 @@ export interface WizardStep {
   placeholder?: string;
 }
 
-// Added Comparable interface to fix the error in ValuationReport.tsx
+// Enhanced Comparable interface
 export interface Comparable {
   projectName: string;
   price: number;
@@ -168,6 +168,8 @@ export interface Comparable {
   bhk: string;
   latitude?: number;
   longitude?: number;
+  imageUrl?: string;
+  propertyType?: 'Apartment' | 'Villa' | 'Penthouse' | 'Plot';
 }
 
 // Added ValuationResult interface to fix the error in ValuationReport.tsx

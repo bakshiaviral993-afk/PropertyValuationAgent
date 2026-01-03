@@ -3,28 +3,29 @@ import React from 'react';
 import { LandResult } from '../types';
 import { Map, Zap, Layers, Globe, MessageSquare, ExternalLink } from 'lucide-react';
 
+// Added LandReportProps interface to fix "Cannot find name 'LandReportProps'" error
 interface LandReportProps {
   result: LandResult;
 }
 
 const LandReport: React.FC<LandReportProps> = ({ result }) => {
   return (
-    <div className="h-full flex flex-col gap-6 animate-in fade-in slide-in-from-right-8 duration-1000 overflow-y-auto pr-2 scrollbar-thin">
-      <div className="glass-panel rounded-3xl p-6 md:p-8 bg-gradient-to-br from-cyber-orange/10 to-transparent border-cyber-orange/20 relative overflow-hidden shrink-0">
+    <div className="h-full flex flex-col gap-6 animate-in fade-in slide-in-from-right-8 duration-1000 overflow-y-auto pr-2 pb-10 scrollbar-thin">
+      <div className="glass-panel rounded-3xl p-6 md:p-8 bg-gradient-to-br from-cyber-orange/10 to-transparent border-cyber-orange/20 relative overflow-hidden shrink-0 min-h-[200px]">
         <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
           <Map size={200} className="text-cyber-orange" />
         </div>
         
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 relative z-10">
           <div>
             <h2 className="text-2xl md:text-3xl font-mono font-bold text-white uppercase tracking-tighter">LAND_VALUATION_RECON</h2>
             <div className="flex items-center gap-2 text-[10px] md:text-xs text-gray-500 font-mono mt-1">
               <Zap size={14} className="text-cyber-orange" /> SECURE_VECTOR_HYBRID_ANALYSIS
             </div>
           </div>
-          <div className="bg-black/40 backdrop-blur-xl border border-cyber-orange/30 p-4 md:p-6 rounded-2xl text-right w-full md:w-auto">
-            <span className="text-[10px] font-mono text-gray-500 uppercase">Hybrid Market Valuation</span>
-            <div className="text-3xl md:text-4xl font-mono font-bold text-cyber-orange tracking-tight break-words">{result.landValue}</div>
+          <div className="bg-black/40 backdrop-blur-xl border border-cyber-orange/30 p-4 md:p-6 rounded-2xl text-right w-full md:w-auto min-h-[100px] flex flex-col justify-center">
+            <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest block mb-1">Hybrid Market Valuation</span>
+            <div className="text-3xl md:text-4xl font-mono font-bold text-cyber-orange tracking-tight break-words text-glow-orange leading-tight">{result.landValue}</div>
           </div>
         </div>
 
@@ -75,11 +76,11 @@ const LandReport: React.FC<LandReportProps> = ({ result }) => {
             {result.listings.map((item, idx) => (
               <div key={idx} className="bg-white/[0.02] border border-white/10 rounded-2xl p-4 hover:border-cyber-orange/40 transition-all group">
                 <div className="flex flex-col gap-3 h-full justify-between">
-                  <div>
-                    <h4 className="font-bold text-white text-xs mb-1 line-clamp-2 uppercase">{item.title}</h4>
+                  <div className="flex flex-col gap-1">
+                    <h4 className="font-bold text-white text-xs line-clamp-2 uppercase tracking-tight">{item.title}</h4>
                     <p className="text-[9px] text-gray-500 font-mono truncate">{item.address}</p>
                     <div className="mt-2 flex items-center justify-between">
-                      <span className="text-[10px] font-mono text-cyber-orange font-bold">{item.price}</span>
+                      <span className="text-[11px] font-mono text-cyber-orange font-bold leading-none">{item.price}</span>
                       <span className="text-[9px] text-gray-600 font-mono">{item.size}</span>
                     </div>
                   </div>

@@ -2,7 +2,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { ValuationResult, ValuationRequest, Comparable } from '../types';
 import { 
-  MapPin, TrendingUp, Download, Loader2, Layers, Globe, Share2, FileText, Zap, Home, Car, Grid, Info
+  MapPin, TrendingUp, Download, Loader2, Layers, Globe, Share2, FileText, Zap, Home, Car, Grid, Info, Building2, Star, Map as MapIcon
 } from 'lucide-react';
 // @ts-ignore
 import { jsPDF } from 'jspdf';
@@ -197,17 +197,55 @@ const ReportMap = ({ lat, lng, comparables }: { lat: number, lng: number, compar
                     return `₹${(val / 100000).toFixed(2)} L`;
                 };
 
-                const marker = L.marker([comp.latitude, comp.longitude], { icon: compIcon });
-                
+                // Infer Icon based on Property Type or BHK/Name
+                let IconSvg = '';
+                let iconColor = 'text-cyber-teal';
+                const type = comp.propertyType || (comp.projectName.toLowerCase().includes('villa') ? 'Villa' : 'Apartment');
+
+                if (type === 'Villa') {
+                  IconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>';
+                  iconColor = 'text-cyber-lime';
+                } else if (type === 'Penthouse') {
+                  IconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+                  iconColor = 'text-cyber-orange';
+                } else if (type === 'Plot') {
+                  IconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="M12 9v1"/><path d="M12 14v1"/><path d="M15 12h-1"/><path d="M10 12H9"/></svg>';
+                  iconColor = 'text-white';
+                } else {
+                  IconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M8 10h.01"/><path d="M16 10h.01"/><path d="M8 14h.01"/><path d="M16 14h.01"/></svg>';
+                  iconColor = 'text-cyber-teal';
+                }
+
+                // Placeholder image if not provided
+                const thumbUrl = comp.imageUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${comp.projectName}&backgroundColor=0D0F12`;
+
                 const tooltipContent = `
-                    <div class="font-mono text-[10px] p-1">
-                        <b class="text-white block truncate uppercase mb-1">${comp.projectName}</b>
-                        <div class="text-cyber-lime font-bold">${formatPrice(comp.price)}</div>
-                        <div class="text-gray-500 text-[8px] mt-0.5">₹${comp.pricePerSqft}/sqft</div>
+                    <div class="flex gap-3 min-w-[200px] p-2 bg-cyber-black rounded-lg">
+                        <div class="w-[60px] h-[60px] shrink-0 rounded-md overflow-hidden border border-white/10">
+                           <img src="${thumbUrl}" class="w-full h-full object-cover grayscale hover:grayscale-0 transition-all" />
+                        </div>
+                        <div class="flex-1 overflow-hidden">
+                           <div class="flex items-center justify-between mb-1">
+                              <span class="text-[8px] font-mono font-bold uppercase ${iconColor} flex items-center gap-1">
+                                ${IconSvg} ${type}
+                              </span>
+                              <span class="text-[8px] text-gray-500 font-mono">#${idx + 1}</span>
+                           </div>
+                           <b class="text-white block text-[10px] font-mono truncate uppercase mb-1">${comp.projectName}</b>
+                           <div class="text-cyber-lime font-mono font-bold text-[11px] leading-tight">${formatPrice(comp.price)}</div>
+                           <div class="text-gray-500 text-[8px] mt-1 font-mono uppercase tracking-tighter">
+                              ${comp.bhk} • ₹${comp.pricePerSqft}/sqft
+                           </div>
+                        </div>
                     </div>
                 `;
 
-                marker.bindTooltip(tooltipContent, { direction: 'top', offset: [0, -10] });
+                const marker = L.marker([comp.latitude, comp.longitude], { icon: compIcon });
+                marker.bindTooltip(tooltipContent, { 
+                  direction: 'top', 
+                  offset: [0, -15],
+                  className: 'custom-comp-tooltip'
+                });
                 clusters.addLayer(marker);
             }
         });
@@ -228,6 +266,17 @@ const ReportMap = ({ lat, lng, comparables }: { lat: number, lng: number, compar
                  <div className="w-1.5 h-1.5 rounded-full bg-cyber-teal animate-pulse"></div>
                  ACTIVE_GEOSPATIAL_PROBE
              </div>
+             <style>{`
+                .custom-comp-tooltip {
+                  background: transparent !important;
+                  border: none !important;
+                  box-shadow: none !important;
+                  padding: 0 !important;
+                }
+                .custom-comp-tooltip::before {
+                  display: none;
+                }
+             `}</style>
         </div>
     );
 };
@@ -427,7 +476,7 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                                             {comp.bhk} • {comp.area} sqft
                                         </div>
                                         <div className="px-2 py-0.5 rounded bg-white/5 text-[10px] text-gray-400 font-mono">
-                                            ₹{comp.pricePerSqft}/sqft
+                                            ₹${comp.pricePerSqft}/sqft
                                         </div>
                                     </div>
                                 </div>
