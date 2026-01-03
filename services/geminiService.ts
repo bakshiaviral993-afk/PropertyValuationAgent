@@ -6,14 +6,18 @@ import {
   LandRequest, LandResult
 } from "../types";
 
-// Validation helper to provide clear feedback for deployment issues
-const getAIClient = () => {
+/**
+ * Validates and returns the API key from environment.
+ * Prevents initialization with invalid or missing keys.
+ */
+const getValidatedApiKey = (): string => {
   const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    console.error("CRITICAL: process.env.API_KEY is undefined. Ensure Vercel environment variables are correctly configured.");
-    throw new Error("QuantCasa Intelligence: API Key missing. Verify production environment configuration.");
+  if (!apiKey || apiKey === 'undefined' || apiKey === 'null' || apiKey.trim() === '') {
+    const errorMsg = "CRITICAL: process.env.API_KEY is missing or invalid. Check Vercel Environment Variables.";
+    console.error(errorMsg);
+    throw new Error(errorMsg);
   }
-  return new GoogleGenAI({ apiKey });
+  return apiKey;
 };
 
 const BUY_SCHEMA: Schema = {
@@ -112,7 +116,9 @@ const LAND_SCHEMA: Schema = {
 };
 
 export const getBuyAnalysis = async (data: any): Promise<BuyResult> => {
-  const ai = getAIClient();
+  const apiKey = getValidatedApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+  
   const isSell = data.age !== undefined;
   const role = isSell ? "Liquidator/Asset Appraiser" : "Chief Acquisition Strategist";
   
@@ -135,11 +141,14 @@ export const getBuyAnalysis = async (data: any): Promise<BuyResult> => {
     config: { responseMimeType: "application/json", responseSchema: BUY_SCHEMA }
   });
 
-  return JSON.parse(structResponse.text!) as BuyResult;
+  if (!structResponse.text) throw new Error("QuantCore: Analysis synthesis failed.");
+  return JSON.parse(structResponse.text) as BuyResult;
 };
 
 export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> => {
-  const ai = getAIClient();
+  const apiKey = getValidatedApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
   const prompt = `Act as Rental Strategist. Locality: ${data.address}, ${data.city}. 
   Estimate rent and yield. Return JSON per RENT_SCHEMA.`;
 
@@ -155,11 +164,14 @@ export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> =>
     config: { responseMimeType: "application/json", responseSchema: RENT_SCHEMA }
   });
 
-  return JSON.parse(structResponse.text!) as RentResult;
+  if (!structResponse.text) throw new Error("QuantCore: Rental reconnaissance failed.");
+  return JSON.parse(structResponse.text) as RentResult;
 };
 
 export const getLandValuationAnalysis = async (data: LandRequest): Promise<LandResult> => {
-  const ai = getAIClient();
+  const apiKey = getValidatedApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
   const prompt = `Act as Expert Land Valuer. Plot: ${data.plotSize} ${data.unit} in ${data.address}, ${data.city}.
   Analyze FSI and dev potential. Return JSON per LAND_SCHEMA.`;
 
@@ -175,5 +187,6 @@ export const getLandValuationAnalysis = async (data: LandRequest): Promise<LandR
     config: { responseMimeType: "application/json", responseSchema: LAND_SCHEMA }
   });
 
-  return JSON.parse(structResponse.text!) as LandResult;
+  if (!structResponse.text) throw new Error("QuantCore: Geographic plot appraisal failed.");
+  return JSON.parse(structResponse.text) as LandResult;
 };

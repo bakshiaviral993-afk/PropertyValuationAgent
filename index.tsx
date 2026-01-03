@@ -3,9 +3,12 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 
-// Global shim for process.env to support SDK requirements in production/mobile environments
+// Global shim for process.env to support SDK requirements in production/mobile environments.
+// We only define it if it's completely missing, and we avoid overriding existing env variables.
 if (typeof (window as any).process === 'undefined') {
   (window as any).process = { env: {} };
+} else if (!(window as any).process.env) {
+  (window as any).process.env = {};
 }
 
 const rootElement = document.getElementById('root');

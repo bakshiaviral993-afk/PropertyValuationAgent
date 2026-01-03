@@ -11,25 +11,25 @@ interface VectorDocument {
 let cachedDb: VectorDocument[] | null = null;
 
 export class VectorService {
-    private _ai: GoogleGenAI | null = null;
-
-    // Lazy initializer for the AI client
-    private get ai(): GoogleGenAI {
-        if (!this._ai) {
-            const apiKey = process.env.API_KEY;
-            if (!apiKey) {
-                console.error("VectorService: process.env.API_KEY is missing.");
-                throw new Error("Intelligence Core: API Key required for vector search.");
-            }
-            this._ai = new GoogleGenAI({ apiKey });
+    /**
+     * Resiliently creates a new AI client instance.
+     * We initialize this per-request or lazily to ensure it uses the latest process.env values.
+     */
+    private createClient(): GoogleGenAI {
+        const apiKey = process.env.API_KEY;
+        if (!apiKey || apiKey === 'undefined' || apiKey === 'null') {
+            const errorMsg = "VectorService: API_KEY is missing from environment.";
+            console.error(errorMsg);
+            throw new Error(errorMsg);
         }
-        return this._ai;
+        return new GoogleGenAI({ apiKey });
     }
 
     private async getEmbedding(text: string): Promise<number[]> {
         try {
+            const ai = this.createClient();
             // Using text-embedding-004 model for high-quality embeddings
-            const response = await this.ai.models.embedContent({
+            const response = await ai.models.embedContent({
                 model: 'text-embedding-004',
                 contents: text
             });
@@ -58,6 +58,8 @@ export class VectorService {
         if (cachedDb) return;
         
         const docs: VectorDocument[] = [];
+        console.log("QuantCore: Starting vector space indexing...");
+        
         // Create embeddings for all documents in the knowledge base
         const promises = REAL_ESTATE_KNOWLEDGE_BASE.map(async (text) => {
             const vector = await this.getEmbedding(text);
@@ -68,13 +70,13 @@ export class VectorService {
         
         await Promise.all(promises);
         cachedDb = docs;
-        console.log(`Vector DB Initialized with ${cachedDb.length} documents.`);
+        console.log(`Vector DB Initialized with ${cachedDb.length} nodes.`);
     }
 
     async search(query: string, k: number = 3): Promise<string[]> {
         // Ensure DB is initialized
         if (!cachedDb) await this.init();
-        if (!cachedDb || cachedDb.length === 0) return []; // Fallback if embedding fails
+        if (!cachedDb || cachedDb.length === 0) return []; 
 
         const queryVector = await this.getEmbedding(query);
         if (queryVector.length === 0) return [];
