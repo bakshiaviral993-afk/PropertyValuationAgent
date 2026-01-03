@@ -86,6 +86,8 @@ export interface RentalListing {
   sourceUrl: string;
   bhk: string;
   qualityScore: number;
+  latitude: number;
+  longitude: number;
 }
 
 export interface SaleListing {
@@ -106,6 +108,8 @@ export interface LandListing {
   size: string;
   address: string;
   sourceUrl: string;
+  latitude: number;
+  longitude: number;
 }
 
 export interface BuyResult {

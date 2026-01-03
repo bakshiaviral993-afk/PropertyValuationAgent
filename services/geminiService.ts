@@ -13,7 +13,11 @@ import {
 const getValidatedApiKey = (): string => {
   const apiKey = process.env.API_KEY;
   if (!apiKey || apiKey === 'undefined' || apiKey === 'null' || apiKey.trim() === '') {
-    const errorMsg = "CRITICAL: process.env.API_KEY is missing or invalid. Check Vercel Environment Variables.";
+    // If running in browser, try to check if it's available globally as a last resort
+    const globalKey = (window as any).API_KEY;
+    if (globalKey && globalKey !== 'undefined') return globalKey;
+    
+    const errorMsg = "CRITICAL: process.env.API_KEY is missing. Verify environment variable configuration in your deployment settings.";
     console.error(errorMsg);
     throw new Error(errorMsg);
   }
@@ -67,7 +71,7 @@ const RENT_SCHEMA: Schema = {
     confidenceScore: { type: Type.NUMBER },
     suggestRadiusExpansion: { type: Type.BOOLEAN },
     propertiesFoundCount: { type: Type.NUMBER },
-    valuationJustification: { type: Type.STRING, description: "Rationale for the suggested rent based on local demand and inventory." },
+    valuationJustification: { type: Type.STRING },
     listings: {
       type: Type.ARRAY,
       items: {
@@ -78,9 +82,11 @@ const RENT_SCHEMA: Schema = {
           address: { type: Type.STRING },
           sourceUrl: { type: Type.STRING },
           bhk: { type: Type.STRING },
-          qualityScore: { type: Type.NUMBER }
+          qualityScore: { type: Type.NUMBER },
+          latitude: { type: Type.NUMBER },
+          longitude: { type: Type.NUMBER }
         },
-        required: ["title", "rent", "address", "sourceUrl", "bhk"]
+        required: ["title", "rent", "address", "sourceUrl", "bhk", "latitude", "longitude"]
       }
     }
   },
@@ -96,7 +102,7 @@ const LAND_SCHEMA: Schema = {
     negotiationStrategy: { type: Type.STRING },
     confidenceScore: { type: Type.NUMBER },
     zoningAnalysis: { type: Type.STRING },
-    valuationJustification: { type: Type.STRING, description: "Expert explanation of land value based on FSI and zoning." },
+    valuationJustification: { type: Type.STRING },
     listings: {
       type: Type.ARRAY,
       items: {
@@ -106,9 +112,11 @@ const LAND_SCHEMA: Schema = {
           price: { type: Type.STRING },
           size: { type: Type.STRING },
           address: { type: Type.STRING },
-          sourceUrl: { type: Type.STRING }
+          sourceUrl: { type: Type.STRING },
+          latitude: { type: Type.NUMBER },
+          longitude: { type: Type.NUMBER }
         },
-        required: ["title", "price", "size", "address", "sourceUrl"]
+        required: ["title", "price", "size", "address", "sourceUrl", "latitude", "longitude"]
       }
     }
   },
@@ -150,7 +158,9 @@ export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> =>
   const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `Act as Rental Strategist. Locality: ${data.address}, ${data.city}. 
-  Estimate rent and yield. Return JSON per RENT_SCHEMA.`;
+  Estimate rent and yield. Ground results in real-world data. 
+  Every property MUST have latitude/longitude.
+  Return JSON per RENT_SCHEMA.`;
 
   const searchResponse = await ai.models.generateContent({
     model: 'gemini-3-pro-preview', 
@@ -173,7 +183,9 @@ export const getLandValuationAnalysis = async (data: LandRequest): Promise<LandR
   const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `Act as Expert Land Valuer. Plot: ${data.plotSize} ${data.unit} in ${data.address}, ${data.city}.
-  Analyze FSI and dev potential. Return JSON per LAND_SCHEMA.`;
+  Analyze FSI and dev potential. Ground results in real-world data. 
+  Every listing MUST have latitude/longitude.
+  Return JSON per LAND_SCHEMA.`;
 
   const searchResponse = await ai.models.generateContent({
     model: 'gemini-3-pro-preview', 

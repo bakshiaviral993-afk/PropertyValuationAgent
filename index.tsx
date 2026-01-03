@@ -3,13 +3,33 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 
-// Global shim for process.env to support SDK requirements in production/mobile environments.
-// We only define it if it's completely missing, and we avoid overriding existing env variables.
-if (typeof (window as any).process === 'undefined') {
-  (window as any).process = { env: {} };
-} else if (!(window as any).process.env) {
-  (window as any).process.env = {};
+/**
+ * Senior Dev Note: Nuclear Shim for process.env
+ * Some browser environments and PWA builders strip the process object.
+ * We ensure it's available and mapped to the window's state.
+ */
+function initializeGlobalEnvironment() {
+  const isProcessUndefined = typeof (window as any).process === 'undefined';
+  
+  if (isProcessUndefined) {
+    (window as any).process = { 
+      env: { 
+        API_KEY: (window as any).API_KEY || undefined 
+      } 
+    };
+  } else if (!(window as any).process.env) {
+    (window as any).process.env = {
+      API_KEY: (window as any).API_KEY || undefined
+    };
+  }
+
+  // Double-link for maximum visibility
+  if ((window as any).process.env.API_KEY) {
+     (window as any).API_KEY = (window as any).process.env.API_KEY;
+  }
 }
+
+initializeGlobalEnvironment();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
