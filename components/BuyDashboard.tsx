@@ -4,17 +4,36 @@ import { BuyResult, SaleListing } from '../types';
 import { 
   ExternalLink, TrendingUp, Calculator, Globe, 
   Zap, Info, Database, Layers, Map as MapIcon, 
-  LayoutDashboard, Navigation, Home, Building2, Gem
+  LayoutDashboard, Navigation, Bookmark
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface BuyDashboardProps {
   result: BuyResult;
   buyType?: 'New Buy' | 'Resale';
+  onSave?: () => void;
 }
 
-// Waze Key provided by user for enhanced routing
-const WAZE_API_KEY = "9b9817e604msh23232e7c48177ecp11f684jsnc32882321d9f";
+// Custom Tooltip for the Recharts LineChart
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-cyber-black/95 border border-white/10 p-3 rounded-xl shadow-glass backdrop-blur-xl font-mono min-w-[200px] animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between mb-2">
+           <span className="text-[8px] text-cyber-teal font-bold uppercase tracking-widest">Listing_Identified</span>
+           <span className="text-[8px] text-gray-600 font-bold uppercase">{data.name}</span>
+        </div>
+        <p className="text-[10px] text-white font-bold uppercase truncate mb-1">{data.title}</p>
+        <p className="text-[13px] text-cyber-teal font-bold mb-1">{data.full}</p>
+        <div className="h-px bg-white/5 my-2" />
+        <p className="text-[9px] text-gray-500 uppercase leading-tight truncate">{data.address}</p>
+        <p className="text-[8px] text-gray-700 mt-1 uppercase tracking-tighter">CONFIG: {data.bhk}</p>
+      </div>
+    );
+  }
+  return null;
+};
 
 const DashboardMap = ({ listings }: { listings: SaleListing[] }) => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -31,6 +50,7 @@ const DashboardMap = ({ listings }: { listings: SaleListing[] }) => {
 
     const map = L.map(mapRef.current, { zoomControl: false }).setView([avgLat, avgLng], 13);
     
+    // Using OpenStreetMap based tiles for zero-config map rendering
     const tileUrl = layerType === 'map' 
       ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
       : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -58,9 +78,8 @@ const DashboardMap = ({ listings }: { listings: SaleListing[] }) => {
 
       const thumbUrl = `https://api.dicebear.com/7.x/identicon/svg?seed=${item.title}&backgroundColor=13161B&shapeColor=00F6FF`;
       const isVilla = item.title.toLowerCase().includes('villa');
-      const isPenthouse = item.title.toLowerCase().includes('penthouse');
       
-      const typeLabel = isVilla ? 'Villa' : isPenthouse ? 'Penthouse' : 'Apartment';
+      const typeLabel = isVilla ? 'Villa' : 'Apartment';
       const typeIcon = isVilla 
         ? '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>'
         : '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="18" x="3" y="3" rx="1"/><rect width="8" height="10" x="13" y="3" rx="1"/><rect width="8" height="6" x="13" y="15" rx="1"/></svg>';
@@ -136,9 +155,10 @@ const DashboardMap = ({ listings }: { listings: SaleListing[] }) => {
   );
 };
 
-const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType }) => {
+const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType, onSave }) => {
   const [viewMode, setViewMode] = useState<'dashboard' | 'map'>('dashboard');
   const [isRendered, setIsRendered] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     // Settling delay ensures Recharts doesn't measure dimensions during CSS transitions
@@ -146,10 +166,22 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType }) => {
     return () => clearTimeout(timer);
   }, [viewMode]);
 
+  const handleSave = () => {
+    if (onSave) {
+      onSave();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
+  };
+
+  // Enriched chart data with additional fields for the custom tooltip
   const chartData = result.listings.map((l, i) => ({
     name: `L${i+1}`,
     val: l.priceValue / 100000,
-    full: l.price
+    full: l.price,
+    title: l.title,
+    address: l.address,
+    bhk: l.bhk
   })).sort((a,b) => a.val - b.val);
 
   return (
@@ -162,12 +194,25 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType }) => {
           <span className="text-[10px] font-mono font-bold text-white uppercase tracking-widest">Buy_Intel_Report</span>
         </div>
         
-        <div className="flex bg-black/40 rounded-xl p-1 border border-white/10 shadow-inner">
-          <button onClick={() => setViewMode('dashboard')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all ${viewMode === 'dashboard' ? 'bg-cyber-teal text-cyber-black' : 'text-gray-500 hover:text-white'}`}>
-            <LayoutDashboard size={14} /> DASHBOARD
-          </button>
-          <button onClick={() => setViewMode('map')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all ${viewMode === 'map' ? 'bg-cyber-teal text-cyber-black' : 'text-gray-500 hover:text-white'}`}>
-            <MapIcon size={14} /> MAP_VIEW
+        <div className="flex items-center gap-3">
+          <div className="flex bg-black/40 rounded-xl p-1 border border-white/10 shadow-inner">
+            <button onClick={() => setViewMode('dashboard')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all ${viewMode === 'dashboard' ? 'bg-cyber-teal text-cyber-black' : 'text-gray-500 hover:text-white'}`}>
+              <LayoutDashboard size={14} /> DASHBOARD
+            </button>
+            <button onClick={() => setViewMode('map')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all ${viewMode === 'map' ? 'bg-cyber-teal text-cyber-black' : 'text-gray-500 hover:text-white'}`}>
+              <MapIcon size={14} /> MAP_VIEW
+            </button>
+          </div>
+
+          <button 
+            onClick={handleSave}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-mono font-bold transition-all border ${
+              saved 
+              ? 'bg-cyber-lime/10 border-cyber-lime text-cyber-lime' 
+              : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:border-white/20'
+            }`}
+          >
+            <Bookmark size={14} className={saved ? 'fill-cyber-lime' : ''} /> {saved ? 'SAVED' : 'SAVE_RECON'}
           </button>
         </div>
       </div>
@@ -207,7 +252,7 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType }) => {
               </div>
             </div>
 
-            {/* Price Spread Chart with Fixed Dimension Parent Guard */}
+            {/* Price Spread Chart with Custom Tooltip */}
             <div className="glass-panel rounded-3xl p-6 border border-white/5 bg-black/20 overflow-hidden">
                 <h3 className="text-xs font-mono font-bold text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
                   <TrendingUp size={16} className="text-cyber-lime" /> Sector Price Spread (Lakhs)
@@ -219,18 +264,16 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType }) => {
                         <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
                         <XAxis dataKey="name" stroke="#555" fontSize={10} tickLine={false} axisLine={false} />
                         <YAxis stroke="#555" fontSize={10} tickLine={false} axisLine={false} />
-                        <Tooltip 
-                          contentStyle={{ backgroundColor: '#0D0F12', border: '1px solid #333', fontSize: '10px', borderRadius: '8px' }}
-                          itemStyle={{ color: '#00F6FF' }}
-                        />
+                        <Tooltip content={<CustomTooltip />} />
                         <Line 
                           type="monotone" 
                           dataKey="val" 
                           stroke="#00F6FF" 
                           strokeWidth={3} 
                           dot={{ fill: '#00F6FF', stroke: '#0D0F12', strokeWidth: 2, r: 4 }} 
-                          activeDot={{ r: 6 }}
-                          isAnimationActive={false}
+                          activeDot={{ r: 6, stroke: '#00F6FF', strokeWidth: 2, fill: '#fff' }}
+                          isAnimationActive={true}
+                          animationDuration={1500}
                         />
                       </LineChart>
                     </ResponsiveContainer>

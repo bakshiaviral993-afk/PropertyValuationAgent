@@ -2,11 +2,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RentResult, RentalListing } from '../types';
 import { 
-  MapPin, ExternalLink, Zap, Terminal, Globe, MessageSquare, TrendingUp, Calculator, Info, ShieldAlert, Layers, Map as MapIcon, Navigation, Building2, LayoutDashboard
+  MapPin, ExternalLink, Zap, Terminal, Globe, MessageSquare, TrendingUp, Calculator, Info, ShieldAlert, Layers, Map as MapIcon, Navigation, Building2, LayoutDashboard, Bookmark
 } from 'lucide-react';
 
 interface RentDashboardProps {
   result: RentResult;
+  onSave?: () => void;
 }
 
 const WAZE_API_KEY = "9b9817e604msh23232e7c48177ecp11f684jsnc32882321d9f";
@@ -124,8 +125,17 @@ const DashboardMap = ({ listings }: { listings: RentalListing[] }) => {
   );
 };
 
-const RentDashboard: React.FC<RentDashboardProps> = ({ result }) => {
+const RentDashboard: React.FC<RentDashboardProps> = ({ result, onSave }) => {
   const [viewMode, setViewMode] = useState<'dashboard' | 'map'>('dashboard');
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    if (onSave) {
+      onSave();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
+  };
 
   return (
     <div className="h-full flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-8 duration-1000 overflow-hidden relative">
@@ -137,12 +147,25 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result }) => {
           <span className="text-[10px] font-mono font-bold text-white uppercase tracking-widest">Rental_Intel_Report</span>
         </div>
         
-        <div className="flex bg-black/40 rounded-xl p-1 border border-white/10 shadow-inner">
-          <button onClick={() => setViewMode('dashboard')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all ${viewMode === 'dashboard' ? 'bg-cyber-lime text-cyber-black' : 'text-gray-500 hover:text-white'}`}>
-            <LayoutDashboard size={14} /> DASHBOARD
-          </button>
-          <button onClick={() => setViewMode('map')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all ${viewMode === 'map' ? 'bg-cyber-lime text-cyber-black' : 'text-gray-500 hover:text-white'}`}>
-            <MapIcon size={14} /> MAP_VIEW
+        <div className="flex items-center gap-3">
+          <div className="flex bg-black/40 rounded-xl p-1 border border-white/10 shadow-inner">
+            <button onClick={() => setViewMode('dashboard')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all ${viewMode === 'dashboard' ? 'bg-cyber-lime text-cyber-black' : 'text-gray-500 hover:text-white'}`}>
+              <LayoutDashboard size={14} /> DASHBOARD
+            </button>
+            <button onClick={() => setViewMode('map')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all ${viewMode === 'map' ? 'bg-cyber-lime text-cyber-black' : 'text-gray-500 hover:text-white'}`}>
+              <MapIcon size={14} /> MAP_VIEW
+            </button>
+          </div>
+
+          <button 
+            onClick={handleSave}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-mono font-bold transition-all border ${
+              saved 
+              ? 'bg-cyber-lime/10 border-cyber-lime text-cyber-lime' 
+              : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:border-white/20'
+            }`}
+          >
+            <Bookmark size={14} className={saved ? 'fill-cyber-lime' : ''} /> {saved ? 'SAVED' : 'SAVE_RECON'}
           </button>
         </div>
       </div>

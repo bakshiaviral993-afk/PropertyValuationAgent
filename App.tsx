@@ -9,13 +9,13 @@ import {
   BuyRequest, BuyResult, 
   RentRequest, RentResult, 
   LandRequest, LandResult,
-  AppMode, UserProfile
+  AppMode, UserProfile, SavedSearch
 } from './types';
 import { 
   getBuyAnalysis, getRentAnalysis, getLandValuationAnalysis 
 } from './services/geminiService';
 import { REAL_ESTATE_KNOWLEDGE_BASE } from './data/knowledgeBase';
-import { Zap, ShieldAlert, Database, User, ShoppingBag, Search, Map as MapIcon, Layers, ArrowLeft, Tag, Building2, Landmark } from 'lucide-react';
+import { Zap, Database, User, ShoppingBag, Search, Map as MapIcon, Layers, ArrowLeft, Tag, Building2, Landmark, Bookmark, Trash2, Clock, X } from 'lucide-react';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -33,6 +33,21 @@ const App: React.FC = () => {
 
   const [suggestExpansion, setSuggestExpansion] = useState(false);
   const [pendingRequestData, setPendingRequestData] = useState<any>(null);
+  
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+  const [showSavedPanel, setShowSavedPanel] = useState(false);
+
+  useEffect(() => {
+    // Load saved searches from localStorage
+    const stored = localStorage.getItem('quantcasa_saved_intel');
+    if (stored) {
+      try {
+        setSavedSearches(JSON.parse(stored));
+      } catch (e) {
+        console.error("Failed to load saved searches");
+      }
+    }
+  }, []);
 
   useEffect(() => {
     let interval: any;
@@ -48,6 +63,7 @@ const App: React.FC = () => {
     setIsLoading(true);
     setError(null);
     setSuggestExpansion(false);
+    setPendingRequestData(data); // Store last request
     try {
       if (mode === 'buy' || mode === 'sell') {
         const requestData = { ...data, purchaseType: buyType === 'New Buy' ? 'New Booking' : 'Resale Purchase' };
@@ -57,7 +73,6 @@ const App: React.FC = () => {
         const result = await getRentAnalysis(data as RentRequest);
         if (result.suggestRadiusExpansion && !data.forceExpandRadius) {
            setSuggestExpansion(true);
-           setPendingRequestData(data);
         } else {
            setRentData(result);
         }
@@ -66,10 +81,53 @@ const App: React.FC = () => {
         setLandData(result);
       }
     } catch (err: any) {
-      setError(err instanceof Error ? err.message : "Intelligence Wing signal disruption.");
+      setError(err instanceof Error ? err.message : "Signal disruption.");
     } finally {
       setIsLoading(false);
+      if (window.innerWidth < 768) {
+        setTimeout(() => {
+          window.scrollTo({ top: 400, behavior: 'smooth' });
+        }, 100);
+      }
     }
+  };
+
+  const handleSaveSearch = () => {
+    if (!pendingRequestData) return;
+    
+    const configStr = mode === 'land' 
+      ? `${pendingRequestData.plotSize} ${pendingRequestData.unit}`
+      : `${pendingRequestData.bhk || 'N/A'} • ${pendingRequestData.sqft} SQFT`;
+
+    const newSaved: SavedSearch = {
+      id: Math.random().toString(36).substr(2, 9),
+      timestamp: Date.now(),
+      mode,
+      location: pendingRequestData.address,
+      city: pendingRequestData.city,
+      config: configStr,
+      data: pendingRequestData
+    };
+
+    const updated = [newSaved, ...savedSearches].slice(0, 20); // Keep last 20
+    setSavedSearches(updated);
+    localStorage.setItem('quantcasa_saved_intel', JSON.stringify(updated));
+  };
+
+  const handleDeleteSaved = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = savedSearches.filter(s => s.id !== id);
+    setSavedSearches(updated);
+    localStorage.setItem('quantcasa_saved_intel', JSON.stringify(updated));
+  };
+
+  const handleRecallSearch = (saved: SavedSearch) => {
+    setMode(saved.mode);
+    setBuyData(null);
+    setRentData(null);
+    setLandData(null);
+    setShowSavedPanel(false);
+    handleComplete(saved.data);
   };
 
   const handleConfirmExpansion = () => {
@@ -86,6 +144,7 @@ const App: React.FC = () => {
     setSuggestExpansion(false);
     setPendingRequestData(null);
     setSessionKey(prev => prev + 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const isAnyResult = !!buyData || !!rentData || !!landData;
@@ -93,10 +152,10 @@ const App: React.FC = () => {
   if (!user) return <Onboarding onComplete={setUser} />;
 
   return (
-    <div className="min-h-screen flex flex-col font-sans bg-cyber-black text-cyber-text overflow-hidden relative selection:bg-cyber-teal selection:text-black">
-      <header className="px-4 md:px-8 py-4 md:py-5 flex flex-col md:flex-row items-center justify-between z-30 border-b border-cyber-border bg-cyber-black/95 backdrop-blur-2xl gap-4">
+    <div className="min-h-screen flex flex-col font-sans bg-cyber-black text-cyber-text selection:bg-cyber-teal selection:text-black">
+      <header className="sticky top-0 px-4 md:px-8 py-4 md:py-5 flex flex-col md:flex-row items-center justify-between z-[60] border-b border-cyber-border bg-cyber-black/95 backdrop-blur-2xl gap-4">
         <div className="flex items-center justify-between w-full md:w-auto gap-4 md:gap-12">
-          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => { resetMode(); }}>
+          <div className="flex items-center gap-3 cursor-pointer group" onClick={resetMode}>
             <div className="p-2 rounded-xl border border-cyber-teal/30 bg-cyber-teal/10 shadow-neon-teal">
                 <Zap size={18} />
             </div>
@@ -104,28 +163,16 @@ const App: React.FC = () => {
           </div>
 
           <nav className="flex items-center bg-white/5 rounded-2xl p-1 border border-white/5 shadow-inner">
-            <button 
-              onClick={() => { setMode('buy'); resetMode(); }}
-              className={`flex items-center gap-2 px-3 md:px-5 py-2 rounded-xl text-[9px] md:text-[10px] font-mono font-bold tracking-widest transition-all whitespace-nowrap ${mode === 'buy' ? 'bg-cyber-teal text-cyber-black shadow-neon-teal' : 'text-gray-500 hover:text-white'}`}
-            >
+            <button onClick={() => { setMode('buy'); resetMode(); }} className={`flex items-center gap-2 px-3 md:px-5 py-2 rounded-xl text-[9px] md:text-[10px] font-mono font-bold tracking-widest transition-all ${mode === 'buy' ? 'bg-cyber-teal text-cyber-black shadow-neon-teal' : 'text-gray-500 hover:text-white'}`}>
               <ShoppingBag size={14} /> BUY
             </button>
-            <button 
-              onClick={() => { setMode('sell'); resetMode(); }}
-              className={`flex items-center gap-2 px-3 md:px-5 py-2 rounded-xl text-[9px] md:text-[10px] font-mono font-bold tracking-widest transition-all whitespace-nowrap ${mode === 'sell' ? 'bg-cyber-teal text-cyber-black shadow-neon-teal' : 'text-gray-500 hover:text-white'}`}
-            >
+            <button onClick={() => { setMode('sell'); resetMode(); }} className={`flex items-center gap-2 px-3 md:px-5 py-2 rounded-xl text-[9px] md:text-[10px] font-mono font-bold tracking-widest transition-all ${mode === 'sell' ? 'bg-cyber-teal text-cyber-black shadow-neon-teal' : 'text-gray-500 hover:text-white'}`}>
               <Tag size={14} /> SELL
             </button>
-            <button 
-              onClick={() => { setMode('rent'); resetMode(); }}
-              className={`flex items-center gap-2 px-3 md:px-5 py-2 rounded-xl text-[9px] md:text-[10px] font-mono font-bold tracking-widest transition-all whitespace-nowrap ${mode === 'rent' ? 'bg-cyber-teal text-cyber-black shadow-neon-teal' : 'text-gray-500 hover:text-white'}`}
-            >
+            <button onClick={() => { setMode('rent'); resetMode(); }} className={`flex items-center gap-2 px-3 md:px-5 py-2 rounded-xl text-[9px] md:text-[10px] font-mono font-bold tracking-widest transition-all ${mode === 'rent' ? 'bg-cyber-teal text-cyber-black shadow-neon-teal' : 'text-gray-500 hover:text-white'}`}>
               <Search size={14} /> RENT
             </button>
-            <button 
-              onClick={() => { setMode('land'); resetMode(); }}
-              className={`flex items-center gap-2 px-3 md:px-5 py-2 rounded-xl text-[9px] md:text-[10px] font-mono font-bold tracking-widest transition-all whitespace-nowrap ${mode === 'land' ? 'bg-cyber-teal text-cyber-black shadow-neon-teal' : 'text-gray-500 hover:text-white'}`}
-            >
+            <button onClick={() => { setMode('land'); resetMode(); }} className={`flex items-center gap-2 px-3 md:px-5 py-2 rounded-xl text-[9px] md:text-[10px] font-mono font-bold tracking-widest transition-all ${mode === 'land' ? 'bg-cyber-teal text-cyber-black shadow-neon-teal' : 'text-gray-500 hover:text-white'}`}>
               <MapIcon size={14} /> LAND
             </button>
           </nav>
@@ -143,65 +190,135 @@ const App: React.FC = () => {
             </div>
           )}
 
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 font-mono text-[9px] text-gray-400">
-             <User size={10} className="text-cyber-teal" /> {user.name.toUpperCase()}
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setShowSavedPanel(true)}
+              className="relative p-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-cyber-teal transition-all group"
+            >
+              <Bookmark size={18} />
+              {savedSearches.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-cyber-teal text-cyber-black text-[9px] font-bold rounded-full flex items-center justify-center border border-cyber-black">
+                  {savedSearches.length}
+                </span>
+              )}
+            </button>
+
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 font-mono text-[9px] text-gray-400">
+               <User size={10} className="text-cyber-teal" /> {user.name.toUpperCase()}
+            </div>
+            
+            {isAnyResult && (
+                <button onClick={resetMode} className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-cyber-teal/10 border border-cyber-teal text-cyber-teal text-[10px] font-bold font-mono shadow-neon-teal hover:bg-cyber-teal hover:text-black transition-all">
+                    <ArrowLeft size={14} /> NEW_VAL
+                </button>
+            )}
           </div>
-          {isAnyResult && (
-              <button onClick={resetMode} className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-cyber-teal/10 border border-cyber-teal text-cyber-teal text-[10px] font-bold font-mono shadow-neon-teal hover:bg-cyber-teal hover:text-black transition-all">
-                  <ArrowLeft size={14} /> NEW_VAL
-              </button>
-          )}
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        <main className="flex-1 flex flex-col md:flex-row gap-4 md:gap-8 p-4 md:p-8 overflow-hidden relative">
-          {isLoading && (
-              <div className="absolute inset-0 z-50 bg-cyber-black/95 backdrop-blur-3xl flex flex-col items-center justify-center p-8">
-                   <div className="relative mb-8 md:mb-12 animate-pulse">
-                     <div className="w-32 h-32 md:w-48 md:h-48 border-t-2 border-cyber-teal rounded-full animate-spin"></div>
-                     <div className="absolute inset-0 flex items-center justify-center">
-                        <Database size={32} className="md:size-[48px] text-cyber-teal" />
-                     </div>
-                   </div>
-                   <p className="text-xl md:text-2xl font-mono font-bold tracking-widest text-cyber-teal uppercase mb-4 animate-glow text-center">QUANT_PROCESSOR_ENGAGED</p>
-                   <div className="max-w-xl glass-panel p-4 md:p-6 border-l-4 border-cyber-lime">
-                      <p className="text-[11px] md:text-sm font-mono text-white italic leading-relaxed">"{REAL_ESTATE_KNOWLEDGE_BASE[currentFactIndex]}"</p>
-                   </div>
+      {/* Saved Intelligence Hub Sidebar */}
+      {showSavedPanel && (
+        <>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]" onClick={() => setShowSavedPanel(false)} />
+          <div className="fixed top-0 right-0 h-full w-full max-w-[380px] bg-cyber-black border-l border-white/10 z-[101] p-6 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <Bookmark className="text-cyber-teal" size={20} />
+                <h3 className="text-sm font-mono font-bold text-white uppercase tracking-widest">SAVED_INTELLIGENCE</h3>
               </div>
-          )}
+              <button onClick={() => setShowSavedPanel(false)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 transition-all">
+                <X size={20} />
+              </button>
+            </div>
 
-          <div className={`transition-all duration-700 flex-shrink-0 flex flex-col ${isAnyResult ? 'w-full md:w-[420px]' : 'w-full md:w-[600px] md:mx-auto'}`}>
-               <div className="flex-1 min-h-[400px] md:min-h-0">
-                 <ChatInterface 
-                    key={`${sessionKey}-${mode}-${buyType}`} 
-                    mode={mode} 
-                    buyType={buyType}
-                    onComplete={handleComplete} 
-                    isLoading={isLoading} 
-                    suggestExpansion={suggestExpansion}
-                    onConfirmExpansion={handleConfirmExpansion}
-                 />
-               </div>
-          </div>
-
-          <div className="flex-1 min-h-0 relative">
-            {(buyData || mode === 'sell' && buyData) && <BuyDashboard result={buyData} buyType={buyType} />}
-            {rentData && mode === 'rent' && <RentDashboard result={rentData} />}
-            {landData && mode === 'land' && <LandReport result={landData} />}
-            
-            {!isAnyResult && !isLoading && (
-              <div className="hidden md:flex h-full flex-col items-center justify-center text-center opacity-30 select-none">
-                <div className="mb-10 p-12 rounded-full border border-dashed border-white/20 animate-pulse-slow">
-                  <Layers size={80} className="text-cyber-teal" />
+            <div className="flex-1 overflow-y-auto space-y-4 pr-2 scrollbar-thin">
+              {savedSearches.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 opacity-30 text-center">
+                  <Bookmark size={40} className="mb-4" />
+                  <p className="text-[10px] font-mono uppercase tracking-widest">NO_SAVED_INTEL</p>
                 </div>
-                <h1 className="text-4xl font-mono font-bold tracking-[0.6em] text-white uppercase mb-4 tracking-tighter">MODE_INACTIVE</h1>
-                <p className="text-[10px] font-mono text-gray-500 uppercase tracking-[0.4em]">Use Chat Interface to Input Sector Parameters</p>
-              </div>
-            )}
+              ) : (
+                savedSearches.map(saved => (
+                  <div 
+                    key={saved.id} 
+                    onClick={() => handleRecallSearch(saved)}
+                    className="group relative bg-white/[0.03] border border-white/5 rounded-2xl p-4 cursor-pointer hover:border-cyber-teal/40 hover:bg-white/[0.05] transition-all"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="px-2 py-0.5 rounded-md bg-cyber-teal/10 text-[8px] font-mono font-bold text-cyber-teal uppercase tracking-widest border border-cyber-teal/20">
+                        {saved.mode.toUpperCase()}
+                      </span>
+                      <button 
+                        onClick={(e) => handleDeleteSaved(saved.id, e)}
+                        className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-500 hover:text-red-500 transition-all"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                    <h4 className="text-white text-[11px] font-bold uppercase truncate tracking-tight">{saved.location}</h4>
+                    <p className="text-[9px] text-gray-500 font-mono mt-1">{saved.city} • {saved.config}</p>
+                    <div className="mt-3 flex items-center justify-between text-[8px] text-gray-600 font-mono uppercase">
+                      <span className="flex items-center gap-1"><Clock size={10} /> {new Date(saved.timestamp).toLocaleDateString()}</span>
+                      <span className="text-cyber-teal opacity-0 group-hover:opacity-100 transition-opacity">RECALL_SIGNAL</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            
+            <div className="mt-6 pt-6 border-t border-white/10">
+              <p className="text-[9px] text-gray-600 font-mono leading-relaxed uppercase">
+                * Saved criteria are stored locally on your device's research cache.
+              </p>
+            </div>
           </div>
-        </main>
-      </div>
+        </>
+      )}
+
+      <main className="flex-1 flex flex-col md:flex-row gap-4 md:gap-8 p-4 md:p-8 relative">
+        {isLoading && (
+            <div className="fixed inset-0 z-[100] bg-cyber-black/95 backdrop-blur-3xl flex flex-col items-center justify-center p-8">
+                 <div className="relative mb-8 md:mb-12">
+                   <div className="w-32 h-32 md:w-48 md:h-48 border-t-2 border-cyber-teal rounded-full animate-spin"></div>
+                   <div className="absolute inset-0 flex items-center justify-center">
+                      <Database size={32} className="md:size-[48px] text-cyber-teal animate-pulse" />
+                   </div>
+                 </div>
+                 <p className="text-xl md:text-2xl font-mono font-bold tracking-widest text-cyber-teal uppercase mb-4 text-center">QUANT_PROCESSOR_ENGAGED</p>
+                 <div className="max-w-xl glass-panel p-4 md:p-6 border-l-4 border-cyber-lime">
+                    <p className="text-[11px] md:text-sm font-mono text-white italic leading-relaxed">"{REAL_ESTATE_KNOWLEDGE_BASE[currentFactIndex]}"</p>
+                 </div>
+            </div>
+        )}
+
+        <div className={`transition-all duration-700 flex-shrink-0 flex flex-col ${isAnyResult ? 'w-full md:w-[420px]' : 'w-full md:w-[600px] md:mx-auto'}`}>
+             <div className="flex-1">
+               <ChatInterface 
+                  key={`${sessionKey}-${mode}-${buyType}`} 
+                  mode={mode} 
+                  buyType={buyType}
+                  onComplete={handleComplete} 
+                  isLoading={isLoading} 
+                  suggestExpansion={suggestExpansion}
+                  onConfirmExpansion={handleConfirmExpansion}
+               />
+             </div>
+        </div>
+
+        <div className="flex-1 min-h-[400px] relative">
+          {(buyData || (mode === 'sell' && buyData)) && <BuyDashboard result={buyData} buyType={buyType} onSave={handleSaveSearch} />}
+          {rentData && mode === 'rent' && <RentDashboard result={rentData} onSave={handleSaveSearch} />}
+          {landData && mode === 'land' && <LandReport result={landData} onSave={handleSaveSearch} />}
+          
+          {!isAnyResult && !isLoading && (
+            <div className="hidden md:flex h-full flex-col items-center justify-center text-center opacity-30 select-none">
+              <Layers size={80} className="text-cyber-teal mb-10 animate-pulse-slow" />
+              <h1 className="text-4xl font-mono font-bold tracking-[0.6em] text-white uppercase mb-4">MODE_INACTIVE</h1>
+              <p className="text-[10px] font-mono text-gray-500 uppercase tracking-[0.4em]">Use Chat Interface to Input Sector Parameters</p>
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 };
