@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RentResult, RentalListing } from '../types';
 import { 
-  MapPin, ExternalLink, Zap, Terminal, Globe, MessageSquare, TrendingUp, Calculator, Info, ShieldAlert, Layers, Map as MapIcon, Navigation, Building2, LayoutDashboard, Bookmark
+  MapPin, ExternalLink, Zap, Globe, MessageSquare, TrendingUp, Calculator, Info, ShieldAlert, Layers, Map as MapIcon, Navigation, Building2, LayoutDashboard, Bookmark, Compass
 } from 'lucide-react';
 
 interface RentDashboardProps {
@@ -10,16 +10,14 @@ interface RentDashboardProps {
   onSave?: () => void;
 }
 
-const WAZE_API_KEY = "9b9817e604msh23232e7c48177ecp11f684jsnc32882321d9f";
-
 const DashboardMap = ({ listings }: { listings: RentalListing[] }) => {
   const mapRef = useRef<HTMLDivElement>(null);
-  const [layerType, setLayerType] = useState<'map' | 'sat' | 'waze'>('map');
+  const [layerType, setLayerType] = useState<'map' | 'sat'>('map');
   const mapInstance = useRef<any>(null);
 
   useEffect(() => {
     const L = (window as any).L;
-    if (!mapRef.current || !L || layerType === 'waze') return;
+    if (!mapRef.current || !L) return;
     if (mapInstance.current) mapInstance.current.remove();
 
     const avgLat = listings.length > 0 ? listings.reduce((acc, l) => acc + l.latitude, 0) / listings.length : 19.0760;
@@ -69,7 +67,7 @@ const DashboardMap = ({ listings }: { listings: RentalListing[] }) => {
              <h4 class="text-white block text-[11px] font-mono font-bold truncate uppercase mb-1 tracking-tight">${item.title}</h4>
              <div class="text-cyber-lime font-mono font-bold text-[13px] leading-tight mb-1 text-glow-orange">${item.rent}</div>
              <div class="text-gray-500 text-[9px] font-mono uppercase tracking-widest flex items-center gap-2">
-                ${item.bhk} <span class="w-1.5 h-1.5 rounded-full bg-gray-800"></span> Quality: ${item.qualityScore}/100
+                ${item.bhk} <span class="w-1.5 h-1.5 rounded-full bg-gray-800"></span> Facing: ${item.facing}
              </div>
           </div>
         </div>
@@ -91,36 +89,15 @@ const DashboardMap = ({ listings }: { listings: RentalListing[] }) => {
 
   return (
     <div className="relative w-full h-full rounded-3xl overflow-hidden border border-white/10 shadow-inner group bg-black/20">
-      {layerType === 'waze' ? (
-        <iframe 
-          src={`https://embed.waze.com/iframe?zoom=14&lat=${listings[0]?.latitude || 19.0760}&lon=${listings[0]?.longitude || 72.8777}&ct=true&pin=1`}
-          className="w-full h-full border-none grayscale contrast-[1.1] opacity-90"
-          allowFullScreen
-        />
-      ) : (
-        <div ref={mapRef} className="w-full h-full grayscale opacity-90 transition-opacity hover:opacity-100 duration-700" />
-      )}
-      
+      <div ref={mapRef} className="w-full h-full grayscale opacity-90 transition-opacity hover:opacity-100 duration-700" />
       <div className="absolute top-4 left-4 flex flex-col gap-2 z-[1000]">
         <button onClick={() => setLayerType('map')} className={`p-2 rounded-xl backdrop-blur-md border transition-all ${layerType === 'map' ? 'bg-cyber-lime text-cyber-black border-cyber-lime shadow-neon-teal' : 'bg-black/40 text-gray-500 border-white/10 hover:text-white'}`}><Layers size={16} /></button>
         <button onClick={() => setLayerType('sat')} className={`p-2 rounded-xl backdrop-blur-md border transition-all ${layerType === 'sat' ? 'bg-cyber-lime text-cyber-black border-cyber-lime shadow-neon-teal' : 'bg-black/40 text-gray-500 border-white/10 hover:text-white'}`}><Globe size={16} /></button>
-        <button onClick={() => setLayerType('waze')} className={`p-2 rounded-xl backdrop-blur-md border transition-all ${layerType === 'waze' ? 'bg-cyber-orange text-cyber-black border-cyber-orange shadow-neon-orange' : 'bg-black/40 text-gray-500 border-white/10 hover:text-white'}`}><Navigation size={16} /></button>
       </div>
-
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-xl border border-white/10 px-4 py-2 rounded-xl text-[10px] font-mono text-cyber-lime flex items-center gap-3 shadow-2xl z-[1000]">
           <div className="w-2 h-2 rounded-full bg-cyber-lime animate-pulse"></div>
-          {layerType === 'waze' ? 'WAZE_TRAFFIC_ACTIVE' : `RECON_LOCKED: ${listings.length} RENTALS`}
+          RECON_LOCKED: {listings.length} RENTALS
       </div>
-
-      <style>{`
-        .custom-comp-tooltip {
-          background: transparent !important;
-          border: none !important;
-          box-shadow: none !important;
-          padding: 0 !important;
-        }
-        .custom-comp-tooltip::before { display: none; }
-      `}</style>
     </div>
   );
 };
@@ -157,14 +134,7 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, onSave }) => {
             </button>
           </div>
 
-          <button 
-            onClick={handleSave}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-mono font-bold transition-all border ${
-              saved 
-              ? 'bg-cyber-lime/10 border-cyber-lime text-cyber-lime' 
-              : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:border-white/20'
-            }`}
-          >
+          <button onClick={handleSave} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-mono font-bold transition-all border ${saved ? 'bg-cyber-lime/10 border-cyber-lime text-cyber-lime' : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:border-white/20'}`}>
             <Bookmark size={14} className={saved ? 'fill-cyber-lime' : ''} /> {saved ? 'SAVED' : 'SAVE_RECON'}
           </button>
         </div>
@@ -175,11 +145,6 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, onSave }) => {
           <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="glass-panel rounded-3xl p-6 border-l-4 border-l-cyber-teal bg-cyber-teal/5 relative">
-                  {result.rentOutAlert && (
-                      <div className="absolute -top-3 -right-3 px-3 py-1 bg-cyber-lime text-black text-[9px] font-bold font-mono rounded-full shadow-neon-teal animate-bounce flex items-center gap-1">
-                          <Zap size={10} /> RENT_OUT_NOW
-                      </div>
-                  )}
                   <div className="flex items-center gap-3 mb-6">
                       <div className="p-2 bg-cyber-teal text-cyber-black rounded-lg"><TrendingUp size={20} /></div>
                       <h2 className="text-sm font-mono font-bold text-white uppercase tracking-widest leading-none">Rental Analytics Hub</h2>
@@ -198,13 +163,12 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, onSave }) => {
 
                   <div className="p-4 bg-white/[0.02] rounded-2xl border border-white/5">
                       <h4 className="text-[10px] font-mono text-gray-400 uppercase mb-2 flex items-center gap-2">
-                          <Calculator size={12} className="text-cyber-teal" /> Security Deposit Protocol
+                          <Calculator size={12} className="text-cyber-teal" /> Deposit Protocol
                       </h4>
                       <p className="text-[11px] text-white font-mono leading-relaxed">{result.depositCalc}</p>
                   </div>
               </div>
 
-              {/* Rental Logic Justification */}
               <div className="glass-panel rounded-3xl p-6 border-l-4 border-l-cyber-orange bg-cyber-orange/5 flex flex-col">
                   <h3 className="text-sm font-mono font-bold text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
                       <Info size={16} className="text-cyber-orange" /> Market Logic Recon
@@ -214,25 +178,19 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, onSave }) => {
                           {result.valuationJustification}
                       </p>
                       <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between text-[9px] text-gray-500 font-mono uppercase tracking-widest">
-                        <span>Triangulated Assets: {result.propertiesFoundCount}</span>
+                        <span>Cluster Nodes: {result.propertiesFoundCount}</span>
                         <span className="text-cyber-orange">Confidence: {result.confidenceScore}%</span>
                       </div>
                   </div>
               </div>
             </div>
 
-            {/* Comps List */}
             <div className="glass-panel rounded-3xl p-6 border border-white/5">
               <div className="flex justify-between items-center mb-6">
                   <div className="flex items-center gap-3">
                       <Globe size={18} className="text-cyber-teal" />
                       <h3 className="text-sm font-mono font-bold text-white tracking-widest uppercase">Live Market Comparables</h3>
                   </div>
-                  {result.suggestRadiusExpansion && (
-                    <div className="flex items-center gap-2 text-cyber-lime text-[9px] font-mono animate-pulse uppercase">
-                      <ShieldAlert size={12} /> Expansion Recommended
-                    </div>
-                  )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {result.listings.map((item, idx) => (
@@ -248,35 +206,23 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, onSave }) => {
                               </div>
                           </div>
                           <div className="flex justify-between items-center border-t border-white/5 pt-4">
-                              <span className="px-2 py-0.5 rounded bg-white/5 text-[9px] text-gray-400 font-mono">{item.bhk}</span>
-                              <a 
-                                href={item.sourceUrl} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyber-lime text-cyber-black text-[9px] font-mono font-bold hover:bg-white transition-all shadow-neon-teal"
-                              >
-                                  SECURE_SOURCE <ExternalLink size={10} />
+                              <div className="flex items-center gap-2">
+                                <span className="px-2 py-0.5 rounded bg-white/5 text-[9px] text-gray-400 font-mono">{item.bhk}</span>
+                                <span className="px-2 py-0.5 rounded bg-cyber-lime/10 border border-cyber-lime/20 text-[9px] text-cyber-lime font-mono flex items-center gap-1">
+                                    <Compass size={8} /> {item.facing.toUpperCase()}
+                                </span>
+                              </div>
+                              <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyber-lime text-cyber-black text-[9px] font-mono font-bold hover:bg-white transition-all shadow-neon-teal">
+                                  SOURCE_INTEL <ExternalLink size={10} />
                               </a>
                           </div>
                       </div>
                   ))}
               </div>
             </div>
-
-            {/* Negotiation */}
-            <div className="glass-panel rounded-3xl p-6 border-l-4 border-l-cyber-lime bg-cyber-lime/5">
-                <h3 className="text-sm font-mono font-bold text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
-                    <MessageSquare size={16} className="text-cyber-lime" /> Tenant/Owner Playbook
-                </h3>
-                <div className="bg-black/60 p-5 rounded-2xl border border-cyber-lime/20">
-                    <p className="text-[11px] text-gray-300 font-mono leading-relaxed italic whitespace-pre-wrap">
-                        {result.negotiationScript}
-                    </p>
-                </div>
-            </div>
           </div>
         ) : (
-          <div className="h-[calc(100vh-280px)] md:h-full animate-in fade-in slide-in-from-right-10 duration-500">
+          <div className="h-full animate-in fade-in slide-in-from-right-10 duration-500">
             <DashboardMap listings={result.listings} />
           </div>
         )}

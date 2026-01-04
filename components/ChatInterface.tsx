@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ChatMessage, AppMode, WizardStep } from '../types';
-import { Send, Navigation, Mic, MicOff, Check } from 'lucide-react';
+import { ChatMessage, AppMode, WizardStep, BudgetRange } from '../types';
+import { Send, Navigation, Mic, MicOff, Check, SlidersHorizontal, Compass } from 'lucide-react';
 
 interface ChatInterfaceProps {
   onComplete: (data: any) => void;
@@ -59,6 +59,53 @@ const CITY_DATA: Record<string, { localities: string[], pincodes: Record<string,
   }
 };
 
+const PriceRangeSelector = ({ min, max, step, onConfirm }: { min: number, max: number, step: number, onConfirm: (range: BudgetRange) => void }) => {
+  const [range, setRange] = useState<BudgetRange>({ min, max: max / 2 });
+
+  const formatPrice = (p: number) => {
+    if (p >= 10000000) return `${(p / 10000000).toFixed(2)} Cr`;
+    if (p >= 100000) return `${(p / 100000).toFixed(0)} Lakh`;
+    return `${p / 1000}k`;
+  };
+
+  return (
+    <div className="w-full space-y-6 p-4 bg-white/5 border border-white/10 rounded-2xl animate-in zoom-in-95">
+      <div className="flex justify-between items-center px-2">
+        <div className="text-center">
+          <div className="text-[10px] text-gray-500 uppercase font-mono">Min_Floor</div>
+          <div className="text-sm font-bold text-cyber-teal font-mono">{formatPrice(range.min)}</div>
+        </div>
+        <div className="w-8 h-px bg-white/10"></div>
+        <div className="text-center">
+          <div className="text-[10px] text-gray-500 uppercase font-mono">Max_Ceiling</div>
+          <div className="text-sm font-bold text-cyber-teal font-mono">{formatPrice(range.max)}</div>
+        </div>
+      </div>
+      
+      <div className="space-y-4">
+        <div className="relative pt-2">
+          <input 
+            type="range" 
+            min={min} 
+            max={max} 
+            step={step}
+            value={range.max}
+            onChange={(e) => setRange({ ...range, max: Number(e.target.value) })}
+            className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-cyber-teal"
+          />
+        </div>
+      </div>
+
+      <button 
+        onClick={() => onConfirm(range)}
+        className="w-full py-3 rounded-xl bg-cyber-teal text-cyber-black font-bold text-xs font-mono shadow-neon-teal hover:bg-white transition-all flex items-center justify-center gap-2"
+      >
+        <SlidersHorizontal size={14} /> LOCK_BUDGET_THRESHOLD
+      </button>
+    </div>
+  );
+};
+
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mode, buyType, suggestExpansion, onConfirmExpansion }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -78,35 +125,30 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
 
   const getActiveSteps = (): WizardStep[] => {
     const base = [...commonSteps];
-    if (mode === 'buy') {
+    const facingStep: WizardStep = { field: 'facing', question: "Asset Orientation (Vastu Facing):", type: 'select', options: ['East', 'West', 'North', 'South'] };
+
+    if (mode === 'buy' || mode === 'sell') {
       return [...base,
         { field: 'possessionStatus', question: "Deployment Timeline:", type: 'select', options: ['Ready to Move', 'Under Construction', 'Upcoming Project'] },
         { field: 'bhk', question: "BHK Configuration:", type: 'select', options: ['1 BHK', '2 BHK', '3 BHK', '4 BHK', 'Villa'] },
         { field: 'sqft', question: "Carpet Area (sqft):", type: 'number', placeholder: 'e.g., 1050' },
+        facingStep,
         { field: 'amenities', question: "Select Amenities (Multiple):", type: 'multi-select', options: ['Pool', 'Gym', 'Clubhouse', 'Parking', 'Security', 'Power Backup'] },
-        { field: 'expectedPrice', question: "Budget Ceiling (₹):", type: 'number', placeholder: 'e.g., 8500000' }
+        { field: 'budgetRange', question: "Budget Spectrum Analysis:", type: 'price-range', min: 2000000, max: 200000000, step: 500000 }
       ];
     } else if (mode === 'rent') {
       return [...base,
         { field: 'bhk', question: "BHK Configuration:", type: 'select', options: ['1 BHK', '2 BHK', '3 BHK', '4 BHK'] },
         { field: 'sqft', question: "Carpet Area (sqft):", type: 'number', placeholder: 'e.g., 850' },
-        { field: 'expectedRent', question: "Target Monthly Rent (₹):", type: 'number', placeholder: 'e.g., 25000' },
+        facingStep,
+        { field: 'budgetRange', question: "Rental Yield Range:", type: 'price-range', min: 5000, max: 500000, step: 2000 },
         { field: 'securityDepositMonths', question: "Security Deposit (Months):", type: 'number', placeholder: 'e.g., 6' }
-      ];
-    } else if (mode === 'sell') {
-      return [...base,
-        { field: 'bhk', question: "Current Configuration:", type: 'select', options: ['1 BHK', '2 BHK', '3 BHK', '4 BHK', 'Villa'] },
-        { field: 'sqft', question: "Built-up Area (sqft):", type: 'number', placeholder: 'e.g., 1200' },
-        { field: 'age', question: "Property Age (Years):", type: 'number', placeholder: 'e.g., 5' },
-        { field: 'floor', question: "Floor Level:", type: 'number', placeholder: 'e.g., 12' },
-        { field: 'furnishing', question: "Furnishing Status:", type: 'select', options: ['Unfurnished', 'Semi-furnished', 'Fully-furnished'] },
-        { field: 'expectedPrice', question: "Desired Sale Price (₹):", type: 'number', placeholder: 'e.g., 9500000' }
       ];
     } else if (mode === 'land') {
       return [...base,
         { field: 'plotSize', question: "Plot Dimension Value:", type: 'number', placeholder: 'e.g., 2000' },
         { field: 'unit', question: "Measurement Unit:", type: 'select', options: ['sqft', 'sqyd', 'sqmt', 'acre'] },
-        { field: 'facing', question: "Plot Facing:", type: 'select', options: ['East', 'West', 'North', 'South'] },
+        facingStep,
         { field: 'fsi', question: "Floor Space Index (FSI):", type: 'number', placeholder: 'e.g., 1.5' },
         { field: 'devPotential', question: "Development Intent:", type: 'select', options: ['residential', 'commercial'] }
       ];
@@ -158,25 +200,33 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
 
   const handleNext = async (value: any) => {
     if (value === undefined || value === null) return;
-    if (typeof value === 'string' && !value.trim()) return;
-
-    // Cast numerical types
+    
     let processedValue = value;
+    let displayText = '';
+
     if (currentStep.type === 'number') {
       processedValue = Number(value);
+      displayText = String(value);
+    } else if (currentStep.type === 'price-range') {
+      const range = value as BudgetRange;
+      const format = (p: number) => p >= 10000000 ? `${(p/10000000).toFixed(1)}Cr` : `${(p/100000).toFixed(0)}L`;
+      displayText = `${format(range.min)} - ${format(range.max)}`;
+    } else {
+      displayText = Array.isArray(value) ? value.join(', ') : String(value);
     }
+
+    if (displayText.trim() === '' && currentStep.type !== 'price-range') return;
 
     const newFormData = { ...formData, [currentStep.field]: processedValue };
     setMessages(prev => [...prev, { 
       id: `u-${Date.now()}`, 
       sender: 'user', 
-      text: Array.isArray(value) ? value.join(', ') : String(value) 
+      text: displayText 
     }]);
     setInputValue('');
 
     let nextIdx = currentStepIndex + 1;
     
-    // Auto-fill logic for pincodes based on address
     if (currentStep.field === 'address') {
       const city = newFormData.city;
       const geoCodes = CITY_DATA[city]?.pincodes[value];
@@ -203,7 +253,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
         }]);
       }, 400);
     } else {
-      // Final wizard completion
       onComplete(newFormData);
     }
   };
@@ -222,7 +271,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
          <div className="flex items-center gap-3">
             <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-red-500 animate-pulse' : 'bg-cyber-teal animate-pulse'}`} />
             <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">
-              {isLoading ? 'PROCESSING_NEURAL_DATA' : isListening ? 'VOICE_SYNC_ACTIVE' : 'NEURAL_LINK_STABLE'}
+              {isLoading ? 'SEARCH_GROUNDING_ACTIVE' : isListening ? 'VOICE_SYNC_ACTIVE' : 'NEURAL_LINK_STABLE'}
             </span>
          </div>
          <div className="text-[9px] text-cyber-teal font-mono font-bold uppercase">SEC_{currentStepIndex + 1}_V2.5</div>
@@ -253,7 +302,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
       <div className="p-6 bg-black/20 border-t border-white/5">
         {!isLoading && currentStep && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-            {currentStep.type === 'locality-picker' ? (
+            {currentStep.type === 'price-range' ? (
+              <PriceRangeSelector 
+                min={currentStep.min || 0} 
+                max={currentStep.max || 100000000} 
+                step={currentStep.step || 100000} 
+                onConfirm={handleNext} 
+              />
+            ) : currentStep.type === 'locality-picker' ? (
               <div className="flex flex-wrap gap-2">
                 {CITY_DATA[formData.city]?.localities.map(loc => (
                   <button key={loc} onClick={() => handleNext(loc)} className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-mono text-gray-400 hover:border-cyber-teal hover:text-cyber-teal transition-all flex items-center gap-2">
@@ -298,8 +354,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
             ) : currentStep.type === 'select' ? (
               <div className="flex flex-wrap gap-2">
                 {currentStep.options?.map(opt => (
-                  <button key={opt} onClick={() => handleNext(opt)} className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-mono text-gray-400 hover:border-cyber-teal hover:text-cyber-teal transition-all">
-                    {opt}
+                  <button key={opt} onClick={() => handleNext(opt)} className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-mono text-gray-400 hover:border-cyber-teal hover:text-cyber-teal transition-all flex items-center gap-2">
+                    {currentStep.field === 'facing' && <Compass size={12} />} {opt}
                   </button>
                 ))}
               </div>

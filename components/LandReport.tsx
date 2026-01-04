@@ -1,23 +1,21 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { LandResult, LandListing } from '../types';
-import { Map, Zap, Layers, Globe, MessageSquare, ExternalLink, Info, Database, LayoutDashboard, Map as MapIcon, Navigation, Bookmark } from 'lucide-react';
+import { Map, Zap, Layers, Globe, MessageSquare, ExternalLink, Info, Database, LayoutDashboard, Map as MapIcon, Navigation, Bookmark, Compass } from 'lucide-react';
 
 interface LandReportProps {
   result: LandResult;
   onSave?: () => void;
 }
 
-const WAZE_API_KEY = "9b9817e604msh23232e7c48177ecp11f684jsnc32882321d9f";
-
 const DashboardMap = ({ listings }: { listings: LandListing[] }) => {
   const mapRef = useRef<HTMLDivElement>(null);
-  const [layerType, setLayerType] = useState<'map' | 'sat' | 'waze'>('map');
+  const [layerType, setLayerType] = useState<'map' | 'sat'>('map');
   const mapInstance = useRef<any>(null);
 
   useEffect(() => {
     const L = (window as any).L;
-    if (!mapRef.current || !L || layerType === 'waze') return;
+    if (!mapRef.current || !L) return;
     if (mapInstance.current) mapInstance.current.remove();
 
     const avgLat = listings.length > 0 ? listings.reduce((acc, l) => acc + l.latitude, 0) / listings.length : 19.0760;
@@ -67,7 +65,7 @@ const DashboardMap = ({ listings }: { listings: LandListing[] }) => {
              <h4 class="text-white block text-[11px] font-mono font-bold truncate uppercase mb-1 tracking-tight">${item.title}</h4>
              <div class="text-cyber-orange font-mono font-bold text-[13px] leading-tight mb-1 text-glow-orange">${item.price}</div>
              <div class="text-gray-500 text-[9px] font-mono uppercase tracking-widest flex items-center gap-2">
-                ${item.size} <span class="w-1.5 h-1.5 rounded-full bg-gray-800"></span> MATCH_CODE: ${idx + 400}
+                ${item.size} <span class="w-1.5 h-1.5 rounded-full bg-gray-800"></span> Facing: ${item.facing}
              </div>
           </div>
         </div>
@@ -89,25 +87,16 @@ const DashboardMap = ({ listings }: { listings: LandListing[] }) => {
 
   return (
     <div className="relative w-full h-full rounded-3xl overflow-hidden border border-white/10 shadow-inner group bg-black/20">
-      {layerType === 'waze' ? (
-        <iframe 
-          src={`https://embed.waze.com/iframe?zoom=14&lat=${listings[0]?.latitude || 19.0760}&lon=${listings[0]?.longitude || 72.8777}&ct=true&pin=1`}
-          className="w-full h-full border-none grayscale contrast-[1.1] opacity-90"
-          allowFullScreen
-        />
-      ) : (
-        <div ref={mapRef} className="w-full h-full grayscale opacity-90 transition-opacity hover:opacity-100 duration-700" />
-      )}
+      <div ref={mapRef} className="w-full h-full grayscale opacity-90 transition-opacity hover:opacity-100 duration-700" />
       
       <div className="absolute top-4 left-4 flex flex-col gap-2 z-[1000]">
         <button onClick={() => setLayerType('map')} className={`p-2 rounded-xl backdrop-blur-md border transition-all ${layerType === 'map' ? 'bg-cyber-orange text-cyber-black border-cyber-orange shadow-neon-orange' : 'bg-black/40 text-gray-500 border-white/10 hover:text-white'}`}><Layers size={16} /></button>
         <button onClick={() => setLayerType('sat')} className={`p-2 rounded-xl backdrop-blur-md border transition-all ${layerType === 'sat' ? 'bg-cyber-orange text-cyber-black border-cyber-orange shadow-neon-orange' : 'bg-black/40 text-gray-500 border-white/10 hover:text-white'}`}><Globe size={16} /></button>
-        <button onClick={() => setLayerType('waze')} className={`p-2 rounded-xl backdrop-blur-md border transition-all ${layerType === 'waze' ? 'bg-cyber-teal text-cyber-black border-cyber-teal shadow-neon-teal' : 'bg-black/40 text-gray-500 border-white/10 hover:text-white'}`}><Navigation size={16} /></button>
       </div>
 
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-xl border border-white/10 px-4 py-2 rounded-xl text-[10px] font-mono text-cyber-orange flex items-center gap-3 shadow-2xl z-[1000]">
           <div className="w-2 h-2 rounded-full bg-cyber-orange animate-pulse"></div>
-          {layerType === 'waze' ? 'WAZE_TRAFFIC_ACTIVE' : `SECTOR_LOCKED: ${listings.length} PLOTS`}
+          SECTOR_LOCKED: {listings.length} PLOTS FOUND
       </div>
 
       <style>{`
@@ -257,7 +246,10 @@ const LandReport: React.FC<LandReportProps> = ({ result, onSave }) => {
                           <h4 className="font-bold text-white text-xs line-clamp-2 uppercase tracking-tight">{item.title}</h4>
                           <p className="text-[9px] text-gray-500 font-mono truncate">{item.address}</p>
                           <div className="mt-2 flex items-center justify-between">
-                            <span className="text-[11px] font-mono text-cyber-orange font-bold leading-none text-glow-orange">{item.price}</span>
+                            <div className="flex flex-col">
+                                <span className="text-[11px] font-mono text-cyber-orange font-bold leading-none text-glow-orange">{item.price}</span>
+                                <span className="text-[8px] text-cyber-orange/60 font-mono mt-1 uppercase flex items-center gap-1"><Compass size={8}/> {item.facing}</span>
+                            </div>
                             <span className="text-[9px] text-gray-600 font-mono">{item.size}</span>
                           </div>
                         </div>

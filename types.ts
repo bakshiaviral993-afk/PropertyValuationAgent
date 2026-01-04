@@ -1,7 +1,7 @@
 
 import { ReactNode } from 'react';
 
-export type AppMode = 'buy' | 'sell' | 'rent' | 'land';
+export type AppMode = 'buy' | 'sell' | 'rent' | 'land' | 'finance';
 
 export enum StepField {
   State = 'state',
@@ -44,6 +44,24 @@ export interface GlobalContext {
 export interface GroundingSource {
   title: string;
   uri: string;
+  projectName?: string;
+  priceRange?: string;
+}
+
+export interface BudgetRange {
+  min: number;
+  max: number;
+}
+
+export interface LoanResult {
+  monthlyEmi: number;
+  totalInterest: number;
+  totalPayment: number;
+  stampDuty: number;
+  registration: number;
+  legalCharges: number;
+  totalInitialCash: number;
+  loanAmount: number;
 }
 
 export interface BuyRequest extends GlobalContext {
@@ -53,7 +71,8 @@ export interface BuyRequest extends GlobalContext {
   bhk: string;
   sqft: number;
   amenities: string[];
-  expectedPrice: number;
+  budgetRange: BudgetRange;
+  facing: string;
 }
 
 export interface SellRequest extends GlobalContext {
@@ -64,15 +83,17 @@ export interface SellRequest extends GlobalContext {
   amenities: string[];
   furnishing: string;
   expectedPrice: number;
+  facing: string;
 }
 
 export interface RentRequest extends GlobalContext {
   bhk: string;
   sqft: number;
-  expectedRent: number;
+  budgetRange: BudgetRange;
   leaseTerm: string;
   securityDepositMonths: number;
   forceExpandRadius?: boolean;
+  facing: string;
 }
 
 export interface LandRequest extends GlobalContext {
@@ -103,6 +124,7 @@ export interface RentalListing {
   qualityScore: number;
   latitude: number;
   longitude: number;
+  facing: string;
 }
 
 export interface SaleListing {
@@ -115,6 +137,7 @@ export interface SaleListing {
   emiEstimate: string;
   latitude: number;
   longitude: number;
+  facing: string;
 }
 
 export interface LandListing {
@@ -125,6 +148,7 @@ export interface LandListing {
   sourceUrl: string;
   latitude: number;
   longitude: number;
+  facing: string;
 }
 
 export interface BuyResult {
@@ -180,9 +204,12 @@ export interface ChatMessage {
 export interface WizardStep {
   field: string;
   question: string;
-  type: 'text' | 'number' | 'select' | 'multi-select' | 'city-picker' | 'locality-picker';
+  type: 'text' | 'number' | 'select' | 'multi-select' | 'city-picker' | 'locality-picker' | 'price-range';
   options?: string[];
   placeholder?: string;
+  min?: number;
+  max?: number;
+  step?: number;
 }
 
 export interface Comparable {

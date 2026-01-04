@@ -5,6 +5,7 @@ import ChatInterface from './components/ChatInterface';
 import BuyDashboard from './components/BuyDashboard';
 import RentDashboard from './components/RentDashboard';
 import LandReport from './components/LandReport';
+import LoanCalculator from './components/LoanCalculator';
 import { 
   BuyRequest, BuyResult, 
   RentRequest, RentResult, 
@@ -15,7 +16,7 @@ import {
   getBuyAnalysis, getRentAnalysis, getLandValuationAnalysis 
 } from './services/geminiService';
 import { REAL_ESTATE_KNOWLEDGE_BASE } from './data/knowledgeBase';
-import { Zap, Database, User, ShoppingBag, Search, Map as MapIcon, Layers, ArrowLeft, Tag, Building2, Landmark, Bookmark, Trash2, Clock, X } from 'lucide-react';
+import { Zap, Database, User, ShoppingBag, Search, Map as MapIcon, Layers, ArrowLeft, Tag, Building2, Landmark, Bookmark, Trash2, Clock, X, SearchIcon, Globe, Calculator } from 'lucide-react';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -27,6 +28,7 @@ const App: React.FC = () => {
   const [landData, setLandData] = useState<LandResult | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState("INITIALIZING_SEARCH_GROUNDING");
   const [error, setError] = useState<string | null>(null);
   const [sessionKey, setSessionKey] = useState(0);
   const [currentFactIndex, setCurrentFactIndex] = useState(0);
@@ -38,7 +40,6 @@ const App: React.FC = () => {
   const [showSavedPanel, setShowSavedPanel] = useState(false);
 
   useEffect(() => {
-    // Load saved searches from localStorage
     const stored = localStorage.getItem('quantcasa_saved_intel');
     if (stored) {
       try {
@@ -49,12 +50,24 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const statuses = [
+    "SCANNING_PROPERTY_PORTALS...",
+    "TRIANGULATING_GEO_CLUSTERS...",
+    "GROUNDING_NEURAL_METADATA...",
+    "EXTRACTING_MARKET_LISTINGS...",
+    "SYNTHESIZING_ASSET_VALUATION...",
+    "FINALIZING_REPORT_STREAMS..."
+  ];
+
   useEffect(() => {
     let interval: any;
     if (isLoading) {
+      let statusIdx = 0;
       interval = setInterval(() => {
+        setLoadingStatus(statuses[statusIdx % statuses.length]);
+        statusIdx++;
         setCurrentFactIndex(prev => (prev + 1) % REAL_ESTATE_KNOWLEDGE_BASE.length);
-      }, 4000);
+      }, 3000);
     }
     return () => clearInterval(interval);
   }, [isLoading]);
@@ -63,7 +76,7 @@ const App: React.FC = () => {
     setIsLoading(true);
     setError(null);
     setSuggestExpansion(false);
-    setPendingRequestData(data); // Store last request
+    setPendingRequestData(data);
     try {
       if (mode === 'buy' || mode === 'sell') {
         const requestData = { ...data, purchaseType: buyType === 'New Buy' ? 'New Booking' : 'Resale Purchase' };
@@ -109,7 +122,7 @@ const App: React.FC = () => {
       data: pendingRequestData
     };
 
-    const updated = [newSaved, ...savedSearches].slice(0, 20); // Keep last 20
+    const updated = [newSaved, ...savedSearches].slice(0, 20);
     setSavedSearches(updated);
     localStorage.setItem('quantcasa_saved_intel', JSON.stringify(updated));
   };
@@ -147,7 +160,14 @@ const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const isAnyResult = !!buyData || !!rentData || !!landData;
+  const isAnyResult = !!buyData || !!rentData || !!landData || mode === 'finance';
+
+  const parseValue = (val: string) => {
+    const numeric = parseFloat(val.replace(/[^\d.]/g, ''));
+    if (val.includes('Cr')) return numeric * 10000000;
+    if (val.includes('L')) return numeric * 100000;
+    return numeric;
+  };
 
   if (!user) return <Onboarding onComplete={setUser} />;
 
@@ -174,6 +194,9 @@ const App: React.FC = () => {
             </button>
             <button onClick={() => { setMode('land'); resetMode(); }} className={`flex items-center gap-2 px-3 md:px-5 py-2 rounded-xl text-[9px] md:text-[10px] font-mono font-bold tracking-widest transition-all ${mode === 'land' ? 'bg-cyber-teal text-cyber-black shadow-neon-teal' : 'text-gray-500 hover:text-white'}`}>
               <MapIcon size={14} /> LAND
+            </button>
+            <button onClick={() => { setMode('finance'); resetMode(); }} className={`flex items-center gap-2 px-3 md:px-5 py-2 rounded-xl text-[9px] md:text-[10px] font-mono font-bold tracking-widest transition-all ${mode === 'finance' ? 'bg-cyber-orange text-cyber-black shadow-neon-orange' : 'text-gray-500 hover:text-white'}`}>
+              <Calculator size={14} /> FINANCE
             </button>
           </nav>
         </div>
@@ -207,7 +230,7 @@ const App: React.FC = () => {
                <User size={10} className="text-cyber-teal" /> {user.name.toUpperCase()}
             </div>
             
-            {isAnyResult && (
+            {(isAnyResult && mode !== 'finance') && (
                 <button onClick={resetMode} className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-cyber-teal/10 border border-cyber-teal text-cyber-teal text-[10px] font-bold font-mono shadow-neon-teal hover:bg-cyber-teal hover:text-black transition-all">
                     <ArrowLeft size={14} /> NEW_VAL
                 </button>
@@ -281,32 +304,53 @@ const App: React.FC = () => {
                  <div className="relative mb-8 md:mb-12">
                    <div className="w-32 h-32 md:w-48 md:h-48 border-t-2 border-cyber-teal rounded-full animate-spin"></div>
                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Database size={32} className="md:size-[48px] text-cyber-teal animate-pulse" />
+                      <Globe size={48} className="text-cyber-teal animate-pulse" />
                    </div>
                  </div>
-                 <p className="text-xl md:text-2xl font-mono font-bold tracking-widest text-cyber-teal uppercase mb-4 text-center">QUANT_PROCESSOR_ENGAGED</p>
+                 <p className="text-xl md:text-2xl font-mono font-bold tracking-widest text-cyber-teal uppercase mb-4 text-center">{loadingStatus}</p>
                  <div className="max-w-xl glass-panel p-4 md:p-6 border-l-4 border-cyber-lime">
                     <p className="text-[11px] md:text-sm font-mono text-white italic leading-relaxed">"{REAL_ESTATE_KNOWLEDGE_BASE[currentFactIndex]}"</p>
                  </div>
             </div>
         )}
 
-        <div className={`transition-all duration-700 flex-shrink-0 flex flex-col ${isAnyResult ? 'w-full md:w-[420px]' : 'w-full md:w-[600px] md:mx-auto'}`}>
-             <div className="flex-1">
-               <ChatInterface 
-                  key={`${sessionKey}-${mode}-${buyType}`} 
-                  mode={mode} 
-                  buyType={buyType}
-                  onComplete={handleComplete} 
-                  isLoading={isLoading} 
-                  suggestExpansion={suggestExpansion}
-                  onConfirmExpansion={handleConfirmExpansion}
-               />
+        {error && (
+          <div className="fixed bottom-8 right-8 z-[200] glass-panel p-4 border border-red-500/50 bg-red-500/10 rounded-xl flex items-center gap-4 animate-in slide-in-from-right">
+             <div className="p-2 bg-red-500 text-white rounded-lg"><Trash2 size={16} /></div>
+             <div>
+                <div className="text-[10px] font-mono font-bold text-red-500 uppercase">Signal_Disruption_Error</div>
+                <div className="text-xs text-white/80 font-mono">{error}</div>
              </div>
-        </div>
+             <button onClick={() => setError(null)} className="ml-4 p-2 text-gray-400 hover:text-white"><X size={16} /></button>
+          </div>
+        )}
+
+        {mode !== 'finance' && (
+          <div className={`transition-all duration-700 flex-shrink-0 flex flex-col ${isAnyResult ? 'w-full md:w-[420px]' : 'w-full md:w-[600px] md:mx-auto'}`}>
+               <div className="flex-1">
+                 <ChatInterface 
+                    key={`${sessionKey}-${mode}-${buyType}`} 
+                    mode={mode} 
+                    buyType={buyType}
+                    onComplete={handleComplete} 
+                    isLoading={isLoading} 
+                    suggestExpansion={suggestExpansion}
+                    onConfirmExpansion={handleConfirmExpansion}
+                 />
+               </div>
+          </div>
+        )}
 
         <div className="flex-1 min-h-[400px] relative">
-          {(buyData || (mode === 'sell' && buyData)) && <BuyDashboard result={buyData} buyType={buyType} onSave={handleSaveSearch} />}
+          {mode === 'finance' && <LoanCalculator initialValue={buyData ? parseValue(buyData.fairValue) : 10000000} />}
+          {(buyData || (mode === 'sell' && buyData)) && mode !== 'finance' && (
+            <BuyDashboard 
+              result={buyData} 
+              buyType={buyType} 
+              onSave={handleSaveSearch} 
+              onAnalyzeFinance={(val) => setMode('finance')}
+            />
+          )}
           {rentData && mode === 'rent' && <RentDashboard result={rentData} onSave={handleSaveSearch} />}
           {landData && mode === 'land' && <LandReport result={landData} onSave={handleSaveSearch} />}
           
