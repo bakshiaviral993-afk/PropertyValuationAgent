@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { REAL_ESTATE_KNOWLEDGE_BASE } from "../data/knowledgeBase";
 
@@ -33,7 +32,10 @@ export class VectorService {
                 model: 'text-embedding-004',
                 contents: text
             });
-            return response.embedding?.values || [];
+            // Fix: Property 'embedding' might be missing in some SDK response types, falling back to 'embeddings' if present.
+            const res = response as any;
+            const embedding = res.embedding || (Array.isArray(res.embeddings) ? res.embeddings[0] : res.embeddings);
+            return embedding?.values || [];
         } catch (error) {
             console.warn("Embedding generation failed, falling back to empty vector.", error);
             return [];

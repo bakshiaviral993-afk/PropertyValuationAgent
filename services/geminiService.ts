@@ -7,21 +7,15 @@ import {
 } from "../types";
 
 /**
- * Validates and returns the API key from environment.
- * Prevents initialization with invalid or missing keys.
+ * Safely retrieves the API key.
+ * The key is injected by the platform into process.env.API_KEY.
  */
-const getValidatedApiKey = (): string => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey || apiKey === 'undefined' || apiKey === 'null' || apiKey.trim() === '') {
-    // If running in browser, try to check if it's available globally as a last resort
-    const globalKey = (window as any).API_KEY;
-    if (globalKey && globalKey !== 'undefined') return globalKey;
-    
-    const errorMsg = "CRITICAL: process.env.API_KEY is missing. Verify environment variable configuration in your deployment settings.";
-    console.error(errorMsg);
-    throw new Error(errorMsg);
+const getApiKey = (): string => {
+  const key = process.env.API_KEY;
+  if (!key || key === 'undefined' || key === 'null') {
+    throw new Error("API_KEY_MISSING: Neural Link requires an active API key in the environment.");
   }
-  return apiKey;
+  return key;
 };
 
 const BUY_SCHEMA: Schema = {
@@ -35,7 +29,7 @@ const BUY_SCHEMA: Schema = {
     registrationEstimate: { type: Type.STRING },
     appreciationPotential: { type: Type.STRING },
     confidenceScore: { type: Type.NUMBER },
-    valuationJustification: { type: Type.STRING, description: "Detailed logic and market rationale for this valuation." },
+    valuationJustification: { type: Type.STRING },
     listings: {
       type: Type.ARRAY,
       items: {
@@ -123,19 +117,15 @@ const LAND_SCHEMA: Schema = {
   required: ["landValue", "perSqmValue", "devROI", "negotiationStrategy", "confidenceScore", "listings", "valuationJustification"]
 };
 
-export const getBuyAnalysis = async (data: any): Promise<BuyResult> => {
-  const apiKey = getValidatedApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+export const getBuyAnalysis = async (data: BuyRequest): Promise<BuyResult> => {
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
   
-  const isSell = data.age !== undefined;
-  const role = isSell ? "Liquidator/Asset Appraiser" : "Chief Acquisition Strategist";
-  
-  const prompt = `Act as ${role}. Sector: ${data.address}, ${data.city} (${data.pincode}). Spec: ${data.bhk}, ${data.sqft} sqft.
-  TASK:
-  1. Provide market valuation and justification logic.
-  2. Ground results in real-world web data.
-  3. Every listing MUST have precise latitude/longitude coordinates.
-  Return JSON per BUY_SCHEMA.`;
+  const prompt = `Act as Chief Real Estate Strategist. Analyze property in ${data.address}, ${data.city} (${data.pincode}). 
+  Spec: ${data.bhk}, ${data.sqft} sqft. Type: ${data.purchaseType}.
+  1. Provide market valuation and detailed rationale.
+  2. Ground results in real-world live web data via search.
+  3. Every listing must have precise latitude/longitude.
+  4. Ensure priceValue is an integer representing the price in INR.`;
 
   const searchResponse = await ai.models.generateContent({
     model: 'gemini-3-pro-preview', 
@@ -145,22 +135,25 @@ export const getBuyAnalysis = async (data: any): Promise<BuyResult> => {
 
   const structResponse = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Translate to BUY_SCHEMA JSON: ${searchResponse.text}`,
-    config: { responseMimeType: "application/json", responseSchema: BUY_SCHEMA }
+    contents: `Structure the following real estate analysis into valid BUY_SCHEMA JSON: ${searchResponse.text}`,
+    config: { 
+      responseMimeType: "application/json", 
+      responseSchema: BUY_SCHEMA 
+    }
   });
 
-  if (!structResponse.text) throw new Error("QuantCore: Analysis synthesis failed.");
+  if (!structResponse.text) throw new Error("QuantCore: Failed to structure market intelligence.");
   return JSON.parse(structResponse.text) as BuyResult;
 };
 
 export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> => {
-  const apiKey = getValidatedApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
-  const prompt = `Act as Rental Strategist. Locality: ${data.address}, ${data.city}. 
-  Estimate rent and yield. Ground results in real-world data. 
-  Every property MUST have latitude/longitude.
-  Return JSON per RENT_SCHEMA.`;
+  const prompt = `Act as Rental Market Strategist. Locality: ${data.address}, ${data.city}. 
+  Configuration: ${data.bhk}, ${data.sqft} sqft.
+  1. Estimate monthly rent and annual yield. 
+  2. Ground results in real-world data from the web. 
+  3. Every property MUST have latitude/longitude.`;
 
   const searchResponse = await ai.models.generateContent({
     model: 'gemini-3-pro-preview', 
@@ -170,22 +163,24 @@ export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> =>
 
   const structResponse = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Structure into RENT_SCHEMA JSON: ${searchResponse.text}`,
-    config: { responseMimeType: "application/json", responseSchema: RENT_SCHEMA }
+    contents: `Translate the following market data into RENT_SCHEMA JSON: ${searchResponse.text}`,
+    config: { 
+      responseMimeType: "application/json", 
+      responseSchema: RENT_SCHEMA 
+    }
   });
 
-  if (!structResponse.text) throw new Error("QuantCore: Rental reconnaissance failed.");
+  if (!structResponse.text) throw new Error("QuantCore: Rental reconnaissance synthesis failed.");
   return JSON.parse(structResponse.text) as RentResult;
 };
 
 export const getLandValuationAnalysis = async (data: LandRequest): Promise<LandResult> => {
-  const apiKey = getValidatedApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
-  const prompt = `Act as Expert Land Valuer. Plot: ${data.plotSize} ${data.unit} in ${data.address}, ${data.city}.
-  Analyze FSI and dev potential. Ground results in real-world data. 
-  Every listing MUST have latitude/longitude.
-  Return JSON per LAND_SCHEMA.`;
+  const prompt = `Act as Senior Land Valuer. Plot: ${data.plotSize} ${data.unit} in ${data.address}, ${data.city}.
+  FSI Context: ${data.fsi}. Potential: ${data.devPotential}.
+  1. Analyze land value and dev potential using live web grounding.
+  2. Every listing found must include GPS coordinates.`;
 
   const searchResponse = await ai.models.generateContent({
     model: 'gemini-3-pro-preview', 
@@ -195,8 +190,11 @@ export const getLandValuationAnalysis = async (data: LandRequest): Promise<LandR
 
   const structResponse = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Translate to LAND_SCHEMA JSON: ${searchResponse.text}`,
-    config: { responseMimeType: "application/json", responseSchema: LAND_SCHEMA }
+    contents: `Structure the following land appraisal into LAND_SCHEMA JSON: ${searchResponse.text}`,
+    config: { 
+      responseMimeType: "application/json", 
+      responseSchema: LAND_SCHEMA 
+    }
   });
 
   if (!structResponse.text) throw new Error("QuantCore: Geographic plot appraisal failed.");

@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en" class="dark">
   <head>
@@ -8,20 +9,21 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="QuantCasa">
     <meta name="theme-color" content="#0D0F12">
-    <link rel="manifest" href="./manifest.json">
+    
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="https://img.icons8.com/fluency/48/lightning-bolt.png">
     <link rel="apple-touch-icon" href="https://img.icons8.com/fluency/192/lightning-bolt.png">
     
-    <title>QuantCasa</title>
+    <title>QuantCasa | AI Real Estate Intel</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Fonts: Inter and JetBrains Mono -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Leaflet Ecosystem -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
-    
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
 
     <script>
@@ -35,21 +37,16 @@
             },
             colors: {
               cyber: {
-                black: '#0D0F12', // Matte Black Background
-                card: '#13161B',  // Dark Cards
-                teal: '#00F6FF',  // Neon Teal
+                black: '#0D0F12',
+                card: '#13161B',
+                teal: '#00F6FF',
                 tealDark: '#00B8BF',
-                lime: '#B4FF5C',  // Lime Highlights
+                lime: '#B4FF5C',
                 limeDark: '#86C442',
-                text: '#98A3B3',  // Soft Grey Text
-                orange: '#FFAE42', // Valuation Orange
+                text: '#98A3B3',
+                orange: '#FFAE42',
                 glass: 'rgba(19, 22, 27, 0.6)',
                 border: 'rgba(255, 255, 255, 0.08)'
-              },
-              slate: {
-                900: '#0B1E3C', 
-                800: '#162A4C',
-                50: '#F8FAFC'
               },
             },
             boxShadow: {
@@ -91,29 +88,17 @@
         --glass-bg: rgba(19, 22, 27, 0.7);
       }
 
-      html:not(.dark) {
-        --bg-primary: #F8FAFC;
-        --bg-secondary: #FFFFFF;
-        --text-primary: #0F172A;
-        --text-secondary: #475569;
-        --border-color: rgba(0, 0, 0, 0.08);
-        --glass-bg: rgba(255, 255, 255, 0.8);
-      }
-
       body {
         font-feature-settings: "tnum" on;
         -webkit-font-smoothing: antialiased;
         background-color: var(--bg-primary);
         color: var(--text-secondary);
         overscroll-behavior-y: none;
-        transition: background-color 0.5s ease, color 0.5s ease;
       }
       
-      /* Futuristic Scrollbar */
       ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-track { background: var(--bg-primary); }
       ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-      html:not(.dark) ::-webkit-scrollbar-thumb { background: #CBD5E1; }
       ::-webkit-scrollbar-thumb:hover { background: #00F6FF; }
 
       .glass-panel {
@@ -122,33 +107,14 @@
         -webkit-backdrop-filter: blur(18px);
         border: 1px solid var(--border-color);
         box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-        transition: background-color 0.5s ease, border-color 0.5s ease;
       }
 
-      .text-glow-teal {
-        text-shadow: 0 0 10px rgba(0, 246, 255, 0.5);
-      }
-      
-      .text-glow-orange {
-        text-shadow: 0 0 15px rgba(255, 174, 66, 0.6);
-      }
+      .text-glow-teal { text-shadow: 0 0 10px rgba(0, 246, 255, 0.5); }
+      .text-glow-orange { text-shadow: 0 0 15px rgba(255, 174, 66, 0.6); }
 
-      /* Advanced Map Styles */
-      .leaflet-container {
-        background: var(--bg-primary) !important;
-        font-family: 'Inter', sans-serif;
-      }
-      .leaflet-pane { z-index: 0 !important; }
+      .leaflet-container { background: var(--bg-primary) !important; font-family: 'Inter', sans-serif; }
+      .dark .leaflet-tile-pane { filter: grayscale(100%) invert(100%) contrast(1.2) brightness(0.8); }
       
-      /* Dark Map Tiles Filter */
-      .dark .leaflet-tile-pane {
-        filter: grayscale(100%) invert(100%) contrast(1.2) brightness(0.8); 
-      }
-      
-      /* Clustering Theme Overrides */
-      .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large {
-        background-color: rgba(0, 246, 255, 0.1);
-      }
       .marker-cluster-small div, .marker-cluster-medium div, .marker-cluster-large div {
         background-color: rgba(0, 246, 255, 0.8);
         color: #000;
@@ -156,39 +122,6 @@
         font-family: 'JetBrains Mono';
         box-shadow: 0 0 15px #00F6FF;
       }
-
-      /* Custom Popup Design */
-      .leaflet-popup-content-wrapper {
-        background: #0D0F12 !important;
-        color: #FFF !important;
-        border: 1px solid rgba(0, 246, 255, 0.3) !important;
-        border-radius: 12px !important;
-        font-family: 'JetBrains Mono' !important;
-      }
-      .leaflet-popup-tip {
-        background: #0D0F12 !important;
-        border: 1px solid rgba(0, 246, 255, 0.3) !important;
-      }
-
-      /* Radar Pulse Animation */
-      .radar-wave {
-        position: absolute;
-        border: 2px solid #00F6FF;
-        border-radius: 50%;
-        animation: radar 4s cubic-bezier(0, 0, 0.2, 1) infinite;
-        pointer-events: none;
-      }
-      .radar-wave:nth-child(2) { animation-delay: 1s; }
-      .radar-wave:nth-child(3) { animation-delay: 2s; }
-
-      /* Visualizer Bars */
-      .bar {
-        width: 6px;
-        background: #00F6FF;
-        border-radius: 4px;
-        animation: wave 1s ease-in-out infinite;
-      }
-      .bar:nth-child(odd) { background: #B4FF5C; }
     </style>
   <script type="importmap">
 {

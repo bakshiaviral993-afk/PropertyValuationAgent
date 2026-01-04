@@ -4,32 +4,19 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 
 /**
- * Senior Dev Note: Nuclear Shim for process.env
- * Some browser environments and PWA builders strip the process object.
- * We ensure it's available and mapped to the window's state.
+ * Senior Dev Note: Environment Polyfill
+ * Ensures process.env is available even in environments that don't provide it natively.
  */
-function initializeGlobalEnvironment() {
-  const isProcessUndefined = typeof (window as any).process === 'undefined';
-  
-  if (isProcessUndefined) {
-    (window as any).process = { 
-      env: { 
-        API_KEY: (window as any).API_KEY || undefined 
-      } 
-    };
-  } else if (!(window as any).process.env) {
-    (window as any).process.env = {
-      API_KEY: (window as any).API_KEY || undefined
-    };
+function initializeEnvironment() {
+  if (typeof (window as any).process === 'undefined') {
+    (window as any).process = { env: {} };
   }
-
-  // Double-link for maximum visibility
-  if ((window as any).process.env.API_KEY) {
-     (window as any).API_KEY = (window as any).process.env.API_KEY;
+  if (!(window as any).process.env) {
+    (window as any).process.env = {};
   }
 }
 
-initializeGlobalEnvironment();
+initializeEnvironment();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -44,18 +31,12 @@ async function registerServiceWorker() {
 
   try {
     const swUrl = new URL('./sw.js', import.meta.url).href;
-    
-    if (new URL(swUrl).origin !== window.location.origin) {
-      console.info('Service Worker registration skipped: Origin mismatch.');
-      return;
-    }
-
     const registration = await navigator.serviceWorker.register(swUrl, {
       scope: './'
     });
-    console.log('QuantCasa SW Registered:', registration.scope);
+    console.log('QuantCasa Core SW Registered:', registration.scope);
   } catch (err) {
-    console.info('Service Worker registration skipped or failed:', err instanceof Error ? err.message : err);
+    console.info('Service Worker registration skipped:', err instanceof Error ? err.message : err);
   }
 }
 
