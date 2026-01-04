@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { Calculator, Landmark, ShieldCheck, Zap, Info, Wallet, PieChart as PieChartIcon } from 'lucide-react';
+import { Calculator, Landmark, ShieldCheck, Zap, Info, Wallet } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 interface LoanCalculatorProps {
@@ -134,31 +133,32 @@ const LoanCalculator: React.FC<LoanCalculatorProps> = ({ initialValue = 10000000
           </div>
 
           {/* Results Display */}
-          <div className="space-y-6">
+          <div className="space-y-6 min-w-0">
             <div className="glass-panel rounded-3xl p-8 border-l-4 border-l-cyber-orange bg-cyber-orange/5">
               <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 bg-cyber-orange text-black rounded-lg"><Landmark size={20} /></div>
                 <h3 className="text-sm font-mono font-bold text-white uppercase tracking-widest">Monthly EMI Projection</h3>
               </div>
-              <div className="text-5xl font-mono font-bold text-cyber-orange text-glow-orange tracking-tighter mb-2">
+              <div className="text-4xl sm:text-5xl font-mono font-bold text-cyber-orange text-glow-orange tracking-tighter mb-2 truncate">
                 ₹{loanResult.monthlyEmi.toLocaleString()}
               </div>
               <div className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">Recurring Liability per Month</div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="glass-panel rounded-2xl p-6 border border-white/5 bg-white/[0.02]">
+              <div className="glass-panel rounded-2xl p-6 border border-white/5 bg-white/[0.02] min-w-0">
                 <div className="text-[9px] font-mono text-gray-500 uppercase mb-2">Total Interest</div>
-                <div className="text-lg font-mono font-bold text-white">{formatCurrency(loanResult.totalInterest)}</div>
+                <div className="text-lg font-mono font-bold text-white truncate">{formatCurrency(loanResult.totalInterest)}</div>
               </div>
-              <div className="glass-panel rounded-2xl p-6 border border-white/5 bg-white/[0.02]">
+              <div className="glass-panel rounded-2xl p-6 border border-white/5 bg-white/[0.02] min-w-0">
                 <div className="text-[9px] font-mono text-gray-500 uppercase mb-2">Loan Amount</div>
-                <div className="text-lg font-mono font-bold text-white">{formatCurrency(loanResult.loanAmount)}</div>
+                <div className="text-lg font-mono font-bold text-white truncate">{formatCurrency(loanResult.loanAmount)}</div>
               </div>
             </div>
 
-            <div className="relative w-full h-[220px] glass-panel rounded-3xl border border-white/5 p-4">
-                <ResponsiveContainer width="100%" height="100%">
+            {/* Stable Chart Container to prevent width/height -1 error */}
+            <div className="relative w-full h-[240px] min-h-[240px] glass-panel rounded-3xl border border-white/5 p-4 overflow-hidden">
+                <ResponsiveContainer width="100%" height="100%" minHeight={180}>
                     <PieChart>
                         <Pie
                             data={chartData}

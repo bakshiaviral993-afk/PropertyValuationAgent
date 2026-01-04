@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Onboarding from './components/Onboarding';
 import ChatInterface from './components/ChatInterface';
@@ -16,10 +15,16 @@ import {
   getBuyAnalysis, getRentAnalysis, getLandValuationAnalysis 
 } from './services/geminiService';
 import { REAL_ESTATE_KNOWLEDGE_BASE } from './data/knowledgeBase';
-import { Zap, Database, User, ShoppingBag, Search, Map as MapIcon, Layers, ArrowLeft, Tag, Building2, Landmark, Bookmark, Trash2, Clock, X, SearchIcon, Globe, Calculator } from 'lucide-react';
+import { Zap, User, ShoppingBag, Search, Map as MapIcon, Layers, ArrowLeft, Tag, Building2, Landmark, Bookmark, Trash2, Clock, X, Globe, Calculator } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<UserProfile | null>(null);
+  // Bypassing mandatory auth by providing a default guest profile
+  const [user, setUser] = useState<UserProfile | null>({
+    name: 'Guest Researcher',
+    mobile: '+91 00000 00000',
+    email: 'researcher@quantcasa.io'
+  });
+  
   const [mode, setMode] = useState<AppMode>('buy');
   const [buyType, setBuyType] = useState<'New Buy' | 'Resale'>('New Buy');
   
@@ -169,6 +174,7 @@ const App: React.FC = () => {
     return numeric;
   };
 
+  // Auth Gate Bypass: The check is still here but 'user' is initialized by default
   if (!user) return <Onboarding onComplete={setUser} />;
 
   return (
