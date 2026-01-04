@@ -4,7 +4,7 @@ import { BuyResult, SaleListing } from '../types';
 import { 
   ExternalLink, TrendingUp, Calculator, Globe, 
   Zap, Info, Database, Layers, Map as MapIcon, 
-  LayoutDashboard, Navigation, Bookmark
+  LayoutDashboard, Navigation, Bookmark, Link2, ShieldCheck
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -14,7 +14,6 @@ interface BuyDashboardProps {
   onSave?: () => void;
 }
 
-// Custom Tooltip for the Recharts LineChart
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
@@ -50,7 +49,6 @@ const DashboardMap = ({ listings }: { listings: SaleListing[] }) => {
 
     const map = L.map(mapRef.current, { zoomControl: false }).setView([avgLat, avgLng], 13);
     
-    // Using OpenStreetMap based tiles for zero-config map rendering
     const tileUrl = layerType === 'map' 
       ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
       : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -161,7 +159,6 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType, onSave }) 
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    // Settling delay ensures Recharts doesn't measure dimensions during CSS transitions
     const timer = setTimeout(() => setIsRendered(true), 300);
     return () => clearTimeout(timer);
   }, [viewMode]);
@@ -174,7 +171,6 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType, onSave }) 
     }
   };
 
-  // Enriched chart data with additional fields for the custom tooltip
   const chartData = result.listings.map((l, i) => ({
     name: `L${i+1}`,
     val: l.priceValue / 100000,
@@ -224,7 +220,8 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType, onSave }) 
               <div className="glass-panel rounded-3xl p-6 border-l-4 border-l-cyber-teal bg-cyber-teal/5 relative flex flex-col min-h-[250px]">
                 <div className="absolute top-4 right-4 flex gap-2 z-10">
                    <span className={`px-4 py-1.5 rounded-full text-[10px] font-mono font-bold uppercase shadow-neon-teal ${
-                      result.recommendation === 'Good Buy' ? 'bg-cyber-lime text-black' : 'bg-cyber-teal text-black'
+                      result.recommendation === 'Good Buy' ? 'bg-cyber-lime text-black' : 
+                      result.recommendation === 'Overpriced' ? 'bg-red-500 text-white' : 'bg-cyber-teal text-black'
                    }`}>
                       <Zap size={10} className="inline mr-1" /> {result.recommendation}
                    </span>
@@ -252,7 +249,30 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType, onSave }) 
               </div>
             </div>
 
-            {/* Price Spread Chart with Custom Tooltip */}
+            {/* Neural Grounding Sources - Strictly Extracting Search Intel */}
+            {result.groundingSources && result.groundingSources.length > 0 && (
+              <div className="glass-panel rounded-3xl p-6 border border-cyber-teal/20 bg-cyber-teal/5 overflow-hidden">
+                <h3 className="text-xs font-mono font-bold text-cyber-teal mb-4 flex items-center gap-2 uppercase tracking-widest">
+                  <ShieldCheck size={16} className="text-cyber-teal" /> Neural Grounding Sources (Proof of Intelligence)
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {result.groundingSources.map((source, i) => (
+                    <a 
+                      key={i} 
+                      href={source.uri} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/40 border border-white/5 text-[9px] font-mono text-gray-400 hover:text-white hover:border-cyber-teal transition-all group"
+                    >
+                      <Link2 size={10} className="text-cyber-teal group-hover:scale-110" />
+                      {source.title.length > 40 ? source.title.substring(0, 40) + '...' : source.title}
+                    </a>
+                  ))}
+                </div>
+                <p className="text-[8px] text-gray-600 font-mono mt-3 uppercase tracking-tighter">* These signals were used to verify high-tier valuation floors for the selected sector.</p>
+              </div>
+            )}
+
             <div className="glass-panel rounded-3xl p-6 border border-white/5 bg-black/20 overflow-hidden">
                 <h3 className="text-xs font-mono font-bold text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
                   <TrendingUp size={16} className="text-cyber-lime" /> Sector Price Spread (Lakhs)

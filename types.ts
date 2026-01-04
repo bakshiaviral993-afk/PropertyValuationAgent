@@ -3,7 +3,6 @@ import { ReactNode } from 'react';
 
 export type AppMode = 'buy' | 'sell' | 'rent' | 'land';
 
-// Added StepField enum to fix the missing export error in constants.ts
 export enum StepField {
   State = 'state',
   City = 'city',
@@ -40,6 +39,11 @@ export interface GlobalContext {
   pincode: string;
   city: string;
   photos: string[];
+}
+
+export interface GroundingSource {
+  title: string;
+  uri: string;
 }
 
 export interface BuyRequest extends GlobalContext {
@@ -134,6 +138,7 @@ export interface BuyResult {
   appreciationPotential: string;
   confidenceScore: number;
   valuationJustification: string;
+  groundingSources?: GroundingSource[];
 }
 
 export interface RentResult {
@@ -149,6 +154,7 @@ export interface RentResult {
   suggestRadiusExpansion: boolean;
   propertiesFoundCount: number;
   valuationJustification: string;
+  groundingSources?: GroundingSource[];
 }
 
 export interface LandResult {
@@ -160,6 +166,7 @@ export interface LandResult {
   zoningAnalysis: string;
   listings: LandListing[];
   valuationJustification: string;
+  groundingSources?: GroundingSource[];
 }
 
 export interface ChatMessage {
