@@ -7,13 +7,12 @@ import {
 } from "../types";
 
 /**
- * Safely retrieves the API key.
- * The key is injected by the platform into process.env.API_KEY.
+ * Safely retrieves the API key from the environment.
  */
 const getApiKey = (): string => {
   const key = process.env.API_KEY;
-  if (!key || key === 'undefined' || key === 'null') {
-    throw new Error("API_KEY_MISSING: Neural Link requires an active API key in the environment.");
+  if (!key || key === 'undefined' || key === 'null' || key.trim() === '') {
+    throw new Error("API_KEY_MISSING: Neural Link requires an active API key. Please select a key in the onboarding or via the key icon.");
   }
   return key;
 };

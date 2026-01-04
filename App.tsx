@@ -16,7 +16,7 @@ import {
   getBuyAnalysis, getRentAnalysis, getLandValuationAnalysis 
 } from './services/geminiService';
 import { REAL_ESTATE_KNOWLEDGE_BASE } from './data/knowledgeBase';
-import { Zap, ShieldAlert, Database, User, ShoppingBag, Search, Map as MapIcon, Layers, ArrowLeft, Tag, Building2, Landmark } from 'lucide-react';
+import { Zap, ShieldAlert, Database, User, ShoppingBag, Search, Map as MapIcon, Layers, ArrowLeft, Tag, Building2, Landmark, Key } from 'lucide-react';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -52,7 +52,6 @@ const App: React.FC = () => {
     setSuggestExpansion(false);
     try {
       if (mode === 'buy' || mode === 'sell') {
-        // Inject current buyType into the request
         const requestData = { ...data, purchaseType: buyType === 'New Buy' ? 'New Booking' : 'Resale Purchase' };
         const result = await getBuyAnalysis(requestData as BuyRequest);
         setBuyData(result);
@@ -68,8 +67,14 @@ const App: React.FC = () => {
         const result = await getLandValuationAnalysis(data as LandRequest);
         setLandData(result);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Intelligence Wing signal disruption.");
+    } catch (err: any) {
+      const errorMsg = err instanceof Error ? err.message : "Intelligence Wing signal disruption.";
+      setError(errorMsg);
+      
+      // Recovery logic for Key selection errors
+      if (errorMsg.includes("Requested entity was not found") || errorMsg.includes("API_KEY_MISSING")) {
+        setUser(null); // Return to onboarding to re-select key
+      }
     } finally {
       setIsLoading(false);
     }
@@ -89,6 +94,12 @@ const App: React.FC = () => {
     setSuggestExpansion(false);
     setPendingRequestData(null);
     setSessionKey(prev => prev + 1);
+  };
+
+  const handleOpenKeySelector = async () => {
+    if ((window as any).aistudio) {
+      await (window as any).aistudio.openSelectKey();
+    }
   };
 
   const isAnyResult = !!buyData || !!rentData || !!landData;
@@ -135,6 +146,14 @@ const App: React.FC = () => {
         </div>
         
         <div className="flex items-center justify-between w-full md:w-auto gap-4">
+          <button 
+            onClick={handleOpenKeySelector}
+            className="p-2 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-cyber-orange transition-colors"
+            title="Manage Neural Link"
+          >
+            <Key size={16} />
+          </button>
+
           {(mode === 'buy' || mode === 'sell') && !isAnyResult && (
             <div className="flex bg-cyber-black border border-white/10 rounded-xl p-1 shadow-inner">
                <button 
@@ -195,7 +214,10 @@ const App: React.FC = () => {
                {error && (
                    <div className="mt-4 p-4 bg-red-500/10 text-red-400 rounded-2xl border border-red-500/30 text-[10px] font-mono flex items-center gap-3">
                        <ShieldAlert size={16} className="shrink-0" />
-                       <p className="uppercase tracking-widest">{error}</p>
+                       <div className="flex flex-col">
+                         <p className="uppercase tracking-widest font-bold">Signal Interference Detected</p>
+                         <p className="text-[8px] opacity-70 mt-1">{error}</p>
+                       </div>
                    </div>
                )}
           </div>

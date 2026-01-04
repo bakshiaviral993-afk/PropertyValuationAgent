@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { UserProfile } from '../types';
-import { Zap, ShieldCheck, Database, ArrowRight, User, Phone, Mail, Activity, Home, Lock } from 'lucide-react';
+import { Zap, ShieldCheck, Database, ArrowRight, User, Phone, Mail, Activity, Lock, ExternalLink, Key } from 'lucide-react';
 
 interface OnboardingProps {
   onComplete: (user: UserProfile) => void;
@@ -10,6 +11,27 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   const [formData, setFormData] = useState<UserProfile>({ name: '', mobile: '', email: '' });
   const [stage, setStage] = useState<'input' | 'authorizing' | 'entering'>('input');
   const [statusText, setStatusText] = useState('SYSTEM_IDLE');
+  const [hasKey, setHasKey] = useState<boolean>(false);
+
+  useEffect(() => {
+    const checkKey = async () => {
+      if ((window as any).aistudio && typeof (window as any).aistudio.hasSelectedApiKey === 'function') {
+        const selected = await (window as any).aistudio.hasSelectedApiKey();
+        setHasKey(selected || !!process.env.API_KEY);
+      } else {
+        setHasKey(!!process.env.API_KEY);
+      }
+    };
+    checkKey();
+  }, []);
+
+  const handleConnectKey = async () => {
+    if ((window as any).aistudio && typeof (window as any).aistudio.openSelectKey === 'function') {
+      await (window as any).aistudio.openSelectKey();
+      // Assume success as per platform race condition guidelines
+      setHasKey(true);
+    }
+  };
 
   const statuses = [
     'ENCRYPTING_IDENTITY...',
@@ -20,7 +42,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.mobile || !formData.email) return;
+    if (!formData.name || !formData.mobile || !formData.email || !hasKey) return;
 
     setStage('authorizing');
     let i = 0;
@@ -31,7 +53,6 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         clearInterval(interval);
         setTimeout(() => {
           setStage('entering');
-          // Wait for the zoom animation to finish before calling onComplete
           setTimeout(() => onComplete(formData), 1500);
         }, 500);
       }
@@ -41,11 +62,9 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   return (
     <div className={`fixed inset-0 z-[100] bg-cyber-black flex items-center justify-center overflow-hidden font-mono transition-colors duration-1000 ${stage === 'entering' ? 'bg-white dark:bg-black' : ''}`}>
       
-      {/* Dynamic Digital Background */}
       <div className={`absolute inset-0 opacity-20 pointer-events-none transition-opacity duration-1000 ${stage === 'entering' ? 'opacity-0' : ''}`}>
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f2937_1px,transparent_1px),linear-gradient(to_bottom,#1f2937_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] transform perspective-1000 rotateX-60 origin-top h-[200vh]" />
         
-        {/* Animated Particles */}
         <div className="absolute inset-0 overflow-hidden">
           {[...Array(20)].map((_, i) => (
             <div 
@@ -62,10 +81,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         </div>
       </div>
 
-      {/* STAGE 1 & 2: INPUT AND AUTHORIZING */}
       {stage !== 'entering' && (
         <div className={`relative w-full max-w-lg px-8 py-12 transition-all duration-700 ${stage === 'authorizing' ? 'scale-95 opacity-50' : 'animate-in fade-in zoom-in-95'}`}>
-          {/* Header Branding */}
           <div className="text-center mb-10">
             <div className="inline-flex items-center justify-center p-4 rounded-3xl bg-cyber-teal/10 border border-cyber-teal/30 mb-6 shadow-neon-teal relative overflow-hidden group">
               <Zap size={40} className="text-cyber-teal relative z-10" />
@@ -76,7 +93,6 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
           </div>
 
           <div className="glass-panel rounded-3xl p-8 border border-white/10 shadow-2xl relative overflow-hidden">
-            {/* Authorizing Overlay */}
             {stage === 'authorizing' && (
                <div className="absolute inset-0 bg-cyber-black/80 backdrop-blur-md z-20 flex flex-col items-center justify-center">
                   <div className="relative mb-6">
@@ -87,65 +103,84 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-2 group">
-                <label className="text-[9px] text-gray-500 uppercase tracking-widest flex items-center gap-2 group-focus-within:text-cyber-teal transition-colors">
-                  <User size={10} className="text-cyber-teal" /> Investigator Name
-                </label>
-                <div className="relative">
+            {!hasKey ? (
+              <div className="space-y-6 text-center py-4">
+                <div className="p-4 bg-cyber-orange/10 border border-cyber-orange/20 rounded-2xl flex flex-col items-center gap-3">
+                  <Key size={32} className="text-cyber-orange animate-pulse" />
+                  <h3 className="text-white text-sm font-bold uppercase tracking-widest">Neural Link Required</h3>
+                  <p className="text-[10px] text-gray-400 leading-relaxed">
+                    This high-fidelity interface requires a dedicated API key from a paid Google Cloud project for Google Search grounding.
+                  </p>
+                </div>
+                
+                <button
+                  onClick={handleConnectKey}
+                  className="w-full bg-cyber-orange text-cyber-black font-bold py-5 rounded-xl flex items-center justify-center gap-3 hover:bg-white transition-all shadow-neon-orange group active:scale-[0.98]"
+                >
+                  <Lock size={16} /> CONNECT NEURAL KEY
+                </button>
+
+                <a 
+                  href="https://ai.google.dev/gemini-api/docs/billing" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-[9px] text-cyber-orange hover:text-white transition-colors uppercase tracking-widest font-bold"
+                >
+                  Billing Documentation <ExternalLink size={10} />
+                </a>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="space-y-2 group">
+                  <label className="text-[9px] text-gray-500 uppercase tracking-widest flex items-center gap-2 group-focus-within:text-cyber-teal transition-colors">
+                    <User size={10} className="text-cyber-teal" /> Investigator Name
+                  </label>
                   <input
                     required
                     type="text"
                     placeholder="ENTER FULL NAME"
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-sm text-white focus:outline-none focus:border-cyber-teal focus:ring-1 focus:ring-cyber-teal/50 transition-all font-mono placeholder:text-gray-700"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-sm text-white focus:outline-none focus:border-cyber-teal transition-all font-mono placeholder:text-gray-700"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
-                  <div className="absolute bottom-0 left-0 h-[1px] bg-cyber-teal w-0 group-focus-within:w-full transition-all duration-500 shadow-neon-teal" />
                 </div>
-              </div>
 
-              <div className="space-y-2 group">
-                <label className="text-[9px] text-gray-500 uppercase tracking-widest flex items-center gap-2 group-focus-within:text-cyber-teal transition-colors">
-                  <Phone size={10} className="text-cyber-teal" /> Mobile Verification
-                </label>
-                <div className="relative">
+                <div className="space-y-2 group">
+                  <label className="text-[9px] text-gray-500 uppercase tracking-widest flex items-center gap-2 group-focus-within:text-cyber-teal transition-colors">
+                    <Phone size={10} className="text-cyber-teal" /> Mobile Verification
+                  </label>
                   <input
                     required
                     type="tel"
                     placeholder="+91 XXXXX XXXXX"
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-sm text-white focus:outline-none focus:border-cyber-teal focus:ring-1 focus:ring-cyber-teal/50 transition-all font-mono placeholder:text-gray-700"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-sm text-white focus:outline-none focus:border-cyber-teal transition-all font-mono placeholder:text-gray-700"
                     value={formData.mobile}
                     onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
                   />
-                  <div className="absolute bottom-0 left-0 h-[1px] bg-cyber-teal w-0 group-focus-within:w-full transition-all duration-500 shadow-neon-teal" />
                 </div>
-              </div>
 
-              <div className="space-y-2 group">
-                <label className="text-[9px] text-gray-500 uppercase tracking-widest flex items-center gap-2 group-focus-within:text-cyber-teal transition-colors">
-                  <Mail size={10} className="text-cyber-teal" /> Digital Mailbox
-                </label>
-                <div className="relative">
+                <div className="space-y-2 group">
+                  <label className="text-[9px] text-gray-500 uppercase tracking-widest flex items-center gap-2 group-focus-within:text-cyber-teal transition-colors">
+                    <Mail size={10} className="text-cyber-teal" /> Digital Mailbox
+                  </label>
                   <input
                     required
                     type="email"
                     placeholder="RESEARCHER@QUANTCASA.IO"
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-sm text-white focus:outline-none focus:border-cyber-teal focus:ring-1 focus:ring-cyber-teal/50 transition-all font-mono placeholder:text-gray-700"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-sm text-white focus:outline-none focus:border-cyber-teal transition-all font-mono placeholder:text-gray-700"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   />
-                  <div className="absolute bottom-0 left-0 h-[1px] bg-cyber-teal w-0 group-focus-within:w-full transition-all duration-500 shadow-neon-teal" />
                 </div>
-              </div>
 
-              <button
-                type="submit"
-                className="w-full bg-cyber-teal text-cyber-black font-bold py-5 rounded-xl flex items-center justify-center gap-3 hover:bg-white transition-all shadow-neon-teal group mt-6 active:scale-[0.98]"
-              >
-                <Lock size={16} /> INITIALIZE ENTRY <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-              </button>
-            </form>
+                <button
+                  type="submit"
+                  className="w-full bg-cyber-teal text-cyber-black font-bold py-5 rounded-xl flex items-center justify-center gap-3 hover:bg-white transition-all shadow-neon-teal group mt-6 active:scale-[0.98]"
+                >
+                  <Lock size={16} /> INITIALIZE ENTRY <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                </button>
+              </form>
+            )}
           </div>
 
           <div className="mt-8 flex justify-between items-center px-4 opacity-50">
@@ -161,11 +196,9 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         </div>
       )}
 
-      {/* STAGE 3: THE HOUSE ENTRY PORTAL */}
       {stage === 'entering' && (
         <div className="absolute inset-0 flex items-center justify-center bg-black overflow-hidden">
           <div className="relative flex items-center justify-center animate-portal-zoom">
-            {/* The House Portal Wireframe */}
             <svg viewBox="0 0 100 100" className="w-[100px] h-[100px] text-cyber-teal stroke-[0.5] fill-none">
               <path 
                 d="M50 10 L90 40 V90 H10 V40 Z" 
@@ -175,8 +208,6 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
               <rect x="25" y="45" width="15" height="15" className="animate-draw-path" />
               <rect x="60" y="45" width="15" height="15" className="animate-draw-path" />
             </svg>
-            
-            {/* Glowing Light from "Inside" */}
             <div className="absolute inset-0 bg-cyber-teal/20 blur-[60px] animate-pulse" />
           </div>
           
