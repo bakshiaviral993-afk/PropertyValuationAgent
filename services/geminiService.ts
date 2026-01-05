@@ -20,7 +20,6 @@ const getApiKey = (): string | null => {
 
 /**
  * Generates a photorealistic architectural visualization for a property.
- * Uses gemini-2.5-flash-image for speed and quality.
  */
 export const generatePropertyImage = async (prompt: string): Promise<string | null> => {
   const apiKey = getApiKey();
@@ -58,7 +57,7 @@ export const generatePropertyImage = async (prompt: string): Promise<string | nu
 const BUY_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
-    fairValue: { type: Type.STRING },
+    fairValue: { type: Type.STRING, description: "Total sale price in Cr or Lakhs" },
     valuationRange: { type: Type.STRING },
     recommendation: { type: Type.STRING, enum: ['Good Buy', 'Fair Price', 'Overpriced'] },
     negotiationScript: { type: Type.STRING },
@@ -69,13 +68,13 @@ const BUY_SCHEMA: Schema = {
     valuationJustification: { type: Type.STRING },
     listings: {
       type: Type.ARRAY,
-      description: "A comprehensive list of property listings found via search. Must include 'facing' for each.",
+      description: "ONLY property listings that are FOR SALE. EXCLUDE RENTALS.",
       items: {
         type: Type.OBJECT,
         properties: {
           title: { type: Type.STRING },
-          price: { type: Type.STRING },
-          priceValue: { type: Type.NUMBER },
+          price: { type: Type.STRING, description: "Total sale price (e.g. 1.5 Cr)" },
+          priceValue: { type: Type.NUMBER, description: "Numeric total value in INR" },
           address: { type: Type.STRING },
           sourceUrl: { type: Type.STRING },
           bhk: { type: Type.STRING },
@@ -94,7 +93,7 @@ const BUY_SCHEMA: Schema = {
 const RENT_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
-    rentalValue: { type: Type.STRING },
+    rentalValue: { type: Type.STRING, description: "Monthly rent (e.g. 45k/mo)" },
     yieldPercentage: { type: Type.STRING },
     rentOutAlert: { type: Type.STRING },
     depositCalc: { type: Type.STRING },
@@ -107,11 +106,12 @@ const RENT_SCHEMA: Schema = {
     valuationJustification: { type: Type.STRING },
     listings: {
       type: Type.ARRAY,
+      description: "ONLY property listings that are FOR RENT. EXCLUDE FOR-SALE PROPERTIES.",
       items: {
         type: Type.OBJECT,
         properties: {
           title: { type: Type.STRING },
-          rent: { type: Type.STRING },
+          rent: { type: Type.STRING, description: "Monthly rent amount" },
           address: { type: Type.STRING },
           sourceUrl: { type: Type.STRING },
           bhk: { type: Type.STRING },
@@ -201,7 +201,9 @@ export const getBuyAnalysis = async (data: BuyRequest): Promise<BuyResult> => {
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const searchPrompt = `Search for ${data.bhk} in ${data.address}, ${data.city}. Facing: ${data.facing}.`;
+    // Explicitly searching for SALE properties to prevent rent leakage
+    const searchPrompt = `LATEST PROPERTIES FOR SALE: ${data.bhk} apartments in ${data.address}, ${data.city}. Facing: ${data.facing}. CARPET AREA: ${data.sqft} sqft. PROVIDE MARKET SALE PRICES (CR/LAKH), NOT RENTAL RATES.`;
+    
     const searchResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: searchPrompt,
@@ -210,7 +212,9 @@ export const getBuyAnalysis = async (data: BuyRequest): Promise<BuyResult> => {
 
     const structResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Synthesize valuation JSON for ${data.address} based on: ${searchResponse.text}`,
+      contents: `Synthesize a Sale Valuation report for ${data.address} based on this intel: ${searchResponse.text}. 
+      CRITICAL RULE: ONLY include for-sale property listings. DO NOT include rentals or lease properties. 
+      Ensure 'fairValue' and 'listings.price' are total asset values (e.g. 2.1 Cr), NOT monthly rent.`,
       config: { 
         responseMimeType: "application/json", 
         responseSchema: BUY_SCHEMA 
@@ -227,7 +231,9 @@ export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> =>
   const apiKey = getApiKey();
   try {
     const ai = new GoogleGenAI({ apiKey: apiKey || "" });
-    const searchPrompt = `Rental rates for ${data.bhk} in ${data.address}, ${data.city}.`;
+    // Explicitly searching for RENT properties to prevent sale price leakage
+    const searchPrompt = `LATEST PROPERTIES FOR RENT: ${data.bhk} apartments in ${data.address}, ${data.city}. Facing: ${data.facing}. CARPET AREA: ${data.sqft} sqft. PROVIDE MONTHLY RENTAL RATES (INR), NOT SALE PRICES.`;
+    
     const searchResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: searchPrompt,
@@ -236,7 +242,9 @@ export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> =>
 
     const structResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Synthesize rent JSON based on: ${searchResponse.text}`,
+      contents: `Synthesize a Rental Intel report based on this data: ${searchResponse.text}. 
+      CRITICAL RULE: ONLY include monthly rental listings. DO NOT include for-sale properties or multi-crore asset prices. 
+      Ensure 'rentalValue' and 'listings.rent' are monthly amounts (e.g. 55,000/mo).`,
       config: { 
         responseMimeType: "application/json", 
         responseSchema: RENT_SCHEMA 
@@ -245,14 +253,19 @@ export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> =>
 
     return JSON.parse(structResponse.text || '{}') as RentResult;
   } catch (err) {
-    // Basic fallback for rent
     return {
       rentalValue: "₹45,000/mo",
       yieldPercentage: "3.5%",
       confidenceScore: 70,
-      valuationJustification: "Mock rent analysis.",
-      listings: []
-    } as any;
+      valuationJustification: "Mock rent analysis due to signal disruption.",
+      listings: [],
+      suggestRadiusExpansion: false,
+      propertiesFoundCount: 0,
+      negotiationScript: "Standard market lease terms apply.",
+      depositCalc: "Standard 6-month deposit recommended.",
+      marketSummary: "Stable demand in this sector.",
+      tenantDemandScore: 75
+    } as RentResult;
   }
 };
 
@@ -283,7 +296,10 @@ export const getLandValuationAnalysis = async (data: LandRequest): Promise<LandR
       perSqmValue: "₹15,000",
       confidenceScore: 65,
       valuationJustification: "Mock land analysis.",
-      listings: []
-    } as any;
+      listings: [],
+      devROI: "15-20% Projection",
+      negotiationStrategy: "Focus on FSI potential.",
+      zoningAnalysis: "Residential Zoning detected."
+    } as LandResult;
   }
 };

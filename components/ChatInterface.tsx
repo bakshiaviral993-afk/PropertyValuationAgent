@@ -15,31 +15,86 @@ interface ChatInterfaceProps {
 const CITY_DATA: Record<string, { localities: string[], pincodes: Record<string, string | string[]> }> = {
   'Mumbai': {
     localities: ['Andheri West', 'Bandra', 'Worli', 'Powai', 'Juhu', 'Borivali', 'Malad', 'Colaba'],
-    pincodes: { 'Andheri West': '400053', 'Bandra': '400050', 'Worli': '400018', 'Powai': '400076' }
+    pincodes: { 
+      'Andheri West': '400053', 
+      'Bandra': '400050', 
+      'Worli': '400018', 
+      'Powai': '400076', 
+      'Juhu': '400049', 
+      'Borivali': '400091', 
+      'Malad': '400064', 
+      'Colaba': '400005' 
+    }
   },
   'Pune': {
     localities: ['Wagholi', 'Hinjewadi', 'Baner', 'Kharadi', 'Kothrud', 'Wakad', 'Viman Nagar', 'Hadapsar'],
-    pincodes: { 'Wagholi': '412207', 'Hinjewadi': '411057', 'Kharadi': '411014', 'Baner': '411045' }
+    pincodes: { 
+      'Wagholi': '412207', 
+      'Hinjewadi': '411057', 
+      'Kharadi': '411014', 
+      'Baner': '411045', 
+      'Kothrud': '411038', 
+      'Wakad': '411057', 
+      'Viman Nagar': '411014', 
+      'Hadapsar': '411028' 
+    }
   },
   'Bangalore': {
     localities: ['Whitefield', 'Indiranagar', 'Koramangala', 'HSR Layout', 'Electronic City', 'Hebbal', 'Jayanagar'],
-    pincodes: { 'Whitefield': '560066', 'Indiranagar': '560038', 'Koramangala': '560034' }
+    pincodes: { 
+      'Whitefield': '560066', 
+      'Indiranagar': '560038', 
+      'Koramangala': '560034', 
+      'HSR Layout': '560102', 
+      'Electronic City': '560100', 
+      'Hebbal': '560024', 
+      'Jayanagar': '560041' 
+    }
   },
   'Hyderabad': {
     localities: ['Gachibowli', 'Hitech City', 'Kondapur', 'Banjara Hills', 'Jubilee Hills', 'Manikonda'],
-    pincodes: { 'Gachibowli': '500032', 'Hitech City': '500081', 'Kondapur': '500084' }
+    pincodes: { 
+      'Gachibowli': '500032', 
+      'Hitech City': '500081', 
+      'Kondapur': '500084', 
+      'Banjara Hills': '500034', 
+      'Jubilee Hills': '500033', 
+      'Manikonda': '500089' 
+    }
   },
   'Chennai': {
     localities: ['Adyar', 'Velachery', 'Anna Nagar', 'OMR', 'T Nagar', 'Besant Nagar', 'Mylapore'],
-    pincodes: { 'Adyar': '600020', 'Velachery': '600042', 'Anna Nagar': '600040' }
+    pincodes: { 
+      'Adyar': '600020', 
+      'Velachery': '600042', 
+      'Anna Nagar': '600040', 
+      'OMR': ['600096', '600119'], 
+      'T Nagar': '600017', 
+      'Besant Nagar': '600090', 
+      'Mylapore': '600004' 
+    }
   },
   'Delhi NCR': {
     localities: ['Gurgaon Sec 43', 'Noida Sec 150', 'South Ext', 'Dwarka', 'Greater Noida', 'Saket'],
-    pincodes: { 'Gurgaon Sec 43': '122002', 'Noida Sec 150': '201310', 'Dwarka': '110075' }
+    pincodes: { 
+      'Gurgaon Sec 43': '122002', 
+      'Noida Sec 150': '201310', 
+      'South Ext': '110049', 
+      'Dwarka': '110075', 
+      'Greater Noida': '201308', 
+      'Saket': '110017' 
+    }
   },
   'Kolkata': {
     localities: ['Salt Lake', 'New Town', 'Rajarhat', 'Ballygunge', 'Alipore', 'Park Street'],
-    pincodes: { 'Salt Lake': '700091', 'New Town': '700156', 'Rajarhat': '700135' }
+    pincodes: { 
+      'Salt Lake': '700091', 
+      'New Town': '700156', 
+      'Rajarhat': '700135', 
+      'Ballygunge': '700019', 
+      'Alipore': '700027', 
+      'Park Street': '700016' 
+    }
   }
 };
 
@@ -203,7 +258,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
 
     if (displayText.trim() === '' && currentStep.type !== 'price-range') return;
 
-    const newFormData = { ...formData, [currentStep.field]: processedValue };
+    let newFormData = { ...formData, [currentStep.field]: processedValue };
     setMessages(prev => [...prev, { 
       id: `u-${Date.now()}`, 
       sender: 'user', 
@@ -212,16 +267,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
     setInputValue('');
 
     let nextIdx = currentStepIndex + 1;
+    let autoFillMessage: string | null = null;
     
+    // Auto-pincode detection logic
     if (currentStep.field === 'address') {
       const city = newFormData.city;
       const geoCodes = CITY_DATA[city]?.pincodes[value];
       if (geoCodes) {
         if (typeof geoCodes === 'string') {
+          // One clear pincode: Auto-fill and skip
           newFormData.pincode = geoCodes;
           const pinStepIdx = activeSteps.findIndex(s => s.field === 'pincode');
-          nextIdx = pinStepIdx + 1;
-        } else {
+          if (pinStepIdx !== -1) {
+            nextIdx = pinStepIdx + 1;
+            autoFillMessage = `GEOLINK_VERIFIED: Pincode ${geoCodes} auto-assigned for ${value}.`;
+          }
+        } else if (Array.isArray(geoCodes)) {
+          // Multiple pincodes: Show suggestions in the next step
           setPincodeSuggestions(geoCodes);
         }
       }
@@ -232,11 +294,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
     if (nextIdx < activeSteps.length) {
       setCurrentStepIndex(nextIdx);
       setTimeout(() => {
-        setMessages(prev => [...prev, {
+        const nextStepMsgs: ChatMessage[] = [];
+        
+        if (autoFillMessage) {
+          nextStepMsgs.push({
+            id: `auto-pin-${Date.now()}`,
+            sender: 'bot',
+            text: autoFillMessage
+          });
+        }
+        
+        nextStepMsgs.push({
           id: `b-${Date.now()}`,
           sender: 'bot',
           text: activeSteps[nextIdx].question
-        }]);
+        });
+
+        setMessages(prev => [...prev, ...nextStepMsgs]);
       }, 400);
     } else {
       onComplete(newFormData);
@@ -340,7 +414,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
                     <Navigation size={10} /> {loc}
                   </button>
                 ))}
-                <button onClick={() => handleNext(inputValue)} className="hidden">Hidden Submit</button>
               </div>
             ) : currentStep.type === 'multi-select' ? (
               <div className="space-y-4">
