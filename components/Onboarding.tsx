@@ -1,165 +1,138 @@
-
 import React, { useState } from 'react';
-import { UserProfile } from '../types';
-import { Zap, ShieldCheck, Database, ArrowRight, User, Phone, Mail, Activity, Lock } from 'lucide-react';
+import { Home, Building2, Map as MapIcon, ArrowRight, CheckCircle2, Globe, Zap, ShieldCheck } from 'lucide-react';
+import { AppMode, AppLang } from '../types';
 
 interface OnboardingProps {
-  onComplete: (user: UserProfile) => void;
+  onComplete: (mode: AppMode, lang: AppLang) => void;
 }
 
+const TRANSLATIONS = {
+  EN: {
+    hero: "Find your property's true value.",
+    sub: "AI-powered reports with market trends & fair price estimates.",
+    buy: "Buy 🏠",
+    rent: "Rent 🏘️",
+    land: "Land 🏗️",
+    quick: "Quick Calc",
+    started: "Get started",
+    footer: "Verified data across major Indian cities"
+  },
+  HI: {
+    hero: "अपनी संपत्ति का सही मूल्य जानें।",
+    sub: "बाजार के रुझान और सटीक मूल्य अनुमान के साथ एआई रिपोर्ट।",
+    buy: "खरीदें 🏠",
+    rent: "किराया 🏘️",
+    land: "ज़मीन 🏗️",
+    quick: "तुरंत गणना",
+    started: "शुरू करें",
+    footer: "भारत के प्रमुख शहरों का सत्यापित डेटा"
+  }
+};
+
 const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
-  const [formData, setFormData] = useState<UserProfile>({ name: '', mobile: '', email: '' });
-  const [stage, setStage] = useState<'input' | 'authorizing' | 'entering'>('input');
-  const [statusText, setStatusText] = useState('SYSTEM_IDLE');
+  const [lang, setLang] = useState<AppLang>('EN');
+  const [showModes, setShowModes] = useState(false);
 
-  const statuses = [
-    'ENCRYPTING_IDENTITY...',
-    'STABILIZING_GEOLINK...',
-    'GENERATING_HOUSE_WIREFRM...',
-    'THRESHOLD_SYNC_COMPLETE'
-  ];
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.mobile || !formData.email) return;
-
-    setStage('authorizing');
-    let i = 0;
-    const interval = setInterval(() => {
-      setStatusText(statuses[i]);
-      i++;
-      if (i === statuses.length) {
-        clearInterval(interval);
-        setTimeout(() => {
-          setStage('entering');
-          setTimeout(() => onComplete(formData), 1500);
-        }, 500);
-      }
-    }, 700);
-  };
+  const t = TRANSLATIONS[lang];
 
   return (
-    <div className={`fixed inset-0 z-[100] bg-cyber-black flex items-center justify-center overflow-hidden font-mono transition-colors duration-1000 ${stage === 'entering' ? 'bg-white dark:bg-black' : ''}`}>
-      
-      <div className={`absolute inset-0 opacity-20 pointer-events-none transition-opacity duration-1000 ${stage === 'entering' ? 'opacity-0' : ''}`}>
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f2937_1px,transparent_1px),linear-gradient(to_bottom,#1f2937_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] transform perspective-1000 rotateX-60 origin-top h-[200vh]" />
+    <div className="min-h-screen bg-neo-bg flex flex-col items-center justify-center p-6 sm:p-12 overflow-hidden relative">
+      {/* Background decoration */}
+      <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
+        <div className="absolute top-20 left-10 w-64 h-64 bg-neo-neon rounded-full blur-[100px]" />
+        <div className="absolute bottom-20 right-10 w-64 h-64 bg-neo-pink rounded-full blur-[100px]" />
       </div>
 
-      {stage !== 'entering' && (
-        <div className={`relative w-full max-w-lg px-8 py-12 transition-all duration-700 ${stage === 'authorizing' ? 'scale-95 opacity-50' : 'animate-in fade-in zoom-in-95'}`}>
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center justify-center p-4 rounded-3xl bg-cyber-teal/10 border border-cyber-teal/30 mb-6 shadow-neon-teal">
-              <Zap size={40} className="text-cyber-teal" />
+      <div className="max-w-4xl w-full space-y-12 relative z-10">
+        {/* Language Picker */}
+        <div className="flex justify-center sm:justify-end gap-3">
+          {(['EN', 'HI'] as AppLang[]).map((l) => (
+            <button
+              key={l}
+              onClick={() => setLang(l)}
+              className={`px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest border transition-all ${
+                lang === l
+                  ? 'bg-neo-neon text-white border-neo-neon shadow-neo-glow scale-105'
+                  : 'bg-white/5 text-gray-400 border-white/20 hover:border-neo-neon hover:text-white'
+              }`}
+            >
+              {l === 'EN' ? 'English' : <span className="font-bold">हिंदी</span>}
+            </button>
+          ))}
+        </div>
+
+        {!showModes ? (
+          <div className="text-center space-y-8 animate-in fade-in zoom-in duration-700">
+            <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-neo-neon/10 border border-neo-neon/20 rounded-full text-neo-neon text-[10px] font-black uppercase tracking-[0.3em] shadow-neo-glow">
+              <Zap size={14} className="animate-pulse" /> Free Intelligence • Direct Access
             </div>
-            <h1 className="text-4xl font-bold text-white tracking-tighter mb-2">QUANT<span className="text-cyber-teal">CASA</span></h1>
-            <p className="text-[10px] text-gray-500 uppercase tracking-[0.5em]">Analytics & Research Wing</p>
+            <h1 className="text-5xl md:text-8xl font-black text-white tracking-tighter leading-none">
+              {t.hero.split(' ').map((w, i) => (
+                <span key={i} className={w.includes('true') || w.includes('सही') ? 'text-neo-neon neon-text-glow' : ''}>{w} </span>
+              ))}
+            </h1>
+            <p className="text-lg md:text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed font-medium uppercase tracking-tight">
+              {t.sub}
+            </p>
+            <button 
+              onClick={() => setShowModes(true)}
+              className="px-14 py-6 bg-neo-neon text-white rounded-[32px] text-xl font-black shadow-neo-glow hover:scale-105 active:scale-95 transition-all flex items-center gap-4 mx-auto group border-t border-white/20"
+            >
+              {t.started} <ArrowRight className="group-hover:translate-x-3 transition-transform" />
+            </button>
           </div>
-
-          <div className="glass-panel rounded-3xl p-8 border border-white/10 shadow-2xl relative overflow-hidden">
-            {stage === 'authorizing' && (
-               <div className="absolute inset-0 bg-cyber-black/80 backdrop-blur-md z-20 flex flex-col items-center justify-center">
-                  <div className="relative mb-6">
-                    <div className="w-16 h-16 border-2 border-cyber-teal/20 rounded-full" />
-                    <div className="absolute inset-0 border-t-2 border-cyber-teal rounded-full animate-spin" />
+        ) : (
+          <div className="space-y-10 animate-in slide-in-from-bottom-12 duration-500">
+            <div className="text-center">
+               <h2 className="text-4xl font-black text-white tracking-tighter uppercase">Objective Selection</h2>
+               <p className="text-gray-500 mt-3 font-medium uppercase text-xs tracking-widest">Identify target asset class for valuation</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                { id: 'buy', title: t.buy, desc: 'Capital asset valuation and acquisition insights', icon: <Home />, color: 'neo-neon' },
+                { id: 'rent', title: t.rent, desc: 'Yield analysis and leasehold market estimates', icon: <Building2 />, color: 'blue-500' },
+                { id: 'land', title: t.land, desc: 'Development potential and zoning ROI projections', icon: <MapIcon />, color: 'neo-pink' }
+              ].map((mode) => (
+                <button
+                  key={mode.id}
+                  onClick={() => onComplete(mode.id as any, lang)}
+                  className="group bg-white/5 p-8 rounded-[40px] border border-white/10 shadow-glass-3d hover:border-neo-neon/40 transition-all text-left space-y-6 hover:-translate-y-3"
+                >
+                  <div className={`w-16 h-16 rounded-3xl flex items-center justify-center transition-all duration-500 bg-white/5 text-neo-neon group-hover:bg-neo-neon group-hover:text-white shadow-neo-glow`}>
+                    {React.cloneElement(mode.icon as React.ReactElement, { size: 32 })}
                   </div>
-                  <p className="text-cyber-teal text-[10px] tracking-[0.3em] font-bold animate-pulse uppercase">{statusText}</p>
-               </div>
-            )}
+                  <div>
+                    <h3 className="text-3xl font-black text-white tracking-tighter uppercase">{mode.title}</h3>
+                    <p className="text-[10px] text-gray-500 mt-2 leading-relaxed font-bold uppercase tracking-widest">{mode.desc}</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] font-black text-neo-neon opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-widest">
+                    Initialize Scan <ArrowRight size={14} />
+                  </div>
+                </button>
+              ))}
+            </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-2 group">
-                <label className="text-[9px] text-gray-500 uppercase tracking-widest flex items-center gap-2 group-focus-within:text-cyber-teal transition-colors">
-                  <User size={10} className="text-cyber-teal" /> Investigator Name
-                </label>
-                <input
-                  required
-                  type="text"
-                  placeholder="ENTER FULL NAME"
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-sm text-white focus:outline-none focus:border-cyber-teal transition-all font-mono placeholder:text-gray-700"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2 group">
-                <label className="text-[9px] text-gray-500 uppercase tracking-widest flex items-center gap-2 group-focus-within:text-cyber-teal transition-colors">
-                  <Phone size={10} className="text-cyber-teal" /> Mobile Verification
-                </label>
-                <input
-                  required
-                  type="tel"
-                  placeholder="+91 XXXXX XXXXX"
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-sm text-white focus:outline-none focus:border-cyber-teal transition-all font-mono placeholder:text-gray-700"
-                  value={formData.mobile}
-                  onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2 group">
-                <label className="text-[9px] text-gray-500 uppercase tracking-widest flex items-center gap-2 group-focus-within:text-cyber-teal transition-colors">
-                  <Mail size={10} className="text-cyber-teal" /> Digital Mailbox
-                </label>
-                <input
-                  required
-                  type="email"
-                  placeholder="RESEARCHER@QUANTCASA.IO"
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-sm text-white focus:outline-none focus:border-cyber-teal transition-all font-mono placeholder:text-gray-700"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-cyber-teal text-cyber-black font-bold py-5 rounded-xl flex items-center justify-center gap-3 hover:bg-white transition-all shadow-neon-teal group mt-6 active:scale-[0.98]"
-              >
-                <Lock size={16} /> INITIALIZE ENTRY <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-              </button>
-            </form>
+            <button 
+              onClick={() => onComplete('buy', lang)}
+              className="w-full py-5 border-2 border-dashed border-white/5 rounded-[32px] text-gray-600 font-black uppercase tracking-[0.4em] text-[10px] hover:border-neo-neon/40 hover:text-neo-neon transition-all flex items-center justify-center gap-3"
+            >
+              <Zap size={16} /> Fast Track Calculation
+            </button>
           </div>
+        )}
 
-          <div className="mt-8 flex justify-between items-center px-4 opacity-50">
-             <div className="flex items-center gap-2">
-                <ShieldCheck size={14} className="text-cyber-lime" />
-                <span className="text-[9px] text-gray-500 uppercase tracking-widest font-bold">Secure Protocol 2.5</span>
-             </div>
-             <div className="flex items-center gap-2">
-                <Activity size={14} className="text-cyber-teal" />
-                <span className="text-[9px] text-gray-500 uppercase tracking-widest font-bold">Latency: 14ms</span>
-             </div>
+        {/* Footer info */}
+        <div className="flex flex-col md:flex-row items-center justify-center gap-6 text-[10px] font-black text-gray-700 uppercase tracking-[0.3em]">
+          <div className="flex items-center gap-2">
+            <Globe size={16} /> Global Market Sync Ready
+          </div>
+          <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-gray-800" />
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={16} /> Quantum Encrypted Tunnel
           </div>
         </div>
-      )}
-
-      {stage === 'entering' && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black overflow-hidden">
-          <div className="relative flex items-center justify-center animate-portal-zoom">
-            <svg viewBox="0 0 100 100" className="w-[100px] h-[100px] text-cyber-teal stroke-[0.5] fill-none">
-              <path d="M50 10 L90 40 V90 H10 V40 Z" className="animate-draw-path shadow-neon-teal" />
-              <rect x="40" y="60" width="20" height="30" className="animate-draw-path" />
-              <rect x="25" y="45" width="15" height="15" className="animate-draw-path" />
-              <rect x="60" y="45" width="15" height="15" className="animate-draw-path" />
-            </svg>
-            <div className="absolute inset-0 bg-cyber-teal/20 blur-[60px] animate-pulse" />
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes portal-zoom {
-          0% { transform: scale(1); opacity: 0; }
-          20% { opacity: 1; }
-          100% { transform: scale(60); opacity: 0; }
-        }
-        @keyframes draw-path {
-          0% { stroke-dasharray: 0 300; stroke-dashoffset: 0; }
-          100% { stroke-dasharray: 300 0; stroke-dashoffset: 0; }
-        }
-        .animate-portal-zoom { animation: portal-zoom 1.8s cubic-bezier(0.7, 0, 0.3, 1) forwards; }
-        .animate-draw-path { stroke-dasharray: 300; animation: draw-path 2s ease-out forwards; }
-        .rotateX-60 { transform: rotateX(60deg); }
-        .perspective-1000 { perspective: 1000px; }
-      `}</style>
+      </div>
     </div>
   );
 };

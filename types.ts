@@ -1,7 +1,8 @@
 
 import { ReactNode } from 'react';
 
-export type AppMode = 'buy' | 'sell' | 'rent' | 'land' | 'finance';
+export type AppMode = 'buy' | 'rent' | 'land';
+export type AppLang = 'EN' | 'HI';
 
 export enum StepField {
   State = 'state',
@@ -34,97 +35,27 @@ export interface UserProfile {
   email: string;
 }
 
-export interface GlobalContext {
-  address: string;
-  pincode: string;
-  city: string;
-  photos: string[];
-}
-
-export interface GroundingSource {
+export interface NeighborhoodInsight {
   title: string;
-  uri: string;
-  projectName?: string;
-  priceRange?: string;
+  description: string;
+  type: 'positive' | 'development' | 'trend';
 }
 
-export interface BudgetRange {
-  min: number;
-  max: number;
+export interface NeighborhoodScore {
+  overall: number;
+  walkability: number;
+  grocery: number;
+  parks: number;
+  safety: number;
+  connectivity: number;
 }
 
-export interface LoanResult {
-  monthlyEmi: number;
-  totalInterest: number;
-  totalPayment: number;
-  stampDuty: number;
-  registration: number;
-  legalCharges: number;
-  totalInitialCash: number;
-  loanAmount: number;
-}
-
-export interface BuyRequest extends GlobalContext {
-  purchaseType: 'New Booking' | 'Resale Purchase';
-  possessionStatus: 'Ready to Move' | 'Under Construction' | 'Upcoming Project';
-  possessionYear?: string;
-  bhk: string;
-  sqft: number;
-  amenities: string[];
-  budgetRange: BudgetRange;
-  facing: string;
-}
-
-export interface SellRequest extends GlobalContext {
-  bhk: string;
-  sqft: number;
-  age: number;
-  floor: number;
-  amenities: string[];
-  furnishing: string;
-  expectedPrice: number;
-  facing: string;
-}
-
-export interface RentRequest extends GlobalContext {
-  bhk: string;
-  sqft: number;
-  budgetRange: BudgetRange;
-  leaseTerm: string;
-  securityDepositMonths: number;
-  forceExpandRadius?: boolean;
-  facing: string;
-}
-
-export interface LandRequest extends GlobalContext {
-  plotSize: number;
-  unit: 'sqft' | 'sqyd' | 'sqmt' | 'acre';
-  facing: string;
-  fsi: number;
-  devPotential: 'residential' | 'commercial';
-  approvals: 'NA' | 'RERA' | 'None';
-}
-
-export interface SavedSearch {
-  id: string;
-  timestamp: number;
-  mode: AppMode;
-  location: string;
-  city: string;
-  config: string;
-  data: BuyRequest | RentRequest | LandRequest | SellRequest;
-}
-
-export interface RentalListing {
-  title: string;
-  rent: string;
-  address: string;
-  sourceUrl: string;
-  bhk: string;
-  qualityScore: number;
-  latitude: number;
-  longitude: number;
-  facing: string;
+export interface ValuationBreakdown {
+  baseRate: string;
+  localityPremium: string;
+  amenitiesBoost: string;
+  facingAdjustment: string;
+  ageFactor: string;
 }
 
 export interface SaleListing {
@@ -134,7 +65,21 @@ export interface SaleListing {
   address: string;
   sourceUrl: string;
   bhk: string;
-  emiEstimate: string;
+  image?: string;
+  latitude?: number;
+  longitude?: number;
+  builderName?: string;
+  societyName?: string;
+}
+
+export interface RentalListing {
+  title: string;
+  rent: string;
+  address: string;
+  sourceUrl: string;
+  bhk: string;
+  qualityScore: number;
+  image?: string;
   latitude: number;
   longitude: number;
   facing: string;
@@ -146,9 +91,15 @@ export interface LandListing {
   size: string;
   address: string;
   sourceUrl: string;
+  image?: string;
   latitude: number;
   longitude: number;
   facing: string;
+}
+
+export interface GroundingSource {
+  uri: string;
+  title: string;
 }
 
 export interface BuyResult {
@@ -162,7 +113,10 @@ export interface BuyResult {
   appreciationPotential: string;
   confidenceScore: number;
   valuationJustification: string;
-  groundingSources?: GroundingSource[];
+  breakdown?: ValuationBreakdown;
+  neighborhoodScore?: NeighborhoodScore;
+  insights: NeighborhoodInsight[];
+  groundingSources: GroundingSource[];
 }
 
 export interface RentResult {
@@ -175,10 +129,10 @@ export interface RentResult {
   marketSummary: string;
   tenantDemandScore: number;
   confidenceScore: number;
-  suggestRadiusExpansion: boolean;
-  propertiesFoundCount: number;
   valuationJustification: string;
-  groundingSources?: GroundingSource[];
+  propertiesFoundCount: number;
+  insights: NeighborhoodInsight[];
+  groundingSources: GroundingSource[];
 }
 
 export interface LandResult {
@@ -190,21 +144,19 @@ export interface LandResult {
   zoningAnalysis: string;
   listings: LandListing[];
   valuationJustification: string;
-  groundingSources?: GroundingSource[];
+  insights: NeighborhoodInsight[];
 }
 
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'bot';
-  text?: string;
-  component?: ReactNode;
-  isTyping?: boolean;
+  text: string;
 }
 
 export interface WizardStep {
   field: string;
   question: string;
-  type: 'text' | 'number' | 'select' | 'multi-select' | 'city-picker' | 'locality-picker' | 'price-range';
+  type: 'text' | 'number' | 'select' | 'city-picker' | 'locality-picker' | 'pincode-picker' | 'price-range';
   options?: string[];
   placeholder?: string;
   min?: number;
@@ -212,16 +164,34 @@ export interface WizardStep {
   step?: number;
 }
 
+export interface BuyRequest {
+  state?: string;
+  city: string;
+  pincode: string;
+  area: string;
+  address?: string;
+  bhk: string;
+  sqft: number;
+  facing?: string;
+}
+
+export interface RentRequest extends BuyRequest {}
+
+export interface LandRequest {
+  city: string;
+  address: string;
+  plotSize: number;
+  unit: string;
+  fsi: number;
+}
+
 export interface Comparable {
   projectName: string;
   price: number;
-  pricePerSqft: number;
-  area: number;
   bhk: string;
-  latitude?: number;
-  longitude?: number;
-  imageUrl?: string;
-  propertyType?: 'Apartment' | 'Villa' | 'Penthouse' | 'Plot';
+  area: number;
+  latitude: number;
+  longitude: number;
 }
 
 export interface ValuationResult {
@@ -229,39 +199,23 @@ export interface ValuationResult {
   rangeLow: number;
   rangeHigh: number;
   confidenceScore: number;
-  valuationJustification: string;
   comparables: Comparable[];
 }
 
 export interface ValuationRequest {
-  state: string;
-  city: string;
-  pincode: string;
-  district: string;
-  area: string;
   projectName: string;
-  builderName: string;
-  bhk: string;
-  facing: string;
-  floor: number;
-  constructionYear: number;
-  distanceFromMainRoad: string;
-  roadType: string;
-  nearbyLocations: string;
-  carpetArea: number;
-  builtUpArea: number;
+  city: string;
+  area: string;
   superBuiltUpArea: number;
-  hasParking: string;
+  constructionYear: number;
   parkingCharges: number;
-  hasAmenities: string;
   amenitiesCharges: number;
-  fsi: number;
   latitude?: number;
   longitude?: number;
 }
 
-export interface TutorialStep {
-  title: string;
-  description: string;
-  target?: string;
+export interface GlobalContext {
+  address: string;
+  pincode: string;
+  photos: string[];
 }

@@ -1,6 +1,6 @@
 
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
@@ -8,23 +8,19 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="QuantCasa">
-    <meta name="theme-color" content="#0D0F12">
+    <meta name="theme-color" content="#0a0a0f">
     
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/png" href="https://img.icons8.com/fluency/48/lightning-bolt.png">
-    <link rel="apple-touch-icon" href="https://img.icons8.com/fluency/192/lightning-bolt.png">
+    <link rel="icon" type="image/png" href="https://img.icons8.com/fluency/48/home.png">
     
-    <title>QuantCasa | AI Real Estate Intel</title>
+    <title>QuantCasa | Neo-Quantum Property Valuation</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     
     <!-- Leaflet Ecosystem -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
 
     <script>
       tailwind.config = {
@@ -32,47 +28,27 @@
         theme: {
           extend: {
             fontFamily: {
-              sans: ['Inter', 'sans-serif'],
+              sans: ['Plus Jakarta Sans', 'sans-serif'],
               mono: ['JetBrains Mono', 'monospace'],
             },
             colors: {
-              cyber: {
-                black: '#0D0F12',
-                card: '#13161B',
-                teal: '#00F6FF',
-                tealDark: '#00B8BF',
-                lime: '#B4FF5C',
-                limeDark: '#86C442',
-                text: '#98A3B3',
-                orange: '#FFAE42',
-                glass: 'rgba(19, 22, 27, 0.6)',
-                border: 'rgba(255, 255, 255, 0.08)'
+              'neo-bg': '#0a0a0f',
+              'neo-glass': 'rgba(26,26,46,0.7)',
+              'neo-neon': '#585FD8',
+              'neo-pink': '#FF6B9D',
+              'neo-gold': '#FCD34D',
+              brand: {
+                primary: '#585FD8',
+                secondary: '#FF6B9D',
+                background: '#0a0a0f',
+                surface: '#1a1a2e',
               },
             },
             boxShadow: {
-              'neon-teal': '0 0 10px rgba(0, 246, 255, 0.2), 0 0 20px rgba(0, 246, 255, 0.1)',
-              'neon-orange': '0 0 15px rgba(255, 174, 66, 0.3)',
-              'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
-            },
-            animation: {
-              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-              'glow': 'glow 2s ease-in-out infinite alternate',
-              'wave': 'wave 1.2s ease-in-out infinite',
-              'radar': 'radar 4s cubic-bezier(0, 0, 0.2, 1) infinite',
-            },
-            keyframes: {
-              glow: {
-                '0%': { boxShadow: '0 0 5px rgba(0, 246, 255, 0.2)' },
-                '100%': { boxShadow: '0 0 20px rgba(0, 246, 255, 0.6), 0 0 10px rgba(0, 246, 255, 0.4)' },
-              },
-              wave: {
-                '0%, 100%': { height: '10%' },
-                '50%': { height: '60%' },
-              },
-              radar: {
-                '0%': { transform: 'scale(0.5)', opacity: '1' },
-                '100%': { transform: 'scale(4)', opacity: '0' }
-              }
+              'neo-glow': '0 0 30px rgba(88, 95, 216, 0.4)',
+              'pink-glow': '0 0 25px rgba(255, 107, 157, 0.4)',
+              'gold-glow': '0 0 20px rgba(252, 211, 77, 0.3)',
+              'glass-3d': '0 8px 32px rgba(0, 0, 0, 0.37), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
             }
           }
         }
@@ -80,50 +56,35 @@
     </script>
     <style>
       :root {
-        --bg-primary: #0D0F12;
-        --bg-secondary: #13161B;
-        --text-primary: #FFFFFF;
-        --text-secondary: #98A3B3;
-        --border-color: rgba(255, 255, 255, 0.08);
-        --glass-bg: rgba(19, 22, 27, 0.7);
+        --bg-primary: #0a0a0f;
+        --neon-primary: #585FD8;
+        --glow-accent: #FF6B9D;
       }
-
       body {
-        font-feature-settings: "tnum" on;
-        -webkit-font-smoothing: antialiased;
         background-color: var(--bg-primary);
-        color: var(--text-secondary);
-        overscroll-behavior-y: none;
+        color: #f8fafc;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        overflow-x: hidden;
       }
-      
-      ::-webkit-scrollbar { width: 6px; height: 6px; }
-      ::-webkit-scrollbar-track { background: var(--bg-primary); }
-      ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-      ::-webkit-scrollbar-thumb:hover { background: #00F6FF; }
-
-      .glass-panel {
-        background: var(--glass-bg);
-        backdrop-filter: blur(18px);
-        -webkit-backdrop-filter: blur(18px);
-        border: 1px solid var(--border-color);
-        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+      .glass-3d {
+        background: rgba(26, 26, 46, 0.6);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(88, 95, 216, 0.2);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
       }
-
-      .text-glow-teal { text-shadow: 0 0 10px rgba(0, 246, 255, 0.5); }
-      .text-glow-orange { text-shadow: 0 0 15px rgba(255, 174, 66, 0.6); }
-
-      .leaflet-container { background: var(--bg-primary) !important; font-family: 'Inter', sans-serif; }
-      .dark .leaflet-tile-pane { filter: grayscale(100%) invert(100%) contrast(1.2) brightness(0.8); }
-      
-      .marker-cluster-small div, .marker-cluster-medium div, .marker-cluster-large div {
-        background-color: rgba(0, 246, 255, 0.8);
-        color: #000;
-        font-weight: bold;
-        font-family: 'JetBrains Mono';
-        box-shadow: 0 0 15px #00F6FF;
+      .neon-text-glow {
+        text-shadow: 0 0 15px rgba(88, 95, 216, 0.6);
       }
+      .pink-text-glow {
+        text-shadow: 0 0 15px rgba(255, 107, 157, 0.6);
+      }
+      /* Custom scrollbar for Neo-Quantum */
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #585FD8; border-radius: 10px; }
+      .leaflet-container { border-radius: 2rem; background: #0a0a0f !important; }
     </style>
-  <script type="importmap">
+    <script type="importmap">
 {
   "imports": {
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
@@ -132,13 +93,14 @@
     "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
-    "jspdf": "https://aistudiocdn.com/jspdf@^3.0.4",
-    "html2canvas": "https://aistudiocdn.com/html2canvas@^1.4.1"
+    "canvas-confetti": "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/+esm",
+    "html2canvas": "https://esm.sh/html2canvas@^1.4.1",
+    "jspdf": "https://esm.sh/jspdf@^4.0.0"
   }
 }
 </script>
-</head>
-  <body class="bg-cyber-black text-cyber-text antialiased">
+  </head>
+  <body class="dark">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
   </body>

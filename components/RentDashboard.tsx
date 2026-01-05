@@ -2,9 +2,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RentResult, RentalListing } from '../types';
 import { 
-  MapPin, ExternalLink, Zap, Globe, MessageSquare, TrendingUp, Calculator, Info, ShieldAlert, Layers, Map as MapIcon, Navigation, Building2, LayoutDashboard, Bookmark, Compass, Image as ImageIcon, Loader2
+  MapPin, ExternalLink, Zap, Globe, TrendingUp, Calculator, Info, Layers, 
+  Map as MapIcon, Building2, LayoutDashboard, Bookmark, ImageIcon, Loader2, 
+  Volume2, Share2, FileText, CheckCircle2
 } from 'lucide-react';
-import { generatePropertyImage } from '../services/geminiService';
+import { generatePropertyImage, getSpeech } from '../services/geminiService';
+import { decodeAudioData, decode } from '../utils/audioUtils';
 
 const AIPropertyImage = ({ title, address, type }: { title: string, address: string, type: string }) => {
   const [imgUrl, setImgUrl] = useState<string | null>(null);
@@ -34,23 +37,18 @@ const AIPropertyImage = ({ title, address, type }: { title: string, address: str
           <button 
             onClick={handleGenerate}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-cyber-lime/10 border border-cyber-lime/30 rounded-full text-cyber-lime text-[10px] font-mono font-bold hover:bg-cyber-lime hover:text-black transition-all shadow-neon-teal disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-100 border border-emerald-200 rounded-full text-emerald-700 text-[10px] font-bold hover:bg-emerald-500 hover:text-white transition-all disabled:opacity-50"
           >
             {loading ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />} 
-            {loading ? 'GENERATING_PREVIEW...' : 'AI_RENDER_PREVIEW'}
+            {loading ? 'GENERATING...' : 'AI PREVIEW'}
           </button>
-        </div>
-      )}
-      {imgUrl && (
-        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md border border-white/10 px-2 py-1 rounded text-[8px] font-mono text-cyber-lime">
-          AI_GENERATED
         </div>
       )}
     </div>
   );
 };
 
-const DashboardMap = ({ listings }: { listings: RentalListing[] }) => {
+const DashboardMap = ({ listings = [] }: { listings?: RentalListing[] }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [layerType, setLayerType] = useState<'map' | 'sat'>('map');
   const mapInstance = useRef<any>(null);
@@ -60,8 +58,9 @@ const DashboardMap = ({ listings }: { listings: RentalListing[] }) => {
     if (!mapRef.current || !L) return;
     if (mapInstance.current) mapInstance.current.remove();
 
-    const avgLat = listings.length > 0 ? listings.reduce((acc, l) => acc + l.latitude, 0) / listings.length : 19.0760;
-    const avgLng = listings.length > 0 ? listings.reduce((acc, l) => acc + l.longitude, 0) / listings.length : 72.8777;
+    const safeListings = listings || [];
+    const avgLat = safeListings.length > 0 ? safeListings.reduce((acc, l) => acc + (l.latitude || 0), 0) / safeListings.length : 19.0760;
+    const avgLng = safeListings.length > 0 ? safeListings.reduce((acc, l) => acc + (l.longitude || 0), 0) / safeListings.length : 72.8777;
 
     const map = L.map(mapRef.current, { zoomControl: false }).setView([avgLat, avgLng], 13);
     
@@ -69,209 +68,158 @@ const DashboardMap = ({ listings }: { listings: RentalListing[] }) => {
       ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
       : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 
-    L.tileLayer(tileUrl, { attribution: '' }).addTo(map);
+    L.tileLayer(tileUrl).addTo(map);
 
-    const clusters = (L as any).markerClusterGroup({
-      showCoverageOnHover: false,
-      maxClusterRadius: 40,
-      iconCreateFunction: (cluster: any) => {
-        return L.divIcon({
-          html: `<div class="flex items-center justify-center w-8 h-8 rounded-full bg-cyber-lime/90 text-black font-bold font-mono text-xs border-2 border-white shadow-[0_0_15px_#B4FF5C]">${cluster.getChildCount()}</div>`,
-          className: 'custom-cluster-icon',
+    safeListings.forEach((item, idx) => {
+      if (item.latitude && item.longitude) {
+        const icon = L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div class="w-8 h-8 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-white font-bold shadow-lg">${idx + 1}</div>`,
           iconSize: [32, 32]
         });
+        L.marker([item.latitude, item.longitude], { icon }).addTo(map).bindTooltip(item.title);
       }
     });
 
-    listings.forEach((item, idx) => {
-      const compIcon = L.divIcon({
-        className: 'comp-marker-icon',
-        html: `<div class="w-6 h-6 -ml-3 -mt-3 bg-cyber-lime border-2 border-cyber-black rounded-full shadow-[0_0_10px_#B4FF5C] flex items-center justify-center text-[10px] text-cyber-black font-bold font-mono group transition-transform hover:scale-125">${idx + 1}</div>`,
-        iconSize: [0, 0]
-      });
-
-      const thumbUrl = `https://api.dicebear.com/7.x/identicon/svg?seed=${item.title}&backgroundColor=13161B&shapeColor=B4FF5C`;
-
-      const tooltipContent = `
-        <div class="flex gap-4 min-w-[280px] p-3 bg-cyber-black rounded-2xl border border-white/10 shadow-glass backdrop-blur-xl group">
-          <div class="w-[80px] h-[80px] shrink-0 rounded-xl overflow-hidden border border-white/5 bg-black/40">
-             <img src="${thumbUrl}" class="w-full h-full object-cover transition-transform group-hover:scale-110" />
-          </div>
-          <div class="flex-1 min-w-0">
-             <div class="flex items-center justify-between mb-1.5">
-                <span class="text-[9px] font-mono font-bold uppercase text-cyber-lime flex items-center gap-1.5">
-                   RENTAL_INTEL
-                </span>
-                <span class="text-[9px] text-gray-600 font-mono tracking-tighter">IDX_${idx + 1}</span>
-             </div>
-             <h4 class="text-white block text-[11px] font-mono font-bold truncate uppercase mb-1 tracking-tight">${item.title}</h4>
-             <div class="text-cyber-lime font-mono font-bold text-[13px] leading-tight mb-1 text-glow-orange">${item.rent}</div>
-             <div class="text-gray-500 text-[9px] font-mono uppercase tracking-widest flex items-center gap-2">
-                ${item.bhk} <span class="w-1.5 h-1.5 rounded-full bg-gray-800"></span> Facing: ${item.facing}
-             </div>
-          </div>
-        </div>
-      `;
-
-      const marker = L.marker([item.latitude, item.longitude], { icon: compIcon });
-      marker.bindTooltip(tooltipContent, { 
-        direction: 'top', 
-        offset: [0, -15],
-        className: 'custom-comp-tooltip'
-      });
-      clusters.addLayer(marker);
-    });
-
-    map.addLayer(clusters);
     mapInstance.current = map;
     return () => { if (mapInstance.current) mapInstance.current.remove(); };
   }, [listings, layerType]);
 
   return (
-    <div className="relative w-full h-full rounded-3xl overflow-hidden border border-white/10 shadow-inner group bg-black/20">
-      <div ref={mapRef} className="w-full h-full grayscale opacity-90 transition-opacity hover:opacity-100 duration-700" />
+    <div className="relative w-full h-[400px] rounded-3xl overflow-hidden border border-white/10 shadow-neo-glow">
+      <div ref={mapRef} className="w-full h-full" />
       <div className="absolute top-4 left-4 flex flex-col gap-2 z-[1000]">
-        <button onClick={() => setLayerType('map')} className={`p-2 rounded-xl backdrop-blur-md border transition-all ${layerType === 'map' ? 'bg-cyber-lime text-cyber-black border-cyber-lime shadow-neon-teal' : 'bg-black/40 text-gray-500 border-white/10 hover:text-white'}`}><Layers size={16} /></button>
-        <button onClick={() => setLayerType('sat')} className={`p-2 rounded-xl backdrop-blur-md border transition-all ${layerType === 'sat' ? 'bg-cyber-lime text-cyber-black border-cyber-lime shadow-neon-teal' : 'bg-black/40 text-gray-500 border-white/10 hover:text-white'}`}><Globe size={16} /></button>
-      </div>
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-xl border border-white/10 px-4 py-2 rounded-xl text-[10px] font-mono text-cyber-lime flex items-center gap-3 shadow-2xl z-[1000]">
-          <div className="w-2 h-2 rounded-full bg-cyber-lime animate-pulse"></div>
-          RECON_LOCKED: {listings.length} RENTALS
+        <button onClick={() => setLayerType('map')} className={`p-2 rounded-xl border transition-all ${layerType === 'map' ? 'bg-emerald-500 text-white border-emerald-500 shadow-brand' : 'bg-black/40 text-gray-500 border-white/10'}`}><Layers size={16} /></button>
+        <button onClick={() => setLayerType('sat')} className={`p-2 rounded-xl border transition-all ${layerType === 'sat' ? 'bg-emerald-500 text-white border-emerald-500 shadow-brand' : 'bg-black/40 text-gray-500 border-white/10'}`}><Globe size={16} /></button>
       </div>
     </div>
   );
 };
 
-// Fixed missing RentDashboardProps interface
 interface RentDashboardProps {
   result: RentResult;
-  onSave?: () => void;
 }
 
-const RentDashboard: React.FC<RentDashboardProps> = ({ result, onSave }) => {
+const RentDashboard: React.FC<RentDashboardProps> = ({ result }) => {
   const [viewMode, setViewMode] = useState<'dashboard' | 'map'>('dashboard');
-  const [saved, setSaved] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const listings = result.listings || [];
 
-  const handleSave = () => {
-    if (onSave) {
-      onSave();
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+  useEffect(() => {
+    return () => {
+      if (audioContextRef.current) audioContextRef.current.close();
+    };
+  }, []);
+
+  const handleListen = async () => {
+    if (isSpeaking) return;
+    setIsSpeaking(true);
+    try {
+      const summary = `Analyzing rental potential for this property. The estimated monthly rent is ${result.rentalValue}, projecting an annual yield of ${result.yieldPercentage}. Based on tenant demand metrics, I have assigned a confidence rating of ${result.confidenceScore} percent. ${result.marketSummary}.`;
+      
+      const base64Audio = await getSpeech(summary);
+      if (base64Audio) {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        }
+        const ctx = audioContextRef.current;
+        const audioBuffer = await decodeAudioData(decode(base64Audio), ctx, 24000, 1);
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+        source.onended = () => setIsSpeaking(false);
+        source.start();
+      } else {
+        setIsSpeaking(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setIsSpeaking(false);
     }
   };
 
   return (
-    <div className="h-full flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-8 duration-1000 overflow-hidden relative">
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white/5 border border-white/5 p-3 rounded-2xl shrink-0">
+    <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-cyber-lime/10 border border-cyber-lime/20">
-            <Building2 size={16} className="text-cyber-lime" />
+          <div className="p-3 bg-neo-neon/10 rounded-2xl border border-neo-neon/20">
+            <Building2 size={24} className="text-neo-neon" />
           </div>
-          <span className="text-[10px] font-mono font-bold text-white uppercase tracking-widest">Rental_Intel_Report</span>
+          <div>
+            <h2 className="text-2xl font-black text-white">Rental Intelligence</h2>
+            <p className="text-sm text-gray-500">Market-verified monthly estimates</p>
+          </div>
         </div>
-        
-        <div className="flex items-center gap-3">
-          <div className="flex bg-black/40 rounded-xl p-1 border border-white/10 shadow-inner">
-            <button onClick={() => setViewMode('dashboard')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all ${viewMode === 'dashboard' ? 'bg-cyber-lime text-cyber-black' : 'text-gray-500 hover:text-white'}`}>
-              <LayoutDashboard size={14} /> DASHBOARD
-            </button>
-            <button onClick={() => setViewMode('map')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all ${viewMode === 'map' ? 'bg-cyber-lime text-cyber-black' : 'text-gray-500 hover:text-white'}`}>
-              <MapIcon size={14} /> MAP_VIEW
-            </button>
-          </div>
 
-          <button onClick={handleSave} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-mono font-bold transition-all border ${saved ? 'bg-cyber-lime/10 border-cyber-lime text-cyber-lime' : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:border-white/20'}`}>
-            <Bookmark size={14} className={saved ? 'fill-cyber-lime' : ''} /> {saved ? 'SAVED' : 'SAVE_RECON'}
+        <div className="flex gap-2">
+           <button 
+             onClick={handleListen}
+             disabled={isSpeaking}
+             className={`p-3 rounded-xl transition-all border ${isSpeaking ? 'bg-neo-neon text-white border-neo-neon animate-pulse' : 'bg-white/5 border-white/10 text-neo-neon hover:bg-white/10'}`}
+             title="Listen to AI Summary"
+           >
+              {isSpeaking ? <Loader2 size={20} className="animate-spin" /> : <Volume2 size={20}/>}
+           </button>
+           <button onClick={() => setViewMode('dashboard')} className={`px-6 py-2 rounded-xl text-sm font-bold transition-all border ${viewMode === 'dashboard' ? 'bg-neo-neon text-white border-neo-neon shadow-neo-glow' : 'bg-white/5 text-gray-400 border-white/10'}`}>
+            DASHBOARD
+          </button>
+          <button onClick={() => setViewMode('map')} className={`px-6 py-2 rounded-xl text-sm font-bold transition-all border ${viewMode === 'map' ? 'bg-neo-neon text-white border-neo-neon shadow-neo-glow' : 'bg-white/5 text-gray-400 border-white/10'}`}>
+            MAP VIEW
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pr-2 pb-10 scrollbar-thin">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d">
+          <span className="text-xs font-black text-neo-neon uppercase tracking-widest block mb-1">Monthly Rent</span>
+          <div className="text-4xl font-black text-white tracking-tighter">{result.rentalValue}</div>
+        </div>
+        <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d">
+          <span className="text-xs font-black text-neo-pink uppercase tracking-widest block mb-1">Projected Yield</span>
+          <div className="text-4xl font-black text-white tracking-tighter">{result.yieldPercentage}</div>
+        </div>
+        <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d">
+          <span className="text-xs font-black text-neo-gold uppercase tracking-widest block mb-1">Confidence</span>
+          <div className="text-4xl font-black text-white tracking-tighter">{result.confidenceScore}%</div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto pr-2 pb-10 scrollbar-hide">
         {viewMode === 'dashboard' ? (
-          <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="glass-panel rounded-3xl p-6 border-l-4 border-l-cyber-teal bg-cyber-teal/5 relative">
-                  <div className="flex items-center gap-3 mb-6">
-                      <div className="p-2 bg-cyber-teal text-cyber-black rounded-lg"><TrendingUp size={20} /></div>
-                      <h2 className="text-sm font-mono font-bold text-white uppercase tracking-widest leading-none">Rental Analytics Hub</h2>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                      <div className="p-4 bg-black/40 rounded-2xl border border-cyber-teal/20">
-                          <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1 block">Projected Yield</span>
-                          <div className="text-xl sm:text-2xl font-mono font-bold text-cyber-teal break-words text-glow-teal">{result.yieldPercentage}</div>
-                      </div>
-                      <div className="p-4 bg-black/40 rounded-2xl border border-white/5">
-                          <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1 block">Demand Score</span>
-                          <div className="text-xl sm:text-2xl font-mono font-bold text-white">{result.tenantDemandScore}/100</div>
-                      </div>
-                  </div>
-
-                  <div className="p-4 bg-white/[0.02] rounded-2xl border border-white/5">
-                      <h4 className="text-[10px] font-mono text-gray-400 uppercase mb-2 flex items-center gap-2">
-                          <Calculator size={12} className="text-cyber-teal" /> Deposit Protocol
-                      </h4>
-                      <p className="text-[11px] text-white font-mono leading-relaxed">{result.depositCalc}</p>
-                  </div>
-              </div>
-
-              <div className="glass-panel rounded-3xl p-6 border-l-4 border-l-cyber-orange bg-cyber-orange/5 flex flex-col">
-                  <h3 className="text-sm font-mono font-bold text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
-                      <Info size={16} className="text-cyber-orange" /> Market Logic Recon
-                  </h3>
-                  <div className="bg-black/60 p-5 rounded-2xl border border-cyber-orange/20 flex-1 flex flex-col min-h-[120px]">
-                      <p className="text-[11px] text-gray-300 font-mono leading-relaxed italic whitespace-pre-wrap flex-1">
-                          {result.valuationJustification}
-                      </p>
-                      <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between text-[9px] text-gray-500 font-mono uppercase tracking-widest">
-                        <span>Cluster Nodes: {result.propertiesFoundCount}</span>
-                        <span className="text-cyber-orange">Confidence: {result.confidenceScore}%</span>
-                      </div>
-                  </div>
-              </div>
+          <div className="space-y-8">
+            <div className="bg-neo-neon/5 rounded-[32px] p-8 border border-neo-neon/20 shadow-neo-glow">
+              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <Info size={20} className="text-neo-neon" /> Market Reasoning
+              </h3>
+              <p className="text-gray-300 leading-relaxed italic border-l-2 border-neo-neon/30 pl-4 py-1">
+                "{result.valuationJustification}"
+              </p>
             </div>
 
-            <div className="glass-panel rounded-3xl p-6 border border-white/5">
-              <div className="flex justify-between items-center mb-6">
-                  <div className="flex items-center gap-3">
-                      <Globe size={18} className="text-cyber-teal" />
-                      <h3 className="text-sm font-mono font-bold text-white tracking-widest uppercase">Live Market Comparables</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {listings.map((item, idx) => (
+                <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 shadow-glass-3d hover:border-neo-neon/40 transition-all group">
+                  <AIPropertyImage title={item.title} address={item.address} type={item.bhk} />
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h4 className="font-bold text-white group-hover:text-neo-neon transition-colors">{item.title}</h4>
+                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-1"><MapPin size={12}/> {item.address}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xl font-black text-neo-neon">{item.rent}</div>
+                      <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">Verified</div>
+                    </div>
                   </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {result.listings.map((item, idx) => (
-                      <div key={idx} className="group bg-white/[0.02] border border-white/10 rounded-2xl p-5 hover:border-cyber-lime/40 transition-all">
-                          <AIPropertyImage title={item.title} address={item.address} type={item.bhk} />
-                          <div className="flex justify-between items-start mb-4">
-                              <div className="flex-1 mr-4 overflow-hidden">
-                                  <h4 className="font-bold text-white text-sm truncate uppercase tracking-tight">{item.title}</h4>
-                                  <p className="text-[10px] text-gray-500 mt-1 truncate">{item.address}</p>
-                              </div>
-                              <div className="text-right">
-                                  <div className="text-sm sm:text-base font-mono font-bold text-cyber-lime break-words text-glow-orange">{item.rent}</div>
-                                  <div className="text-[8px] text-gray-600 uppercase mt-1">Market Match</div>
-                              </div>
-                          </div>
-                          <div className="flex justify-between items-center border-t border-white/5 pt-4">
-                              <div className="flex items-center gap-2">
-                                <span className="px-2 py-0.5 rounded bg-white/5 text-[9px] text-gray-400 font-mono">{item.bhk}</span>
-                                <span className="px-2 py-0.5 rounded bg-cyber-lime/10 border border-cyber-lime/20 text-[9px] text-cyber-lime font-mono flex items-center gap-1">
-                                    <Compass size={8} /> {item.facing.toUpperCase()}
-                                </span>
-                              </div>
-                              <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyber-lime text-cyber-black text-[9px] font-mono font-bold hover:bg-white transition-all shadow-neon-teal">
-                                  SOURCE_INTEL <ExternalLink size={10} />
-                              </a>
-                          </div>
-                      </div>
-                  ))}
-              </div>
+                  <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-gray-400 text-sm font-bold flex items-center justify-center gap-2 hover:bg-neo-neon hover:text-white hover:border-neo-neon transition-all">
+                    View Details <ExternalLink size={14} />
+                  </a>
+                </div>
+              ))}
             </div>
           </div>
         ) : (
-          <div className="h-full animate-in fade-in slide-in-from-right-10 duration-500">
-            <DashboardMap listings={result.listings} />
-          </div>
+          <DashboardMap listings={listings} />
         )}
       </div>
     </div>
