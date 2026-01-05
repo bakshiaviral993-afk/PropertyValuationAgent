@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Onboarding from './components/Onboarding';
 import ChatInterface from './components/ChatInterface';
@@ -5,6 +6,7 @@ import BuyDashboard from './components/BuyDashboard';
 import RentDashboard from './components/RentDashboard';
 import LandReport from './components/LandReport';
 import LoanCalculator from './components/LoanCalculator';
+import TutorialOverlay from './components/TutorialOverlay';
 import { 
   BuyRequest, BuyResult, 
   RentRequest, RentResult, 
@@ -18,13 +20,8 @@ import { REAL_ESTATE_KNOWLEDGE_BASE } from './data/knowledgeBase';
 import { Zap, User, ShoppingBag, Search, Map as MapIcon, Layers, ArrowLeft, Tag, Building2, Landmark, Bookmark, Trash2, Clock, X, Globe, Calculator } from 'lucide-react';
 
 const App: React.FC = () => {
-  // Bypassing mandatory auth by providing a default guest profile
-  const [user, setUser] = useState<UserProfile | null>({
-    name: 'Guest Researcher',
-    mobile: '+91 00000 00000',
-    email: 'researcher@quantcasa.io'
-  });
-  
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [mode, setMode] = useState<AppMode>('buy');
   const [buyType, setBuyType] = useState<'New Buy' | 'Resale'>('New Buy');
   
@@ -45,6 +42,17 @@ const App: React.FC = () => {
   const [showSavedPanel, setShowSavedPanel] = useState(false);
 
   useEffect(() => {
+    // Check if user is already in storage
+    const storedUser = localStorage.getItem('quantcasa_user_profile');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+
+    const tutorialComplete = localStorage.getItem('quantcasa_tutorial_complete');
+    if (!tutorialComplete && storedUser) {
+      setShowTutorial(true);
+    }
+
     const stored = localStorage.getItem('quantcasa_saved_intel');
     if (stored) {
       try {
@@ -76,6 +84,17 @@ const App: React.FC = () => {
     }
     return () => clearInterval(interval);
   }, [isLoading]);
+
+  const handleOnboardingComplete = (profile: UserProfile) => {
+    setUser(profile);
+    localStorage.setItem('quantcasa_user_profile', JSON.stringify(profile));
+    setShowTutorial(true);
+  };
+
+  const handleTutorialClose = () => {
+    setShowTutorial(false);
+    localStorage.setItem('quantcasa_tutorial_complete', 'true');
+  };
 
   const handleComplete = async (data: any) => {
     setIsLoading(true);
@@ -174,11 +193,12 @@ const App: React.FC = () => {
     return numeric;
   };
 
-  // Auth Gate Bypass: The check is still here but 'user' is initialized by default
-  if (!user) return <Onboarding onComplete={setUser} />;
+  if (!user) return <Onboarding onComplete={handleOnboardingComplete} />;
 
   return (
     <div className="min-h-screen flex flex-col font-sans bg-cyber-black text-cyber-text selection:bg-cyber-teal selection:text-black">
+      {showTutorial && <TutorialOverlay onClose={handleTutorialClose} />}
+      
       <header className="sticky top-0 px-4 md:px-8 py-4 md:py-5 flex flex-col md:flex-row items-center justify-between z-[60] border-b border-cyber-border bg-cyber-black/95 backdrop-blur-2xl gap-4">
         <div className="flex items-center justify-between w-full md:w-auto gap-4 md:gap-12">
           <div className="flex items-center gap-3 cursor-pointer group" onClick={resetMode}>

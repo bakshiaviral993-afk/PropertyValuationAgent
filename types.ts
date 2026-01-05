@@ -259,3 +259,9 @@ export interface ValuationRequest {
   latitude?: number;
   longitude?: number;
 }
+
+export interface TutorialStep {
+  title: string;
+  description: string;
+  target?: string;
+}

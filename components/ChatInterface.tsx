@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { ChatMessage, AppMode, WizardStep, BudgetRange } from '../types';
-import { Send, Navigation, Mic, MicOff, Check, SlidersHorizontal, Compass } from 'lucide-react';
+import { Send, Navigation, Mic, MicOff, Check, SlidersHorizontal, Compass, MapPin, Search } from 'lucide-react';
 
 interface ChatInterfaceProps {
   onComplete: (data: any) => void;
@@ -14,48 +14,32 @@ interface ChatInterfaceProps {
 
 const CITY_DATA: Record<string, { localities: string[], pincodes: Record<string, string | string[]> }> = {
   'Mumbai': {
-    localities: ['Andheri East', 'Andheri West', 'Bandra West', 'Bandra East', 'Worli', 'Powai', 'Borivali West', 'Borivali East', 'Malad West', 'Juhu', 'Colaba', 'Chembur'],
-    pincodes: { 
-      'Andheri East': ['400069', '400093', '400099', '400059', '400072'], 
-      'Andheri West': ['400053', '400058', '400061'],
-      'Bandra West': '400050', 
-      'Bandra East': '400051',
-      'Worli': ['400018', '400030'],
-      'Powai': ['400076', '400087'],
-      'Borivali West': '400091',
-      'Borivali East': '400066',
-      'Malad West': ['400064', '400095'],
-      'Juhu': '400049',
-      'Colaba': '400005',
-      'Chembur': ['400071', '400074', '400088']
-    }
+    localities: ['Andheri West', 'Bandra', 'Worli', 'Powai', 'Juhu', 'Borivali', 'Malad', 'Colaba'],
+    pincodes: { 'Andheri West': '400053', 'Bandra': '400050', 'Worli': '400018', 'Powai': '400076' }
   },
   'Pune': {
-    localities: ['Wagholi', 'Hinjewadi', 'Baner', 'Kharadi', 'Magarpatta', 'Hadapsar', 'Kothrud', 'Wakad', 'Viman Nagar'],
-    pincodes: { 
-      'Wagholi': '412207', 
-      'Hinjewadi': ['411057', '411033'], 
-      'Baner': ['411045', '411007'], 
-      'Kharadi': '411014', 
-      'Magarpatta': '411013',
-      'Hadapsar': ['411028', '411013'],
-      'Kothrud': ['411038', '411029', '411058'],
-      'Wakad': '411057',
-      'Viman Nagar': '411014'
-    }
+    localities: ['Wagholi', 'Hinjewadi', 'Baner', 'Kharadi', 'Kothrud', 'Wakad', 'Viman Nagar', 'Hadapsar'],
+    pincodes: { 'Wagholi': '412207', 'Hinjewadi': '411057', 'Kharadi': '411014', 'Baner': '411045' }
   },
   'Bangalore': {
-    localities: ['Whitefield', 'Electronic City', 'Indiranagar', 'Koramangala', 'HSR Layout', 'Marathahalli', 'Jayanagar', 'Hebbal'],
-    pincodes: { 
-      'Whitefield': ['560066', '560067'], 
-      'Electronic City': ['560100', '560105'], 
-      'Indiranagar': '560038',
-      'Koramangala': ['560034', '560095'],
-      'HSR Layout': '560102',
-      'Marathahalli': '560037',
-      'Jayanagar': '560041',
-      'Hebbal': '560024'
-    }
+    localities: ['Whitefield', 'Indiranagar', 'Koramangala', 'HSR Layout', 'Electronic City', 'Hebbal', 'Jayanagar'],
+    pincodes: { 'Whitefield': '560066', 'Indiranagar': '560038', 'Koramangala': '560034' }
+  },
+  'Hyderabad': {
+    localities: ['Gachibowli', 'Hitech City', 'Kondapur', 'Banjara Hills', 'Jubilee Hills', 'Manikonda'],
+    pincodes: { 'Gachibowli': '500032', 'Hitech City': '500081', 'Kondapur': '500084' }
+  },
+  'Chennai': {
+    localities: ['Adyar', 'Velachery', 'Anna Nagar', 'OMR', 'T Nagar', 'Besant Nagar', 'Mylapore'],
+    pincodes: { 'Adyar': '600020', 'Velachery': '600042', 'Anna Nagar': '600040' }
+  },
+  'Delhi NCR': {
+    localities: ['Gurgaon Sec 43', 'Noida Sec 150', 'South Ext', 'Dwarka', 'Greater Noida', 'Saket'],
+    pincodes: { 'Gurgaon Sec 43': '122002', 'Noida Sec 150': '201310', 'Dwarka': '110075' }
+  },
+  'Kolkata': {
+    localities: ['Salt Lake', 'New Town', 'Rajarhat', 'Ballygunge', 'Alipore', 'Park Street'],
+    pincodes: { 'Salt Lake': '700091', 'New Town': '700156', 'Rajarhat': '700135' }
   }
 };
 
@@ -113,12 +97,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
   const [inputValue, setInputValue] = useState('');
   const [pincodeSuggestions, setPincodeSuggestions] = useState<string[]>([]);
   const [isListening, setIsListening] = useState(false);
+  const [manualCityMode, setManualCityMode] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
   const commonSteps: WizardStep[] = [
-    { field: 'city', question: "Select Operation City:", type: 'select', options: Object.keys(CITY_DATA) },
+    { field: 'city', question: "Select Operation City:", type: 'city-picker' },
     { field: 'address', question: "Select Locality/Sector:", type: 'locality-picker' },
     { field: 'pincode', question: "Verify Sector Pincode:", type: 'text', placeholder: '400001' }
   ];
@@ -183,6 +168,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
     }]);
     setCurrentStepIndex(0);
     setFormData({ amenities: [] });
+    setManualCityMode(false);
   }, [mode]);
 
   useEffect(() => {
@@ -265,6 +251,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
     setFormData({ ...formData, amenities: updated });
   };
 
+  // Helper to check if we are in manual input mode for the current step
+  const isCustomCityFallback = 
+    (currentStep.field === 'address' || currentStep.field === 'pincode') && 
+    !CITY_DATA[formData.city];
+
   return (
     <div className="flex flex-col h-full glass-panel rounded-3xl overflow-hidden border border-white/10 shadow-2xl min-h-[500px]">
       <div className="bg-black/40 px-6 py-4 border-b border-white/5 flex items-center justify-between">
@@ -309,13 +300,47 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
                 step={currentStep.step || 100000} 
                 onConfirm={handleNext} 
               />
-            ) : currentStep.type === 'locality-picker' ? (
+            ) : currentStep.type === 'city-picker' ? (
+              <div className="space-y-4">
+                {manualCityMode ? (
+                  <div className="relative">
+                    <input
+                      autoFocus
+                      type="text"
+                      placeholder="ENTER GLOBAL CITY NAME..."
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-xs text-white focus:outline-none focus:border-cyber-teal transition-all font-mono pr-24"
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleNext(inputValue)}
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                      <button onClick={() => setManualCityMode(false)} className="p-2 text-gray-500 hover:text-white bg-white/5 rounded-lg text-[9px] font-mono">BACK</button>
+                      <button onClick={() => handleNext(inputValue)} className="p-2 text-cyber-teal hover:text-white bg-cyber-teal/10 rounded-lg">
+                        <Send size={18} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {Object.keys(CITY_DATA).map(city => (
+                      <button key={city} onClick={() => handleNext(city)} className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-mono text-gray-400 hover:border-cyber-teal hover:text-cyber-teal transition-all flex items-center gap-2">
+                        <MapPin size={10} /> {city.toUpperCase()}
+                      </button>
+                    ))}
+                    <button onClick={() => setManualCityMode(true)} className="px-4 py-2 rounded-xl bg-cyber-teal/10 border border-cyber-teal/30 text-[10px] font-mono text-cyber-teal hover:bg-cyber-teal hover:text-black transition-all flex items-center gap-2 shadow-neon-teal">
+                      <Search size={10} /> CUSTOM_LOCUS
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : currentStep.type === 'locality-picker' && !isCustomCityFallback ? (
               <div className="flex flex-wrap gap-2">
                 {CITY_DATA[formData.city]?.localities.map(loc => (
                   <button key={loc} onClick={() => handleNext(loc)} className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-mono text-gray-400 hover:border-cyber-teal hover:text-cyber-teal transition-all flex items-center gap-2">
                     <Navigation size={10} /> {loc}
                   </button>
                 ))}
+                <button onClick={() => handleNext(inputValue)} className="hidden">Hidden Submit</button>
               </div>
             ) : currentStep.type === 'multi-select' ? (
               <div className="space-y-4">
@@ -342,7 +367,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
                   CONFIRM_SPEC_ARRAY
                 </button>
               </div>
-            ) : currentStep.field === 'pincode' && pincodeSuggestions.length > 0 ? (
+            ) : currentStep.field === 'pincode' && pincodeSuggestions.length > 0 && !isCustomCityFallback ? (
                <div className="flex flex-wrap gap-2">
                   {pincodeSuggestions.map(pin => (
                     <button key={pin} onClick={() => handleNext(pin)} className="px-5 py-3 rounded-xl bg-cyber-teal/10 border border-cyber-teal text-cyber-teal font-mono text-xs hover:bg-cyber-teal hover:text-black transition-all shadow-neon-teal">
@@ -363,7 +388,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
               <div className="relative">
                 <input
                   type={currentStep.type === 'number' ? 'number' : 'text'}
-                  placeholder={currentStep.placeholder}
+                  placeholder={currentStep.placeholder || "TYPE_DATA_INPUT..."}
                   className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-xs text-white focus:outline-none focus:border-cyber-teal transition-all font-mono pr-24"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}

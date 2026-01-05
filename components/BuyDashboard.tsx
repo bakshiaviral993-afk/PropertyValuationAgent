@@ -4,9 +4,53 @@ import { BuyResult, SaleListing } from '../types';
 import { 
   ExternalLink, TrendingUp, Calculator, Globe, 
   Zap, Info, Database, Layers, Map as MapIcon, 
-  LayoutDashboard, Navigation, Bookmark, Link2, ShieldCheck, CheckCircle2, Compass, Tag, ArrowRight
+  LayoutDashboard, Navigation, Bookmark, Link2, ShieldCheck, CheckCircle2, Compass, Tag, ArrowRight, Image as ImageIcon, Loader2
 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { generatePropertyImage } from '../services/geminiService';
+
+const AIPropertyImage = ({ title, address, type }: { title: string, address: string, type: string }) => {
+  const [imgUrl, setImgUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleGenerate = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setLoading(true);
+    const prompt = `${type} named ${title} located in ${address}`;
+    const url = await generatePropertyImage(prompt);
+    setImgUrl(url);
+    setLoading(false);
+  };
+
+  const placeholderUrl = `https://api.dicebear.com/7.x/identicon/svg?seed=${title}&backgroundColor=13161B&shapeColor=00F6FF`;
+
+  return (
+    <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white/5 bg-black/40 group mb-4">
+      <img 
+        src={imgUrl || placeholderUrl} 
+        alt={title}
+        className={`w-full h-full object-cover transition-all duration-700 ${imgUrl ? 'scale-100' : 'scale-50 opacity-30 grayscale'}`}
+      />
+      {!imgUrl && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <button 
+            onClick={handleGenerate}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-cyber-teal/10 border border-cyber-teal/30 rounded-full text-cyber-teal text-[10px] font-mono font-bold hover:bg-cyber-teal hover:text-black transition-all shadow-neon-teal disabled:opacity-50"
+          >
+            {loading ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />} 
+            {loading ? 'GENERATING_PREVIEW...' : 'AI_RENDER_PREVIEW'}
+          </button>
+        </div>
+      )}
+      {imgUrl && (
+        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md border border-white/10 px-2 py-1 rounded text-[8px] font-mono text-cyber-teal">
+          AI_GENERATED
+        </div>
+      )}
+    </div>
+  );
+};
 
 const DashboardMap = ({ listings }: { listings: SaleListing[] }) => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -133,37 +177,6 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType, onSave, on
                 </div>
             </div>
 
-            {/* Neural Grounding Sources */}
-            {result.groundingSources && result.groundingSources.length > 0 && (
-              <div className="glass-panel rounded-3xl p-6 border border-cyber-teal/20 bg-cyber-teal/5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xs font-mono font-bold text-cyber-teal flex items-center gap-2 uppercase tracking-widest">
-                    <ShieldCheck size={16} /> Neural Grounding (Project Match)
-                  </h3>
-                  <span className="text-[9px] font-mono text-cyber-teal/50">SIGNAL_STRENGTH: 98%</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {result.groundingSources.map((source, i) => (
-                    <a key={i} href={source.uri} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-xl bg-black/40 border border-white/5 hover:border-cyber-teal hover:bg-black/60 transition-all group">
-                      <div className="p-2 rounded-lg bg-white/5 text-cyber-teal group-hover:bg-cyber-teal group-hover:text-black transition-colors">
-                        <Link2 size={12} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[10px] font-bold text-white truncate uppercase tracking-tight">{source.projectName || source.title}</div>
-                        <div className="flex items-center justify-between mt-1">
-                            <div className="text-[8px] text-gray-500 font-mono truncate max-w-[150px]">{source.uri.replace('https://', '')}</div>
-                            <div className="flex items-center gap-1">
-                                <Tag size={8} className="text-cyber-teal" />
-                                <span className="text-[9px] font-bold text-cyber-teal uppercase">{source.priceRange || 'Verified'}</span>
-                            </div>
-                        </div>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <div className="glass-panel rounded-3xl p-6 border border-white/5">
               <h3 className="text-sm font-mono font-bold text-white uppercase tracking-widest mb-6 flex items-center gap-2">
                 <Globe size={18} className="text-cyber-teal" /> Asset Discovery & Hybrid Comps
@@ -171,9 +184,7 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, buyType, onSave, on
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {result.listings.map((item, idx) => (
                   <div key={idx} className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 hover:border-cyber-teal/40 transition-all relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-20 transition-opacity">
-                       <CheckCircle2 size={40} className="text-cyber-teal" />
-                    </div>
+                    <AIPropertyImage title={item.title} address={item.address} type={item.bhk} />
                     <div className="flex justify-between items-start mb-2">
                       <h4 className="font-bold text-white text-sm truncate uppercase tracking-tight w-2/3">{item.title}</h4>
                       <div className="text-cyber-teal font-mono font-bold">{item.price}</div>

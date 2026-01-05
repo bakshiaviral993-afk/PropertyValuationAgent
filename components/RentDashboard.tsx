@@ -2,13 +2,53 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RentResult, RentalListing } from '../types';
 import { 
-  MapPin, ExternalLink, Zap, Globe, MessageSquare, TrendingUp, Calculator, Info, ShieldAlert, Layers, Map as MapIcon, Navigation, Building2, LayoutDashboard, Bookmark, Compass
+  MapPin, ExternalLink, Zap, Globe, MessageSquare, TrendingUp, Calculator, Info, ShieldAlert, Layers, Map as MapIcon, Navigation, Building2, LayoutDashboard, Bookmark, Compass, Image as ImageIcon, Loader2
 } from 'lucide-react';
+import { generatePropertyImage } from '../services/geminiService';
 
-interface RentDashboardProps {
-  result: RentResult;
-  onSave?: () => void;
-}
+const AIPropertyImage = ({ title, address, type }: { title: string, address: string, type: string }) => {
+  const [imgUrl, setImgUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleGenerate = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setLoading(true);
+    const prompt = `${type} rental property named ${title} located in ${address}`;
+    const url = await generatePropertyImage(prompt);
+    setImgUrl(url);
+    setLoading(false);
+  };
+
+  const placeholderUrl = `https://api.dicebear.com/7.x/identicon/svg?seed=${title}&backgroundColor=13161B&shapeColor=B4FF5C`;
+
+  return (
+    <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white/5 bg-black/40 group mb-4">
+      <img 
+        src={imgUrl || placeholderUrl} 
+        alt={title}
+        className={`w-full h-full object-cover transition-all duration-700 ${imgUrl ? 'scale-100' : 'scale-50 opacity-30 grayscale'}`}
+      />
+      {!imgUrl && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <button 
+            onClick={handleGenerate}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-cyber-lime/10 border border-cyber-lime/30 rounded-full text-cyber-lime text-[10px] font-mono font-bold hover:bg-cyber-lime hover:text-black transition-all shadow-neon-teal disabled:opacity-50"
+          >
+            {loading ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />} 
+            {loading ? 'GENERATING_PREVIEW...' : 'AI_RENDER_PREVIEW'}
+          </button>
+        </div>
+      )}
+      {imgUrl && (
+        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md border border-white/10 px-2 py-1 rounded text-[8px] font-mono text-cyber-lime">
+          AI_GENERATED
+        </div>
+      )}
+    </div>
+  );
+};
 
 const DashboardMap = ({ listings }: { listings: RentalListing[] }) => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -101,6 +141,12 @@ const DashboardMap = ({ listings }: { listings: RentalListing[] }) => {
     </div>
   );
 };
+
+// Fixed missing RentDashboardProps interface
+interface RentDashboardProps {
+  result: RentResult;
+  onSave?: () => void;
+}
 
 const RentDashboard: React.FC<RentDashboardProps> = ({ result, onSave }) => {
   const [viewMode, setViewMode] = useState<'dashboard' | 'map'>('dashboard');
@@ -195,6 +241,7 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, onSave }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {result.listings.map((item, idx) => (
                       <div key={idx} className="group bg-white/[0.02] border border-white/10 rounded-2xl p-5 hover:border-cyber-lime/40 transition-all">
+                          <AIPropertyImage title={item.title} address={item.address} type={item.bhk} />
                           <div className="flex justify-between items-start mb-4">
                               <div className="flex-1 mr-4 overflow-hidden">
                                   <h4 className="font-bold text-white text-sm truncate uppercase tracking-tight">{item.title}</h4>

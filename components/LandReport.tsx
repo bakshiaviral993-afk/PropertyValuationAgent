@@ -1,12 +1,52 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { LandResult, LandListing } from '../types';
-import { Map, Zap, Layers, Globe, MessageSquare, ExternalLink, Info, Database, LayoutDashboard, Map as MapIcon, Navigation, Bookmark, Compass } from 'lucide-react';
+import { Map, Zap, Layers, Globe, MessageSquare, ExternalLink, Info, Database, LayoutDashboard, Map as MapIcon, Navigation, Bookmark, Compass, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { generatePropertyImage } from '../services/geminiService';
 
-interface LandReportProps {
-  result: LandResult;
-  onSave?: () => void;
-}
+const AIPropertyImage = ({ title, address, type }: { title: string, address: string, type: string }) => {
+  const [imgUrl, setImgUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleGenerate = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setLoading(true);
+    const prompt = `Aerial professional real estate photograph of: ${type} land parcel named ${title} located in ${address}`;
+    const url = await generatePropertyImage(prompt);
+    setImgUrl(url);
+    setLoading(false);
+  };
+
+  const placeholderUrl = `https://api.dicebear.com/7.x/identicon/svg?seed=${title}&backgroundColor=13161B&shapeColor=FFAE42`;
+
+  return (
+    <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white/5 bg-black/40 group mb-4">
+      <img 
+        src={imgUrl || placeholderUrl} 
+        alt={title}
+        className={`w-full h-full object-cover transition-all duration-700 ${imgUrl ? 'scale-100' : 'scale-50 opacity-30 grayscale'}`}
+      />
+      {!imgUrl && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <button 
+            onClick={handleGenerate}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-cyber-orange/10 border border-cyber-orange/30 rounded-full text-cyber-orange text-[10px] font-mono font-bold hover:bg-cyber-orange hover:text-black transition-all shadow-neon-orange disabled:opacity-50"
+          >
+            {loading ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />} 
+            {loading ? 'GENERATING_PREVIEW...' : 'AI_RENDER_PREVIEW'}
+          </button>
+        </div>
+      )}
+      {imgUrl && (
+        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md border border-white/10 px-2 py-1 rounded text-[8px] font-mono text-cyber-orange">
+          AI_GENERATED
+        </div>
+      )}
+    </div>
+  );
+};
 
 const DashboardMap = ({ listings }: { listings: LandListing[] }) => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -98,19 +138,15 @@ const DashboardMap = ({ listings }: { listings: LandListing[] }) => {
           <div className="w-2 h-2 rounded-full bg-cyber-orange animate-pulse"></div>
           SECTOR_LOCKED: {listings.length} PLOTS FOUND
       </div>
-
-      <style>{`
-        .custom-comp-tooltip {
-          background: transparent !important;
-          border: none !important;
-          box-shadow: none !important;
-          padding: 0 !important;
-        }
-        .custom-comp-tooltip::before { display: none; }
-      `}</style>
     </div>
   );
 };
+
+// Fixed missing LandReportProps interface
+interface LandReportProps {
+  result: LandResult;
+  onSave?: () => void;
+}
 
 const LandReport: React.FC<LandReportProps> = ({ result, onSave }) => {
   const [viewMode, setViewMode] = useState<'dashboard' | 'map'>('dashboard');
@@ -194,79 +230,42 @@ const LandReport: React.FC<LandReportProps> = ({ result, onSave }) => {
               </div>
             </div>
 
-            {/* Expanded Valuation Rationale */}
-            <div className="glass-panel rounded-3xl p-6 border-l-4 border-l-cyber-orange bg-cyber-orange/5">
-              <h3 className="text-sm font-mono font-bold text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
-                <Info size={16} className="text-cyber-orange" /> Market Valuation Logic
-              </h3>
-              <div className="bg-black/60 p-5 rounded-2xl border border-cyber-orange/20">
-                  <p className="text-[11px] text-gray-300 font-mono leading-relaxed italic whitespace-pre-wrap">
-                    {result.valuationJustification}
-                  </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="glass-panel rounded-3xl p-6 border-l-4 border-l-cyber-teal bg-cyber-teal/5">
-                <h3 className="text-sm font-mono font-bold text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
-                  <Layers size={16} className="text-cyber-teal" /> Zoning & Usage Intel
-                </h3>
-                <p className="text-[11px] text-gray-400 font-mono leading-relaxed italic whitespace-pre-wrap">
-                  {result.zoningAnalysis}
-                </p>
-              </div>
-              <div className="glass-panel rounded-3xl p-6 border-l-4 border-l-cyber-lime bg-cyber-lime/5">
-                <h3 className="text-sm font-mono font-bold text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
-                  <MessageSquare size={16} className="text-cyber-lime" /> Negotiation Strategy
-                </h3>
-                <div className="bg-black/60 p-5 rounded-2xl border border-cyber-lime/20 h-full min-h-[100px]">
-                  <p className="text-[11px] text-gray-300 font-mono leading-relaxed italic">
-                      {result.negotiationStrategy}
-                  </p>
+            <div className="glass-panel rounded-3xl p-6 border border-white/5 mb-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <Globe size={18} className="text-cyber-orange" />
+                  <h3 className="text-sm font-mono font-bold text-white tracking-widest uppercase">Asset Market Discovery</h3>
                 </div>
               </div>
-            </div>
-
-            {result.listings && result.listings.length > 0 && (
-              <div className="glass-panel rounded-3xl p-6 border border-white/5 mb-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <Globe size={18} className="text-cyber-orange" />
-                    <h3 className="text-sm font-mono font-bold text-white tracking-widest uppercase">Asset Market Discovery</h3>
-                  </div>
-                  <div className="flex items-center gap-2 px-3 py-1 bg-cyber-orange/10 border border-cyber-orange/30 rounded-lg text-[9px] font-mono text-cyber-orange uppercase">
-                      <Database size={12} /> Vector Match Active
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {result.listings.map((item, idx) => (
-                    <div key={idx} className="bg-white/[0.02] border border-white/10 rounded-2xl p-4 hover:border-cyber-orange/40 transition-all group">
-                      <div className="flex flex-col gap-3 h-full justify-between">
-                        <div className="flex flex-col gap-1">
-                          <h4 className="font-bold text-white text-xs line-clamp-2 uppercase tracking-tight">{item.title}</h4>
-                          <p className="text-[9px] text-gray-500 font-mono truncate">{item.address}</p>
-                          <div className="mt-2 flex items-center justify-between">
-                            <div className="flex flex-col">
-                                <span className="text-[11px] font-mono text-cyber-orange font-bold leading-none text-glow-orange">{item.price}</span>
-                                <span className="text-[8px] text-cyber-orange/60 font-mono mt-1 uppercase flex items-center gap-1"><Compass size={8}/> {item.facing}</span>
-                            </div>
-                            <span className="text-[9px] text-gray-600 font-mono">{item.size}</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {result.listings.map((item, idx) => (
+                  <div key={idx} className="bg-white/[0.02] border border-white/10 rounded-2xl p-4 hover:border-cyber-orange/40 transition-all group">
+                    <AIPropertyImage title={item.title} address={item.address} type="Parcel" />
+                    <div className="flex flex-col gap-3 h-full justify-between">
+                      <div className="flex flex-col gap-1">
+                        <h4 className="font-bold text-white text-xs line-clamp-2 uppercase tracking-tight">{item.title}</h4>
+                        <p className="text-[9px] text-gray-500 font-mono truncate">{item.address}</p>
+                        <div className="mt-2 flex items-center justify-between">
+                          <div className="flex flex-col">
+                              <span className="text-[11px] font-mono text-cyber-orange font-bold leading-none text-glow-orange">{item.price}</span>
+                              <span className="text-[8px] text-cyber-orange/60 font-mono mt-1 uppercase flex items-center gap-1"><Compass size={8}/> {item.facing}</span>
                           </div>
+                          <span className="text-[9px] text-gray-600 font-mono">{item.size}</span>
                         </div>
-                        <a 
-                          href={item.sourceUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-cyber-orange/10 border border-cyber-orange/30 text-cyber-orange text-[9px] font-mono font-bold hover:bg-cyber-orange hover:text-black transition-all shadow-neon-orange"
-                        >
-                          SECURE_LISTING <ExternalLink size={10} />
-                        </a>
                       </div>
+                      <a 
+                        href={item.sourceUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-cyber-orange/10 border border-cyber-orange/30 text-cyber-orange text-[9px] font-mono font-bold hover:bg-cyber-orange hover:text-black transition-all shadow-neon-orange"
+                      >
+                        SECURE_LISTING <ExternalLink size={10} />
+                      </a>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
           </div>
         ) : (
           <div className="h-[calc(100vh-280px)] md:h-full animate-in fade-in slide-in-from-right-10 duration-500">
