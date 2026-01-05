@@ -109,6 +109,7 @@ export interface BuyResult {
   negotiationScript: string;
   listings: SaleListing[];
   marketSentiment: string;
+  sentimentScore: number; // 0 to 100 (Bearish to Bullish)
   registrationEstimate: string;
   appreciationPotential: string;
   confidenceScore: number;
@@ -185,13 +186,14 @@ export interface LandRequest {
   fsi: number;
 }
 
+// Support for ValuationReport.tsx
 export interface Comparable {
   projectName: string;
   price: number;
   bhk: string;
   area: number;
-  latitude: number;
-  longitude: number;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface ValuationResult {
@@ -204,8 +206,8 @@ export interface ValuationResult {
 
 export interface ValuationRequest {
   projectName: string;
-  city: string;
   area: string;
+  city: string;
   superBuiltUpArea: number;
   constructionYear: number;
   parkingCharges: number;
@@ -214,6 +216,7 @@ export interface ValuationRequest {
   longitude?: number;
 }
 
+// Support for Sidebar.tsx
 export interface GlobalContext {
   address: string;
   pincode: string;

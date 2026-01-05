@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { 
   BuyRequest, BuyResult, 
   RentRequest, RentResult, 
@@ -12,6 +12,10 @@ const getApiKey = (): string | null => {
   return (!key || key === 'undefined' || key.trim() === '') ? null : key;
 };
 
+/**
+ * Enhanced analysis with deeper search grounding for builder and complex names.
+ * Uses gemini-3-pro-preview for high-quality search processing.
+ */
 export const getBuyAnalysis = async (data: BuyRequest): Promise<BuyResult> => {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("API Key required for live valuation.");
@@ -19,10 +23,11 @@ export const getBuyAnalysis = async (data: BuyRequest): Promise<BuyResult> => {
   try {
     const ai = new GoogleGenAI({ apiKey });
     
-    const searchQuery = `Current real estate prices for ${data.bhk} flats in ${data.area}, ${data.city}. 
-    Pincodes: ${data.pincode}. 
-    Find specific listing examples with prices, exact building names (society name), builder names, and neighborhood insights (safety, parks, transport).
-    Need latitude and longitude for mapping the listings.`;
+    // Step 1: Broad search for specific project intelligence
+    const searchQuery = `Current real estate transactions and listings for ${data.bhk} in ${data.area}, ${data.city} (Pincode: ${data.pincode}). 
+    Find actual building names, society complexes, and prominent builders active in this locality. 
+    Analyze market sentiment (bullish, stable, or bearish) based on recent news and price trends in ${data.area}.
+    Need precise latitude/longitude coordinates for these projects.`;
 
     const searchResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
@@ -35,33 +40,29 @@ export const getBuyAnalysis = async (data: BuyRequest): Promise<BuyResult> => {
       .filter((chunk: any) => chunk.web)
       .map((chunk: any) => ({ uri: chunk.web.uri, title: chunk.web.title }));
 
+    // Step 2: Structured generation using Flash for low latency extraction
     const struct = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Based on this search data: ${searchResponse.text}. 
-      Generate a JSON valuation report for a ${data.bhk} (${data.sqft} sqft) in ${data.area}, ${data.city}.
+      contents: `Based on this intelligence data: ${searchResponse.text}. 
+      Generate a comprehensive JSON valuation for ${data.bhk} (${data.sqft} sqft) in ${data.area}, ${data.city}.
       
       Requirements:
       - fairValue: String (e.g. ₹1.5 Cr)
       - valuationRange: String (e.g. ₹1.4 - 1.7 Cr)
-      - listings: 5+ real examples from search. For each listing, strictly include: 
-          "title" (Project Name), 
-          "societyName" (Complex Name), 
-          "builderName" (Company that built it), 
-          "price" (Current Ask), 
-          "address", 
-          "sourceUrl", 
-          "latitude", 
-          "longitude".
+      - listings: Minimum 5 REAL examples from search. Strictly include "societyName" and "builderName" for each.
       - insights: 4 objects {title, description, type: positive/development/trend}
       - neighborhoodScore: overall, walkability, grocery, parks, safety, connectivity (0-100)
-      - valuationJustification: 3-4 deep sentences explaining the logic.
-      - marketSentiment: Brief summary of the current market vibe.
-      - negotiationScript: A short script for the buyer to use during price negotiation.
-      - appreciationPotential: (e.g. 5-7%)
-      - confidenceScore: (80-99)
+      - marketSentiment: Descriptive text (e.g. "Bullish due to Metro expansion")
+      - sentimentScore: Number between 0 (Very Bearish) to 100 (Very Bullish)
+      - negotiationScript: 2-3 sentences of tactical advice for the user to negotiate this specific area.
+      - appreciationPotential: (e.g. "5-8% annual")
+      - valuationJustification: Deep analysis of why this specific price point is identified.
       
-      Response must be valid JSON matching BuyResult.`,
-      config: { responseMimeType: "application/json" }
+      Response MUST be strictly valid JSON matching BuyResult interface.`,
+      config: { 
+        responseMimeType: "application/json",
+        thinkingConfig: { thinkingBudget: 0 } // Faster processing for structured gen
+      }
     });
 
     const parsed = JSON.parse(struct.text?.trim() || '{}');
@@ -80,7 +81,7 @@ export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> =>
     
     const searchRes = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: `Monthly rent for ${data.bhk} in ${data.area}, ${data.city}. Pincodes: ${data.pincode}. Find real local listings with society and builder names.`,
+      contents: `Monthly rental market in ${data.area}, ${data.city} for ${data.bhk}. Find specific society names and builder developments with active rent listings. Pincode: ${data.pincode}.`,
       config: { tools: [{ googleSearch: {} }] }
     });
 
@@ -91,7 +92,7 @@ export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> =>
 
     const structRes = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Based on this search data: ${searchRes.text}. Return RentResult JSON for ${data.bhk} in ${data.area}, ${data.city}.`,
+      contents: `Generate RentResult JSON based on: ${searchRes.text}. Target: ${data.bhk} in ${data.area}.`,
       config: { responseMimeType: "application/json" }
     });
     
@@ -111,13 +112,13 @@ export const getLandValuationAnalysis = async (data: LandRequest): Promise<LandR
     
     const searchRes = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: `Land plot valuation in ${data.address}, ${data.city}. Size: ${data.plotSize} ${data.unit}. Search for recent sales or listings.`,
+      contents: `Land plot sales and valuations in ${data.address}, ${data.city}. Plot size: ${data.plotSize} ${data.unit}. Check FSI: ${data.fsi} development potential.`,
       config: { tools: [{ googleSearch: {} }] }
     });
 
     const structRes = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Based on this search data: ${searchRes.text}. Return LandResult JSON for plot in ${data.address}, ${data.city}.`,
+      contents: `Generate LandResult JSON based on: ${searchRes.text}. Address: ${data.address}, ${data.city}.`,
       config: { responseMimeType: "application/json" }
     });
     
@@ -135,7 +136,7 @@ export const generatePropertyImage = async (prompt: string): Promise<string | nu
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
-      contents: { parts: [{ text: `A high quality professional architectural real estate photo of ${prompt}. Modern, bright, and appealing.` }] },
+      contents: { parts: [{ text: `A high-end professional real estate exterior shot of ${prompt}. Sunny day, cinematic architectural photography, wide angle, 8k resolution.` }] },
       config: { imageConfig: { aspectRatio: "16:9" } }
     });
     for (const part of response.candidates?.[0]?.content?.parts || []) {
@@ -143,32 +144,7 @@ export const generatePropertyImage = async (prompt: string): Promise<string | nu
     }
     return null;
   } catch (err) {
-    console.error("Image Generation Error:", err);
-    return null;
-  }
-};
-
-export const getSpeech = async (text: string): Promise<string | null> => {
-  const apiKey = getApiKey();
-  if (!apiKey) return null;
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: `Say with expert authority and confidence: ${text}` }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Zephyr' },
-          },
-        },
-      },
-    });
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    return base64Audio || null;
-  } catch (err) {
-    console.error("Speech Generation Error:", err);
+    console.error("Image Gen Error:", err);
     return null;
   }
 };

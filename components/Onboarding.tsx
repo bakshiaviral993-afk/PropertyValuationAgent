@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Home, Building2, Map as MapIcon, ArrowRight, CheckCircle2, Globe, Zap, ShieldCheck } from 'lucide-react';
 import { AppMode, AppLang } from '../types';
@@ -53,10 +54,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
               className={`px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest border transition-all ${
                 lang === l
                   ? 'bg-neo-neon text-white border-neo-neon shadow-neo-glow scale-105'
-                  : 'bg-white/5 text-gray-400 border-white/20 hover:border-neo-neon hover:text-white'
+                  : 'bg-white/5 text-gray-300 border-white/20 hover:border-neo-neon hover:text-white'
               }`}
             >
-              {l === 'EN' ? 'English' : <span className="font-bold">हिंदी</span>}
+              {l === 'EN' ? 'English' : 'हिंदी'}
             </button>
           ))}
         </div>
@@ -71,7 +72,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                 <span key={i} className={w.includes('true') || w.includes('सही') ? 'text-neo-neon neon-text-glow' : ''}>{w} </span>
               ))}
             </h1>
-            <p className="text-lg md:text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed font-medium uppercase tracking-tight">
+            <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed font-medium uppercase tracking-tight">
               {t.sub}
             </p>
             <button 

@@ -8,7 +8,8 @@ import LandReport from './components/LandReport';
 import LoanCalculator from './components/LoanCalculator';
 import { AppMode, AppLang, BuyResult, RentResult, LandResult, BuyRequest, RentRequest, LandRequest } from './types';
 import { getBuyAnalysis, getRentAnalysis, getLandValuationAnalysis } from './services/geminiService';
-import { ArrowLeft, Home, Zap, Shield, Sparkles, Binary, X, BarChart3, Navigation } from 'lucide-react';
+// Fix: Added missing 'Navigation' import from lucide-react
+import { ArrowLeft, Home, Zap, ShieldCheck, Sparkles, Binary, X, BarChart3, Navigation } from 'lucide-react';
 
 const App: React.FC = () => {
   const [stage, setStage] = useState<'onboarding' | 'chat' | 'results'>('onboarding');
@@ -123,7 +124,7 @@ const App: React.FC = () => {
 
       <footer className="p-10 text-center border-t border-white/5 bg-neo-glass/20 backdrop-blur-md">
         <div className="flex flex-wrap items-center justify-center gap-10 opacity-40">
-          <div className="flex items-center gap-3 text-[10px] font-black tracking-widest uppercase"><Shield size={16} className="text-neo-neon"/> Secure_Encrypted</div>
+          <div className="flex items-center gap-3 text-[10px] font-black tracking-widest uppercase"><ShieldCheck size={16} className="text-neo-neon"/> Secure_Encrypted</div>
           <div className="flex items-center gap-3 text-[10px] font-black tracking-widest uppercase"><Sparkles size={16} className="text-neo-pink"/> AI_Grounded</div>
           <div className="flex items-center gap-3 text-[10px] font-black tracking-widest uppercase"><Navigation size={16} className="text-neo-gold"/> RealTime_Mapping</div>
           <div className="text-[10px] font-black tracking-widest uppercase">© 2025 QUANTCASA LABS</div>

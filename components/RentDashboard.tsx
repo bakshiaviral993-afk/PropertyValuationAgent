@@ -1,13 +1,9 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { RentResult, RentalListing } from '../types';
 import { 
-  MapPin, ExternalLink, Zap, Globe, TrendingUp, Calculator, Info, Layers, 
-  Map as MapIcon, Building2, LayoutDashboard, Bookmark, ImageIcon, Loader2, 
-  Volume2, Share2, FileText, CheckCircle2
+  MapPin, ExternalLink, Zap, Globe, TrendingUp, Calculator, Info, Layers, Map as MapIcon, Building2, LayoutDashboard, Bookmark, ImageIcon, Loader2
 } from 'lucide-react';
-import { generatePropertyImage, getSpeech } from '../services/geminiService';
-import { decodeAudioData, decode } from '../utils/audioUtils';
+import { generatePropertyImage } from '../services/geminiService';
 
 const AIPropertyImage = ({ title, address, type }: { title: string, address: string, type: string }) => {
   const [imgUrl, setImgUrl] = useState<string | null>(null);
@@ -86,11 +82,11 @@ const DashboardMap = ({ listings = [] }: { listings?: RentalListing[] }) => {
   }, [listings, layerType]);
 
   return (
-    <div className="relative w-full h-[400px] rounded-3xl overflow-hidden border border-white/10 shadow-neo-glow">
+    <div className="relative w-full h-[400px] rounded-3xl overflow-hidden border border-gray-100 shadow-soft">
       <div ref={mapRef} className="w-full h-full" />
       <div className="absolute top-4 left-4 flex flex-col gap-2 z-[1000]">
-        <button onClick={() => setLayerType('map')} className={`p-2 rounded-xl border transition-all ${layerType === 'map' ? 'bg-emerald-500 text-white border-emerald-500 shadow-brand' : 'bg-black/40 text-gray-500 border-white/10'}`}><Layers size={16} /></button>
-        <button onClick={() => setLayerType('sat')} className={`p-2 rounded-xl border transition-all ${layerType === 'sat' ? 'bg-emerald-500 text-white border-emerald-500 shadow-brand' : 'bg-black/40 text-gray-500 border-white/10'}`}><Globe size={16} /></button>
+        <button onClick={() => setLayerType('map')} className={`p-2 rounded-xl border transition-all ${layerType === 'map' ? 'bg-emerald-500 text-white border-emerald-500 shadow-brand' : 'bg-white text-gray-500 border-gray-100'}`}><Layers size={16} /></button>
+        <button onClick={() => setLayerType('sat')} className={`p-2 rounded-xl border transition-all ${layerType === 'sat' ? 'bg-emerald-500 text-white border-emerald-500 shadow-brand' : 'bg-white text-gray-500 border-gray-100'}`}><Globe size={16} /></button>
       </div>
     </div>
   );
@@ -102,116 +98,73 @@ interface RentDashboardProps {
 
 const RentDashboard: React.FC<RentDashboardProps> = ({ result }) => {
   const [viewMode, setViewMode] = useState<'dashboard' | 'map'>('dashboard');
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const audioContextRef = useRef<AudioContext | null>(null);
   const listings = result.listings || [];
-
-  useEffect(() => {
-    return () => {
-      if (audioContextRef.current) audioContextRef.current.close();
-    };
-  }, []);
-
-  const handleListen = async () => {
-    if (isSpeaking) return;
-    setIsSpeaking(true);
-    try {
-      const summary = `Analyzing rental potential for this property. The estimated monthly rent is ${result.rentalValue}, projecting an annual yield of ${result.yieldPercentage}. Based on tenant demand metrics, I have assigned a confidence rating of ${result.confidenceScore} percent. ${result.marketSummary}.`;
-      
-      const base64Audio = await getSpeech(summary);
-      if (base64Audio) {
-        if (!audioContextRef.current) {
-          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-        }
-        const ctx = audioContextRef.current;
-        const audioBuffer = await decodeAudioData(decode(base64Audio), ctx, 24000, 1);
-        const source = ctx.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(ctx.destination);
-        source.onended = () => setIsSpeaking(false);
-        source.start();
-      } else {
-        setIsSpeaking(false);
-      }
-    } catch (err) {
-      console.error(err);
-      setIsSpeaking(false);
-    }
-  };
 
   return (
     <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-neo-neon/10 rounded-2xl border border-neo-neon/20">
-            <Building2 size={24} className="text-neo-neon" />
+          <div className="p-3 bg-emerald-50 rounded-2xl">
+            <Building2 size={24} className="text-emerald-500" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-white">Rental Intelligence</h2>
+            <h2 className="text-2xl font-black text-gray-900">Rental Intel</h2>
             <p className="text-sm text-gray-500">Market-verified monthly estimates</p>
           </div>
         </div>
-
-        <div className="flex gap-2">
-           <button 
-             onClick={handleListen}
-             disabled={isSpeaking}
-             className={`p-3 rounded-xl transition-all border ${isSpeaking ? 'bg-neo-neon text-white border-neo-neon animate-pulse' : 'bg-white/5 border-white/10 text-neo-neon hover:bg-white/10'}`}
-             title="Listen to AI Summary"
-           >
-              {isSpeaking ? <Loader2 size={20} className="animate-spin" /> : <Volume2 size={20}/>}
-           </button>
-           <button onClick={() => setViewMode('dashboard')} className={`px-6 py-2 rounded-xl text-sm font-bold transition-all border ${viewMode === 'dashboard' ? 'bg-neo-neon text-white border-neo-neon shadow-neo-glow' : 'bg-white/5 text-gray-400 border-white/10'}`}>
+        
+        <div className="flex bg-gray-100 rounded-2xl p-1 border border-gray-200">
+          <button onClick={() => setViewMode('dashboard')} className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${viewMode === 'dashboard' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
             DASHBOARD
           </button>
-          <button onClick={() => setViewMode('map')} className={`px-6 py-2 rounded-xl text-sm font-bold transition-all border ${viewMode === 'map' ? 'bg-neo-neon text-white border-neo-neon shadow-neo-glow' : 'bg-white/5 text-gray-400 border-white/10'}`}>
+          <button onClick={() => setViewMode('map')} className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${viewMode === 'map' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
             MAP VIEW
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d">
-          <span className="text-xs font-black text-neo-neon uppercase tracking-widest block mb-1">Monthly Rent</span>
-          <div className="text-4xl font-black text-white tracking-tighter">{result.rentalValue}</div>
+        <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-soft">
+          <span className="text-xs font-black text-emerald-500 uppercase tracking-widest block mb-1">Monthly Rent</span>
+          <div className="text-4xl font-black text-gray-900 tracking-tighter">{result.rentalValue}</div>
         </div>
-        <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d">
-          <span className="text-xs font-black text-neo-pink uppercase tracking-widest block mb-1">Projected Yield</span>
-          <div className="text-4xl font-black text-white tracking-tighter">{result.yieldPercentage}</div>
+        <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-soft">
+          <span className="text-xs font-black text-blue-500 uppercase tracking-widest block mb-1">Projected Yield</span>
+          <div className="text-4xl font-black text-gray-900 tracking-tighter">{result.yieldPercentage}</div>
         </div>
-        <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d">
-          <span className="text-xs font-black text-neo-gold uppercase tracking-widest block mb-1">Confidence</span>
-          <div className="text-4xl font-black text-white tracking-tighter">{result.confidenceScore}%</div>
+        <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-soft">
+          <span className="text-xs font-black text-orange-500 uppercase tracking-widest block mb-1">Confidence</span>
+          <div className="text-4xl font-black text-gray-900 tracking-tighter">{result.confidenceScore}%</div>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto pr-2 pb-10 scrollbar-hide">
         {viewMode === 'dashboard' ? (
           <div className="space-y-8">
-            <div className="bg-neo-neon/5 rounded-[32px] p-8 border border-neo-neon/20 shadow-neo-glow">
-              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <Info size={20} className="text-neo-neon" /> Market Reasoning
+            <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-soft">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Info size={20} className="text-emerald-500" /> Market Reasoning
               </h3>
-              <p className="text-gray-300 leading-relaxed italic border-l-2 border-neo-neon/30 pl-4 py-1">
+              <p className="text-gray-600 leading-relaxed italic">
                 "{result.valuationJustification}"
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {listings.map((item, idx) => (
-                <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 shadow-glass-3d hover:border-neo-neon/40 transition-all group">
+                <div key={idx} className="bg-white border border-gray-100 rounded-[32px] p-6 shadow-soft hover:shadow-brand transition-all group">
                   <AIPropertyImage title={item.title} address={item.address} type={item.bhk} />
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h4 className="font-bold text-white group-hover:text-neo-neon transition-colors">{item.title}</h4>
-                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-1"><MapPin size={12}/> {item.address}</p>
+                      <h4 className="font-bold text-gray-900">{item.title}</h4>
+                      <p className="text-xs text-gray-400 flex items-center gap-1 mt-1"><MapPin size={12}/> {item.address}</p>
                     </div>
                     <div className="text-right">
-                      <div className="text-xl font-black text-neo-neon">{item.rent}</div>
-                      <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">Verified</div>
+                      <div className="text-xl font-black text-emerald-600">{item.rent}</div>
+                      <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Verified</div>
                     </div>
                   </div>
-                  <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-gray-400 text-sm font-bold flex items-center justify-center gap-2 hover:bg-neo-neon hover:text-white hover:border-neo-neon transition-all">
+                  <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-3 rounded-2xl bg-gray-50 border border-gray-100 text-gray-600 text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-100 transition-all">
                     View Details <ExternalLink size={14} />
                   </a>
                 </div>
