@@ -14,6 +14,12 @@ interface ValuationReportProps {
   request: ValuationRequest;
 }
 
+const formatCurrency = (val: number) => {
+  if (val >= 10000000) return `₹${(val / 10000000).toFixed(2)} Cr`;
+  if (val >= 100000) return `₹${(val / 100000).toFixed(2)} L`;
+  return `₹${val.toLocaleString('en-IN')}`;
+};
+
 // --- MICRO-WIDGETS ---
 
 const CostDial = ({ 
@@ -180,7 +186,7 @@ const ReportMap = ({ lat, lng, comparables }: { lat: number, lng: number, compar
     );
 };
 
-// --- RANGE CHART & REPORT COMPONENT (Rest same as original, keeping structural integrity) ---
+// --- RANGE CHART & REPORT COMPONENT ---
 const RangeAnalysisChart = ({ data }: { data: { label: string, value: number, highlight?: boolean }[] }) => {
     const maxVal = Math.max(...data.map(d => d.value)) * 1.15;
     return (
@@ -213,17 +219,11 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
   const [parkingCost, setParkingCost] = useState(request.parkingCharges || 0);
   const [amenityCost, setAmenityCost] = useState(request.amenitiesCharges || 0);
   const [liveValue, setLiveValue] = useState(result.estimatedValue);
-  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
       const base = result.estimatedValue - (request.parkingCharges || 0) - (request.amenitiesCharges || 0);
       setLiveValue(base + parkingCost + amenityCost);
   }, [parkingCost, amenityCost, result.estimatedValue]);
-
-  const formatCurrency = (val: number) => {
-    if (val >= 10000000) return `₹${(val / 10000000).toFixed(2)} Cr`;
-    return `₹${(val / 100000).toFixed(2)} L`;
-  };
 
   const chartData = [
     { label: 'Low', value: result.rangeLow },

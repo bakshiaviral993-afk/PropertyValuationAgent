@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { Home, Building2, Map as MapIcon, ArrowRight, CheckCircle2, Globe, Zap, ShieldCheck } from 'lucide-react';
+import { Home, Building2, Map as MapIcon, ArrowRight, CheckCircle2, Globe, Zap, ShieldCheck, Sparkles } from 'lucide-react';
 import { AppMode, AppLang } from '../types';
+import { speak } from '../services/voiceService';
 
 interface OnboardingProps {
   onComplete: (mode: AppMode, lang: AppLang) => void;
@@ -14,7 +15,9 @@ const TRANSLATIONS = {
     buy: "Buy 🏠",
     rent: "Rent 🏘️",
     land: "Land 🏗️",
+    expert: "AI Expert ✨",
     started: "Get started",
+    greeting: "Welcome to QuantCasa. I am your property intelligence agent. Let's find your asset value together."
   },
   HI: {
     hero: "अपनी संपत्ति का सही मूल्य जानें।",
@@ -22,7 +25,9 @@ const TRANSLATIONS = {
     buy: "खरीदें 🏠",
     rent: "किराया 🏘️",
     land: "ज़मीन 🏗️",
+    expert: "एआई विशेषज्ञ ✨",
     started: "शुरू करें",
+    greeting: "QuantCasa में आपका स्वागत है। मैं आपका प्रॉपर्टी इंटेलिजेंस एजेंट हूँ। आइए मिलकर आपकी संपत्ति का मूल्य खोजें।"
   }
 };
 
@@ -31,6 +36,12 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   const [showModes, setShowModes] = useState(false);
 
   const t = TRANSLATIONS[lang];
+
+  const handleLangSelect = (l: AppLang) => {
+    setLang(l);
+    // Voice is triggered by user gesture (click) to satisfy browser security
+    speak(TRANSLATIONS[l].greeting, l === 'EN' ? 'en-IN' : 'hi-IN');
+  };
 
   return (
     <div className="min-h-screen bg-neo-bg flex flex-col items-center justify-center p-6 sm:p-12 overflow-hidden relative">
@@ -44,7 +55,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
           {(['EN', 'HI'] as AppLang[]).map((l) => (
             <button
               key={l}
-              onClick={() => setLang(l)}
+              onClick={() => handleLangSelect(l)}
               className={`px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest border transition-all ${
                 lang === l
                   ? 'bg-neo-neon text-white border-neo-neon shadow-neo-glow scale-105'
@@ -80,14 +91,15 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
           <div className="space-y-10 animate-in slide-in-from-bottom-12 duration-500">
             <div className="text-center">
                <h2 className="text-4xl font-black text-white tracking-tighter uppercase">Objective Selection</h2>
-               <p className="text-gray-500 mt-3 font-medium uppercase text-xs tracking-widest">Identify target asset class for valuation</p>
+               <p className="text-gray-500 mt-3 font-medium uppercase text-xs tracking-widest">Identify target asset class or expertise required</p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
                 { id: 'buy', title: t.buy, desc: 'Capital asset valuation and acquisition insights', icon: <Home /> },
                 { id: 'rent', title: t.rent, desc: 'Yield analysis and leasehold market estimates', icon: <Building2 /> },
-                { id: 'land', title: t.land, desc: 'Development potential and zoning ROI projections', icon: <MapIcon /> }
+                { id: 'land', title: t.land, desc: 'Development potential and zoning ROI projections', icon: <MapIcon /> },
+                { id: 'expert', title: t.expert, desc: 'Conversational AI for legal, Vastu and micro-trends', icon: <Sparkles /> }
               ].map((mode) => (
                 <button
                   key={mode.id}
@@ -98,7 +110,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                     {React.cloneElement(mode.icon as React.ReactElement, { size: 32 })}
                   </div>
                   <div>
-                    <h3 className="text-3xl font-black text-white tracking-tighter uppercase">{mode.title}</h3>
+                    <h3 className="text-2xl font-black text-white tracking-tighter uppercase">{mode.title}</h3>
                     <p className="text-[10px] text-gray-500 mt-2 leading-relaxed font-bold uppercase tracking-widest">{mode.desc}</p>
                   </div>
                   <div className="flex items-center gap-2 text-[10px] font-black text-neo-neon opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-widest">

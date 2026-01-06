@@ -1,7 +1,7 @@
 
 import { ReactNode } from 'react';
 
-export type AppMode = 'buy' | 'rent' | 'land';
+export type AppMode = 'buy' | 'rent' | 'land' | 'expert' | 'harmony';
 export type AppLang = 'EN' | 'HI';
 
 export enum StepField {
@@ -186,12 +186,31 @@ export interface LandRequest {
   fsi: number;
 }
 
-// Support for ValuationReport.tsx
+export interface PanchangData {
+  tithi: string;
+  nakshatra: string;
+  yoga: string;
+  rahuKaal: string;
+  auspiciousTiming: string;
+  propertyAdvice: string;
+  harmonyScore: number;
+}
+
+export interface HarmonyReport {
+  vastuScore: number;
+  fengShuiScore: number;
+  advice: string;
+  remedies: string[];
+}
+
+/**
+ * Added missing types for ValuationReport.tsx and Sidebar.tsx
+ */
 export interface Comparable {
   projectName: string;
   price: number;
-  bhk: string;
   area: number;
+  bhk: string;
   latitude?: number;
   longitude?: number;
 }
@@ -210,13 +229,12 @@ export interface ValuationRequest {
   city: string;
   superBuiltUpArea: number;
   constructionYear: number;
-  parkingCharges: number;
-  amenitiesCharges: number;
+  parkingCharges?: number;
+  amenitiesCharges?: number;
   latitude?: number;
   longitude?: number;
 }
 
-// Support for Sidebar.tsx
 export interface GlobalContext {
   address: string;
   pincode: string;

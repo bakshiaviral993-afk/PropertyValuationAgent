@@ -4,7 +4,7 @@ import {
   BuyRequest, BuyResult, 
   RentRequest, RentResult, 
   LandRequest, LandResult,
-  GroundingSource
+  GroundingSource, ChatMessage
 } from "../types";
 
 const getApiKey = (): string | null => {
@@ -12,202 +12,126 @@ const getApiKey = (): string | null => {
   return (!key || key === 'undefined' || key.trim() === '') ? null : key;
 };
 
-export const getBuyAnalysis = async (data: BuyRequest): Promise<BuyResult> => {
+const runWithFallback = async (prompt: string, config: any): Promise<any> => {
   const apiKey = getApiKey();
-  if (!apiKey) throw new Error("API Key configuration error. Please check environment variables.");
+  if (!apiKey) throw new Error("CRITICAL_AUTH_ERROR: API_KEY_MISSING");
 
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    
-    const prompt = `Perform a deep real estate analysis for ${data.bhk} apartment in ${data.area}, ${data.city}.
-    Pincode: ${data.pincode}. Total area: ${data.sqft} sqft.
-    Search for verified listings and market trends.`;
+  const models = ['gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-flash-lite-latest'];
+  let lastError = null;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: prompt,
-      config: { 
-        tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
+  for (const modelName of models) {
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: prompt,
+        config: config
+      });
+      
+      const text = response.text;
+      if (!text) throw new Error("Buffer empty");
+      
+      if (config.responseMimeType === "application/json") {
+          const parsed = JSON.parse(text.trim());
+          const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+          const sources: GroundingSource[] = groundingChunks
+            .filter((chunk: any) => chunk.web)
+            .map((chunk: any) => ({ uri: chunk.web.uri, title: chunk.web.title }));
+
+          return { ...parsed, groundingSources: sources };
+      }
+      
+      return text;
+    } catch (err: any) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error("SYSTEM_HALT: All nodes failed.");
+};
+
+export const getBuyAnalysis = async (data: BuyRequest): Promise<BuyResult> => {
+  const prompt = `Valuation scan for ${data.bhk} in ${data.area}, ${data.city}. Pincode: ${data.pincode}. Area: ${data.sqft}sqft. Strict JSON output.`;
+  const schema = {
+    type: Type.OBJECT,
+    properties: {
+      fairValue: { type: Type.STRING },
+      valuationRange: { type: Type.STRING },
+      recommendation: { type: Type.STRING },
+      negotiationScript: { type: Type.STRING },
+      marketSentiment: { type: Type.STRING },
+      sentimentScore: { type: Type.NUMBER },
+      registrationEstimate: { type: Type.STRING },
+      appreciationPotential: { type: Type.STRING },
+      confidenceScore: { type: Type.NUMBER },
+      valuationJustification: { type: Type.STRING },
+      listings: {
+        type: Type.ARRAY,
+        items: {
           type: Type.OBJECT,
           properties: {
-            fairValue: { type: Type.STRING, description: "e.g. ₹1.5 Cr" },
-            valuationRange: { type: Type.STRING, description: "e.g. ₹1.4 - 1.6 Cr" },
-            recommendation: { type: Type.STRING, description: "Must be one of: Good Buy, Fair Price, Overpriced" },
-            negotiationScript: { type: Type.STRING },
-            marketSentiment: { type: Type.STRING, description: "A single descriptive string about the market vibe." },
-            sentimentScore: { type: Type.NUMBER, description: "0 to 100" },
-            registrationEstimate: { type: Type.STRING },
-            appreciationPotential: { type: Type.STRING, description: "e.g. 5-7% annually" },
-            confidenceScore: { type: Type.NUMBER },
-            valuationJustification: { type: Type.STRING },
-            neighborhoodScore: {
-              type: Type.OBJECT,
-              properties: {
-                overall: { type: Type.NUMBER },
-                walkability: { type: Type.NUMBER },
-                grocery: { type: Type.NUMBER },
-                parks: { type: Type.NUMBER },
-                safety: { type: Type.NUMBER },
-                connectivity: { type: Type.NUMBER }
-              }
-            },
-            insights: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  description: { type: Type.STRING },
-                  type: { type: Type.STRING, description: "positive, development, or trend" }
-                }
-              }
-            },
-            listings: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  price: { type: Type.STRING },
-                  address: { type: Type.STRING },
-                  sourceUrl: { type: Type.STRING },
-                  bhk: { type: Type.STRING },
-                  latitude: { type: Type.NUMBER },
-                  longitude: { type: Type.NUMBER },
-                  builderName: { type: Type.STRING },
-                  societyName: { type: Type.STRING }
-                }
-              }
-            }
-          },
-          required: ["fairValue", "valuationRange", "recommendation", "listings", "marketSentiment", "sentimentScore"]
+            title: { type: Type.STRING },
+            price: { type: Type.STRING },
+            address: { type: Type.STRING },
+            sourceUrl: { type: Type.STRING },
+            bhk: { type: Type.STRING },
+            builderName: { type: Type.STRING },
+            societyName: { type: Type.STRING },
+            latitude: { type: Type.NUMBER },
+            longitude: { type: Type.NUMBER }
+          }
         }
       }
-    });
-
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    const sources: GroundingSource[] = groundingChunks
-      .filter((chunk: any) => chunk.web)
-      .map((chunk: any) => ({ uri: chunk.web.uri, title: chunk.web.title }));
-
-    const text = response.text;
-    if (!text) throw new Error("Empty response from intelligence node.");
-    
-    const parsed = JSON.parse(text.trim());
-    return { ...parsed, groundingSources: sources };
-  } catch (err: any) {
-    console.error("Valuation Engine Error:", err);
-    throw new Error(err.message || "Valuation engine encountered a sync error.");
-  }
+    },
+    required: ["fairValue", "listings"]
+  };
+  return await runWithFallback(prompt, { tools: [{ googleSearch: {} }], responseMimeType: "application/json", responseSchema: schema });
 };
 
 export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> => {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error("API Key required.");
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    const prompt = `Analyze monthly rent for ${data.bhk} in ${data.area}, ${data.city}. Pincode: ${data.pincode}.`;
-
-    const res = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: prompt,
-      config: { 
-        tools: [{ googleSearch: {} }], 
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            rentalValue: { type: Type.STRING },
-            yieldPercentage: { type: Type.STRING },
-            rentOutAlert: { type: Type.STRING },
-            depositCalc: { type: Type.STRING },
-            negotiationScript: { type: Type.STRING },
-            marketSummary: { type: Type.STRING },
-            tenantDemandScore: { type: Type.NUMBER },
-            confidenceScore: { type: Type.NUMBER },
-            valuationJustification: { type: Type.STRING },
-            propertiesFoundCount: { type: Type.NUMBER },
-            listings: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  rent: { type: Type.STRING },
-                  address: { type: Type.STRING },
-                  sourceUrl: { type: Type.STRING },
-                  bhk: { type: Type.STRING },
-                  latitude: { type: Type.NUMBER },
-                  longitude: { type: Type.NUMBER }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    const groundingChunks = res.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    const sources: GroundingSource[] = groundingChunks
-      .filter((chunk: any) => chunk.web)
-      .map((chunk: any) => ({ uri: chunk.web.uri, title: chunk.web.title }));
-
-    const parsed = JSON.parse(res.text?.trim() || '{}');
-    return { ...parsed, groundingSources: sources };
-  } catch (err) {
-    throw new Error("Rental data sync failed.");
-  }
+  const prompt = `Rental analysis for ${data.bhk} in ${data.area}, ${data.city}. Return JSON.`;
+  return await runWithFallback(prompt, { tools: [{ googleSearch: {} }], responseMimeType: "application/json" });
 };
 
 export const getLandValuationAnalysis = async (data: LandRequest): Promise<LandResult> => {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error("API Key required.");
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    const prompt = `Land plot valuation in ${data.address}, ${data.city}. Plot size: ${data.plotSize} ${data.unit}. FSI: ${data.fsi}.`;
+  const prompt = `Land plot valuation in ${data.address}, ${data.city}. Return JSON.`;
+  return await runWithFallback(prompt, { tools: [{ googleSearch: {} }], responseMimeType: "application/json" });
+};
 
-    const res = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: prompt,
-      config: { 
-        tools: [{ googleSearch: {} }], 
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            landValue: { type: Type.STRING },
-            perSqmValue: { type: Type.STRING },
-            devROI: { type: Type.STRING },
-            negotiationStrategy: { type: Type.STRING },
-            confidenceScore: { type: Type.NUMBER },
-            zoningAnalysis: { type: Type.STRING },
-            valuationJustification: { type: Type.STRING },
-            listings: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  price: { type: Type.STRING },
-                  size: { type: Type.STRING },
-                  address: { type: Type.STRING },
-                  sourceUrl: { type: Type.STRING },
-                  latitude: { type: Type.NUMBER },
-                  longitude: { type: Type.NUMBER }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
+export const askPropertyQuestion = async (
+  messages: ChatMessage[], 
+  contextResult?: any, 
+  lang: 'EN' | 'HI' = 'EN',
+  intent: 'general' | 'vastu' | 'interior' | 'feng-shui' = 'general'
+): Promise<string> => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("CRITICAL_AUTH_ERROR: API_KEY_MISSING");
+
+  const systemInstruction = `
+    You are QuantCasa Property Expert. Language: ${lang === 'HI' ? 'Hindi' : 'English'}.
     
-    return JSON.parse(res.text?.trim() || '{}');
-  } catch (err) {
-    throw new Error("Land intelligence node timed out.");
-  }
+    Current Intent Mode: ${intent.toUpperCase()}.
+    ${intent === 'vastu' ? 'You are a Vastu Shastra Consultant. Focus on Ishanya, Agneya, etc.' : ''}
+    ${intent === 'feng-shui' ? 'You are a Feng Shui Master. Use Bagua map concepts, Five Elements, and Chi flow analysis.' : ''}
+    ${intent === 'interior' ? 'You are an Interior Design Architect. Suggest themes and materials.' : ''}
+
+    ${contextResult ? `CONTEXT: User property data: ${JSON.stringify(contextResult)}.` : ''}
+    
+    Guidelines:
+    - If user asks for both Vastu and Feng Shui, blend the advice harmoniously.
+    - Provide non-structural, actionable remedies (crystals, colors, mirrors).
+    - Be professional and concise.
+  `;
+
+  const ai = new GoogleGenAI({ apiKey });
+  const lastUserMessage = messages[messages.length - 1].text;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: { parts: [{ text: lastUserMessage }] },
+    config: { systemInstruction, temperature: 0.7 }
+  });
+
+  return response.text || "Neural connection reset. Please retry.";
 };
 
 export const generatePropertyImage = async (prompt: string): Promise<string | null> => {
@@ -217,14 +141,10 @@ export const generatePropertyImage = async (prompt: string): Promise<string | nu
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
-      contents: { parts: [{ text: `Professional architectural photo of ${prompt}. Modern, wide angle, 4k.` }] },
+      contents: { parts: [{ text: `Professional 4k photo of ${prompt}. Modern luxury style.` }] },
       config: { imageConfig: { aspectRatio: "16:9" } }
     });
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-    }
-    return null;
-  } catch (err) {
-    return null;
-  }
+    const img = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+    return img ? `data:image/png;base64,${img.inlineData.data}` : null;
+  } catch { return null; }
 };
