@@ -12,64 +12,94 @@ const getApiKey = (): string | null => {
   return (!key || key === 'undefined' || key.trim() === '') ? null : key;
 };
 
-/**
- * Enhanced analysis with deeper search grounding for builder and complex names.
- * Uses gemini-3-pro-preview for high-quality search processing.
- */
 export const getBuyAnalysis = async (data: BuyRequest): Promise<BuyResult> => {
   const apiKey = getApiKey();
-  if (!apiKey) throw new Error("API Key required for live valuation.");
+  if (!apiKey) throw new Error("API Key configuration error. Please check environment variables.");
 
   try {
     const ai = new GoogleGenAI({ apiKey });
     
-    // Step 1: Broad search for specific project intelligence
-    const searchQuery = `Current real estate transactions and listings for ${data.bhk} in ${data.area}, ${data.city} (Pincode: ${data.pincode}). 
-    Find actual building names, society complexes, and prominent builders active in this locality. 
-    Analyze market sentiment (bullish, stable, or bearish) based on recent news and price trends in ${data.area}.
-    Need precise latitude/longitude coordinates for these projects.`;
+    const prompt = `Perform a deep real estate analysis for ${data.bhk} apartment in ${data.area}, ${data.city}.
+    Pincode: ${data.pincode}. Total area: ${data.sqft} sqft.
+    Search for verified listings and market trends.`;
 
-    const searchResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: searchQuery,
-      config: { tools: [{ googleSearch: {} }] }
+      contents: prompt,
+      config: { 
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            fairValue: { type: Type.STRING, description: "e.g. ₹1.5 Cr" },
+            valuationRange: { type: Type.STRING, description: "e.g. ₹1.4 - 1.6 Cr" },
+            recommendation: { type: Type.STRING, description: "Must be one of: Good Buy, Fair Price, Overpriced" },
+            negotiationScript: { type: Type.STRING },
+            marketSentiment: { type: Type.STRING, description: "A single descriptive string about the market vibe." },
+            sentimentScore: { type: Type.NUMBER, description: "0 to 100" },
+            registrationEstimate: { type: Type.STRING },
+            appreciationPotential: { type: Type.STRING, description: "e.g. 5-7% annually" },
+            confidenceScore: { type: Type.NUMBER },
+            valuationJustification: { type: Type.STRING },
+            neighborhoodScore: {
+              type: Type.OBJECT,
+              properties: {
+                overall: { type: Type.NUMBER },
+                walkability: { type: Type.NUMBER },
+                grocery: { type: Type.NUMBER },
+                parks: { type: Type.NUMBER },
+                safety: { type: Type.NUMBER },
+                connectivity: { type: Type.NUMBER }
+              }
+            },
+            insights: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  type: { type: Type.STRING, description: "positive, development, or trend" }
+                }
+              }
+            },
+            listings: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  price: { type: Type.STRING },
+                  address: { type: Type.STRING },
+                  sourceUrl: { type: Type.STRING },
+                  bhk: { type: Type.STRING },
+                  latitude: { type: Type.NUMBER },
+                  longitude: { type: Type.NUMBER },
+                  builderName: { type: Type.STRING },
+                  societyName: { type: Type.STRING }
+                }
+              }
+            }
+          },
+          required: ["fairValue", "valuationRange", "recommendation", "listings", "marketSentiment", "sentimentScore"]
+        }
+      }
     });
 
-    const groundingChunks = searchResponse.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     const sources: GroundingSource[] = groundingChunks
       .filter((chunk: any) => chunk.web)
       .map((chunk: any) => ({ uri: chunk.web.uri, title: chunk.web.title }));
 
-    // Step 2: Structured generation using Flash for low latency extraction
-    const struct = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Based on this intelligence data: ${searchResponse.text}. 
-      Generate a comprehensive JSON valuation for ${data.bhk} (${data.sqft} sqft) in ${data.area}, ${data.city}.
-      
-      Requirements:
-      - fairValue: String (e.g. ₹1.5 Cr)
-      - valuationRange: String (e.g. ₹1.4 - 1.7 Cr)
-      - listings: Minimum 5 REAL examples from search. Strictly include "societyName" and "builderName" for each.
-      - insights: 4 objects {title, description, type: positive/development/trend}
-      - neighborhoodScore: overall, walkability, grocery, parks, safety, connectivity (0-100)
-      - marketSentiment: Descriptive text (e.g. "Bullish due to Metro expansion")
-      - sentimentScore: Number between 0 (Very Bearish) to 100 (Very Bullish)
-      - negotiationScript: 2-3 sentences of tactical advice for the user to negotiate this specific area.
-      - appreciationPotential: (e.g. "5-8% annual")
-      - valuationJustification: Deep analysis of why this specific price point is identified.
-      
-      Response MUST be strictly valid JSON matching BuyResult interface.`,
-      config: { 
-        responseMimeType: "application/json",
-        thinkingConfig: { thinkingBudget: 0 } // Faster processing for structured gen
-      }
-    });
-
-    const parsed = JSON.parse(struct.text?.trim() || '{}');
+    const text = response.text;
+    if (!text) throw new Error("Empty response from intelligence node.");
+    
+    const parsed = JSON.parse(text.trim());
     return { ...parsed, groundingSources: sources };
-  } catch (err) {
-    console.error("Buy Analysis Error:", err);
-    throw err;
+  } catch (err: any) {
+    console.error("Valuation Engine Error:", err);
+    throw new Error(err.message || "Valuation engine encountered a sync error.");
   }
 };
 
@@ -78,29 +108,56 @@ export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> =>
   if (!apiKey) throw new Error("API Key required.");
   try {
     const ai = new GoogleGenAI({ apiKey });
-    
-    const searchRes = await ai.models.generateContent({
+    const prompt = `Analyze monthly rent for ${data.bhk} in ${data.area}, ${data.city}. Pincode: ${data.pincode}.`;
+
+    const res = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: `Monthly rental market in ${data.area}, ${data.city} for ${data.bhk}. Find specific society names and builder developments with active rent listings. Pincode: ${data.pincode}.`,
-      config: { tools: [{ googleSearch: {} }] }
+      contents: prompt,
+      config: { 
+        tools: [{ googleSearch: {} }], 
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            rentalValue: { type: Type.STRING },
+            yieldPercentage: { type: Type.STRING },
+            rentOutAlert: { type: Type.STRING },
+            depositCalc: { type: Type.STRING },
+            negotiationScript: { type: Type.STRING },
+            marketSummary: { type: Type.STRING },
+            tenantDemandScore: { type: Type.NUMBER },
+            confidenceScore: { type: Type.NUMBER },
+            valuationJustification: { type: Type.STRING },
+            propertiesFoundCount: { type: Type.NUMBER },
+            listings: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  rent: { type: Type.STRING },
+                  address: { type: Type.STRING },
+                  sourceUrl: { type: Type.STRING },
+                  bhk: { type: Type.STRING },
+                  latitude: { type: Type.NUMBER },
+                  longitude: { type: Type.NUMBER }
+                }
+              }
+            }
+          }
+        }
+      }
     });
 
-    const groundingChunks = searchRes.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    const groundingChunks = res.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     const sources: GroundingSource[] = groundingChunks
       .filter((chunk: any) => chunk.web)
       .map((chunk: any) => ({ uri: chunk.web.uri, title: chunk.web.title }));
 
-    const structRes = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Generate RentResult JSON based on: ${searchRes.text}. Target: ${data.bhk} in ${data.area}.`,
-      config: { responseMimeType: "application/json" }
-    });
-    
-    const parsed = JSON.parse(structRes.text?.trim() || '{}');
+    const parsed = JSON.parse(res.text?.trim() || '{}');
     return { ...parsed, groundingSources: sources };
   } catch (err) {
-    console.error("Rent Analysis Error:", err);
-    throw err;
+    throw new Error("Rental data sync failed.");
   }
 };
 
@@ -109,23 +166,47 @@ export const getLandValuationAnalysis = async (data: LandRequest): Promise<LandR
   if (!apiKey) throw new Error("API Key required.");
   try {
     const ai = new GoogleGenAI({ apiKey });
-    
-    const searchRes = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: `Land plot sales and valuations in ${data.address}, ${data.city}. Plot size: ${data.plotSize} ${data.unit}. Check FSI: ${data.fsi} development potential.`,
-      config: { tools: [{ googleSearch: {} }] }
-    });
+    const prompt = `Land plot valuation in ${data.address}, ${data.city}. Plot size: ${data.plotSize} ${data.unit}. FSI: ${data.fsi}.`;
 
-    const structRes = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Generate LandResult JSON based on: ${searchRes.text}. Address: ${data.address}, ${data.city}.`,
-      config: { responseMimeType: "application/json" }
+    const res = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: prompt,
+      config: { 
+        tools: [{ googleSearch: {} }], 
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            landValue: { type: Type.STRING },
+            perSqmValue: { type: Type.STRING },
+            devROI: { type: Type.STRING },
+            negotiationStrategy: { type: Type.STRING },
+            confidenceScore: { type: Type.NUMBER },
+            zoningAnalysis: { type: Type.STRING },
+            valuationJustification: { type: Type.STRING },
+            listings: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  price: { type: Type.STRING },
+                  size: { type: Type.STRING },
+                  address: { type: Type.STRING },
+                  sourceUrl: { type: Type.STRING },
+                  latitude: { type: Type.NUMBER },
+                  longitude: { type: Type.NUMBER }
+                }
+              }
+            }
+          }
+        }
+      }
     });
     
-    return JSON.parse(structRes.text?.trim() || '{}');
+    return JSON.parse(res.text?.trim() || '{}');
   } catch (err) {
-    console.error("Land Analysis Error:", err);
-    throw err;
+    throw new Error("Land intelligence node timed out.");
   }
 };
 
@@ -136,7 +217,7 @@ export const generatePropertyImage = async (prompt: string): Promise<string | nu
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
-      contents: { parts: [{ text: `A high-end professional real estate exterior shot of ${prompt}. Sunny day, cinematic architectural photography, wide angle, 8k resolution.` }] },
+      contents: { parts: [{ text: `Professional architectural photo of ${prompt}. Modern, wide angle, 4k.` }] },
       config: { imageConfig: { aspectRatio: "16:9" } }
     });
     for (const part of response.candidates?.[0]?.content?.parts || []) {
@@ -144,7 +225,6 @@ export const generatePropertyImage = async (prompt: string): Promise<string | nu
     }
     return null;
   } catch (err) {
-    console.error("Image Gen Error:", err);
     return null;
   }
 };

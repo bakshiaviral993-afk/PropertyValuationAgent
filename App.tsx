@@ -8,7 +8,6 @@ import LandReport from './components/LandReport';
 import LoanCalculator from './components/LoanCalculator';
 import { AppMode, AppLang, BuyResult, RentResult, LandResult, BuyRequest, RentRequest, LandRequest } from './types';
 import { getBuyAnalysis, getRentAnalysis, getLandValuationAnalysis } from './services/geminiService';
-// Fix: Added missing 'Navigation' import from lucide-react
 import { ArrowLeft, Home, Zap, ShieldCheck, Sparkles, Binary, X, BarChart3, Navigation } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -42,9 +41,10 @@ const App: React.FC = () => {
         setLandData(result);
       }
       setStage('results');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Intelligence node timed out. Please try again.");
+      // Fixed: Improved error reporting
+      alert(err.message || "An unexpected error occurred in the valuation node. Please check your connection or try again.");
     } finally {
       setIsLoading(false);
     }

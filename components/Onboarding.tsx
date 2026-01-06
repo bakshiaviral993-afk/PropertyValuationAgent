@@ -14,9 +14,7 @@ const TRANSLATIONS = {
     buy: "Buy 🏠",
     rent: "Rent 🏘️",
     land: "Land 🏗️",
-    quick: "Quick Calc",
     started: "Get started",
-    footer: "Verified data across major Indian cities"
   },
   HI: {
     hero: "अपनी संपत्ति का सही मूल्य जानें।",
@@ -24,9 +22,7 @@ const TRANSLATIONS = {
     buy: "खरीदें 🏠",
     rent: "किराया 🏘️",
     land: "ज़मीन 🏗️",
-    quick: "तुरंत गणना",
     started: "शुरू करें",
-    footer: "भारत के प्रमुख शहरों का सत्यापित डेटा"
   }
 };
 
@@ -38,14 +34,12 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
   return (
     <div className="min-h-screen bg-neo-bg flex flex-col items-center justify-center p-6 sm:p-12 overflow-hidden relative">
-      {/* Background decoration */}
       <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
         <div className="absolute top-20 left-10 w-64 h-64 bg-neo-neon rounded-full blur-[100px]" />
         <div className="absolute bottom-20 right-10 w-64 h-64 bg-neo-pink rounded-full blur-[100px]" />
       </div>
 
       <div className="max-w-4xl w-full space-y-12 relative z-10">
-        {/* Language Picker */}
         <div className="flex justify-center sm:justify-end gap-3">
           {(['EN', 'HI'] as AppLang[]).map((l) => (
             <button
@@ -54,7 +48,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
               className={`px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest border transition-all ${
                 lang === l
                   ? 'bg-neo-neon text-white border-neo-neon shadow-neo-glow scale-105'
-                  : 'bg-white/5 text-gray-300 border-white/20 hover:border-neo-neon hover:text-white'
+                  : 'bg-white/5 text-gray-400 border-white/20 hover:border-neo-neon hover:text-white'
               }`}
             >
               {l === 'EN' ? 'English' : 'हिंदी'}
@@ -91,9 +85,9 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
-                { id: 'buy', title: t.buy, desc: 'Capital asset valuation and acquisition insights', icon: <Home />, color: 'neo-neon' },
-                { id: 'rent', title: t.rent, desc: 'Yield analysis and leasehold market estimates', icon: <Building2 />, color: 'blue-500' },
-                { id: 'land', title: t.land, desc: 'Development potential and zoning ROI projections', icon: <MapIcon />, color: 'neo-pink' }
+                { id: 'buy', title: t.buy, desc: 'Capital asset valuation and acquisition insights', icon: <Home /> },
+                { id: 'rent', title: t.rent, desc: 'Yield analysis and leasehold market estimates', icon: <Building2 /> },
+                { id: 'land', title: t.land, desc: 'Development potential and zoning ROI projections', icon: <MapIcon /> }
               ].map((mode) => (
                 <button
                   key={mode.id}
@@ -113,25 +107,13 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                 </button>
               ))}
             </div>
-
-            <button 
-              onClick={() => onComplete('buy', lang)}
-              className="w-full py-5 border-2 border-dashed border-white/5 rounded-[32px] text-gray-600 font-black uppercase tracking-[0.4em] text-[10px] hover:border-neo-neon/40 hover:text-neo-neon transition-all flex items-center justify-center gap-3"
-            >
-              <Zap size={16} /> Fast Track Calculation
-            </button>
           </div>
         )}
 
-        {/* Footer info */}
         <div className="flex flex-col md:flex-row items-center justify-center gap-6 text-[10px] font-black text-gray-700 uppercase tracking-[0.3em]">
-          <div className="flex items-center gap-2">
-            <Globe size={16} /> Global Market Sync Ready
-          </div>
+          <div className="flex items-center gap-2"><Globe size={16} /> Global Market Sync Ready</div>
           <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-gray-800" />
-          <div className="flex items-center gap-2">
-            <ShieldCheck size={16} /> Quantum Encrypted Tunnel
-          </div>
+          <div className="flex items-center gap-2"><ShieldCheck size={16} /> Quantum Encrypted Tunnel</div>
         </div>
       </div>
     </div>
