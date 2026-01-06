@@ -5,10 +5,11 @@ import { SaleListing, RentalListing } from '../types';
  * Robust price parser using Regex (inspired by Python's 're')
  * Handles formats like: "₹3.5 Cr", "45 Lakhs", "12,000", etc.
  */
-export const parsePrice = (priceStr: string | undefined): number => {
-  if (!priceStr) return 0;
+export const parsePrice = (priceStr: any): number => {
+  if (priceStr === null || priceStr === undefined) return 0;
   
-  const cleanStr = priceStr.replace(/,/g, '').trim();
+  const s = String(priceStr);
+  const cleanStr = s.replace(/,/g, '').trim();
   const regex = /([\d.]+)\s*(Cr|L|Lakh|Crore|k|Thousand)?/i;
   const match = cleanStr.match(regex);
   

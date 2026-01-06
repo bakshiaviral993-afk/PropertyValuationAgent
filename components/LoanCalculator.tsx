@@ -81,14 +81,16 @@ const LoanCalculator: React.FC<LoanCalculatorProps> = ({ initialValue = 10000000
         </div>
 
         <div className="glass-panel rounded-3xl p-8 border border-white/5 flex flex-col items-center justify-center min-h-[300px]">
-           <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                 <Pie data={chartData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                    {chartData.map((e,i)=><Cell key={i} fill={COLORS[i]}/>)}
-                 </Pie>
-                 <Tooltip contentStyle={{backgroundColor:'#000', borderRadius:'12px', border:'none', fontSize:'10px'}}/>
-              </PieChart>
-           </ResponsiveContainer>
+           <div className="w-full h-[200px] min-w-0">
+             <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                   <Pie data={chartData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                      {chartData.map((e,i)=><Cell key={i} fill={COLORS[i]}/>)}
+                   </Pie>
+                   <Tooltip contentStyle={{backgroundColor:'#000', borderRadius:'12px', border:'none', fontSize:'10px'}}/>
+                </PieChart>
+             </ResponsiveContainer>
+           </div>
            <div className="mt-4 text-center">
               <div className="text-[10px] text-gray-500 uppercase tracking-widest">Total Repayment</div>
               <div className="text-2xl font-mono font-bold text-white">₹{(loanResult.totalPayment/10000000).toFixed(2)} Cr</div>

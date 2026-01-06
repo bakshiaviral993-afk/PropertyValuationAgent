@@ -12,12 +12,13 @@ import { callLLMWithFallback } from "./llmFallback";
 /**
  * Robust price parser using Regex
  */
-export function parsePrice(p: string): number {
-  if (!p) return 0;
-  const n = parseFloat(p.replace(/[^0-9.]/g, ''));
+export function parsePrice(p: any): number {
+  if (p === null || p === undefined) return 0;
+  const s = String(p);
+  const n = parseFloat(s.replace(/[^0-9.]/g, ''));
   if (isNaN(n)) return 0;
-  if (p.includes('Cr')) return n * 10000000;
-  if (p.includes('L')) return n * 100000;
+  if (s.includes('Cr')) return n * 10000000;
+  if (s.includes('L')) return n * 100000;
   return n;
 }
 
@@ -58,8 +59,8 @@ export async function getBuyAnalysis(req: BuyRequest): Promise<BuyResult> {
     SEARCH_PROMPT(req.city, req.area, req.pincode, req.bhk), 
     { 
       tools: [{ googleSearch: {} }],
-      temperature: 0.2,
-      responseMimeType: 'application/json'
+      temperature: 0.2
+      // responseMimeType: 'application/json' is removed to avoid conflict with googleSearch tool
     }
   );
   
@@ -108,8 +109,8 @@ export async function getRentAnalysis(req: RentRequest): Promise<RentResult> {
   `;
   const { text, groundingSources } = await callLLMWithFallback(prompt, { 
     tools: [{ googleSearch: {} }],
-    temperature: 0.2,
-    responseMimeType: 'application/json'
+    temperature: 0.2
+    // responseMimeType: 'application/json' is removed to avoid conflict with googleSearch tool
   });
   const parsed = extractJsonFromText(text);
   return { ...parsed, propertiesFoundCount: parsed.listings?.length || 0, groundingSources: groundingSources || [] };

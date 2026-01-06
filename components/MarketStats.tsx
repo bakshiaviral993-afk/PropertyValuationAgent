@@ -91,8 +91,8 @@ const MarketStats: React.FC<MarketStatsProps> = ({ stats, prices, labelPrefix = 
           </div>
         </div>
 
-        <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-[300px] w-full min-w-0">
+          <ResponsiveContainer width="99.9%" height="100%">
             <BarChart data={histogramData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
               <XAxis 

@@ -165,9 +165,9 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 px-4">
               {result.listings?.map((l, i) => (
                 <a key={i} href={l.sourceUrl} target="_blank" rel="noopener"
-                   className="bg-white/5 rounded-[32px] p-6 border border-white/10 hover:border-neo-neon/50 transition-all group shadow-glass-3d">
+                   className="bg-white/5 rounded-[32px] p-6 border border-white/10 hover:border-neo-neon/50 transition-all group shadow-glass-3d flex flex-col">
                   {/* live map thumbnail */}
-                  <div className="w-full h-40 rounded-2xl overflow-hidden mb-4 bg-neo-bg">
+                  <div className="w-full h-40 rounded-2xl overflow-hidden mb-4 bg-neo-bg shrink-0">
                     {l.latitude && l.longitude ? (
                       <iframe
                         className="w-full h-full grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all"
@@ -179,19 +179,19 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
                       <AIListingImage listing={l} />
                     )}
                   </div>
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
+                  <div className="flex justify-between items-start mb-2 gap-4">
+                    <div className="flex-1 min-w-0">
                       <h4 className="font-black text-white text-lg leading-tight line-clamp-2">{l.title}</h4>
-                      <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-1">
-                        <MapPin size={12} /> {l.address}, {l.pincode}
+                      <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-1 truncate">
+                        <MapPin size={12} className="shrink-0" /> {l.address}, {l.pincode}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <div className="text-xl font-black text-neo-neon">{formatPrice(parsePrice(l.price))}</div>
-                      <span className="text-[8px] text-gray-500 uppercase">Live</span>
+                    <div className="text-right shrink-0">
+                      <div className="text-xl font-black text-neo-neon whitespace-nowrap">{formatPrice(parsePrice(l.price))}</div>
+                      <span className="text-[8px] text-gray-500 font-black uppercase tracking-widest block mt-1">LIVE_MARKET</span>
                     </div>
                   </div>
-                  <div className="w-full py-2 rounded-xl bg-white/5 border border-white/10 text-center text-[10px] font-black uppercase tracking-widest mt-4">
+                  <div className="w-full py-3 rounded-xl bg-white/5 border border-white/10 text-center text-[10px] font-black uppercase tracking-widest mt-auto group-hover:bg-neo-neon transition-all">
                     View on {getHostname(l.sourceUrl)}
                   </div>
                 </a>
