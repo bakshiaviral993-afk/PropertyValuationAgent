@@ -38,9 +38,12 @@ const runWithFallback = async (prompt: string, config: any): Promise<any> => {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("CRITICAL_AUTH_ERROR: API_KEY_MISSING");
 
-  // Senior Dev Note: Using standard model identifiers from @google/genai guidelines.
-  // gemini-3-flash-preview is the most reliable for general tasks with search.
-  // gemini-flash-lite-latest is the efficient fallback.
+  /**
+   * Senior Dev Note: Fix 404 errors by using standard SDK identifiers.
+   * gemini-3-flash-preview: Primary for high-speed, grounded reasoning.
+   * gemini-flash-lite-latest: Secondary fallback for efficiency.
+   * DO NOT use gemini-2.5-flash-lite-latest as it is not a valid endpoint.
+   */
   const models = ['gemini-3-flash-preview', 'gemini-flash-lite-latest'];
   let lastError = null;
 
@@ -85,15 +88,14 @@ const runWithFallback = async (prompt: string, config: any): Promise<any> => {
       lastError = err;
       console.warn(`QuantCasa [${modelName}] link failed:`, err.message);
       // If it's a 404 or unsupported method, try the next model.
-      if (err.message?.includes('404') || err.message?.includes('not supported')) continue;
-      else break; // For other errors like API Key, don't loop
+      if (err.message?.includes('404') || err.message?.includes('not found') || err.message?.includes('not supported')) continue;
+      else break; // For other errors like API Key issues, don't loop
     }
   }
   throw lastError || new Error("SYSTEM_HALT: All neural nodes unreachable.");
 };
 
 export const getBuyAnalysis = async (data: BuyRequest): Promise<BuyResult> => {
-  // We append JSON instructions because we can't use responseMimeType with search
   const prompt = `
     Perform a professional real estate valuation scan for:
     Configuration: ${data.bhk}

@@ -137,13 +137,13 @@ export class SpeechInput {
         else interim += r[0].transcript;
       }
 
-      // 1. normal path
+      // 1. Normal path: we got a final transcript
       if (final) {
         this.push(final, true);
         return;
       }
 
-      // 2. keep interim alive
+      // 2. Keep interim alive and update UI
       if (interim) {
         this.lastRaw = interim;
         this.push(interim, false);
@@ -151,10 +151,12 @@ export class SpeechInput {
         return;
       }
 
-      // 3. safety: if we *only* get empty finals forever,
-      //    treat the best interim we had as final after silence
-      if (this.lastRaw.trim().length > 2) {
-        this.push(this.lastRaw, true);
+      /**
+       * 3. Safety path: if we *only* get empty finals forever or results stop coming,
+       * treat the best interim we had as final after a period of silence.
+       */
+      if (this.lastRaw.trim().length > 2 && !this.silenceTmr) {
+         this.resetSilenceTimer();
       }
     };
 
@@ -201,6 +203,7 @@ export class SpeechInput {
       if (this.lastRaw.trim().length > 2) {
         this.push(this.lastRaw, true);
       }
+      this.silenceTmr = null;
     }, 1400);
   }
 
