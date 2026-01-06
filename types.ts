@@ -63,6 +63,7 @@ export interface SaleListing {
   price: string;
   priceValue: number;
   address: string;
+  pincode: string;
   sourceUrl: string;
   bhk: string;
   image?: string;
@@ -105,7 +106,7 @@ export interface GroundingSource {
 export interface BuyResult {
   fairValue: string;
   valuationRange: string;
-  recommendation: 'Good Buy' | 'Fair Price' | 'Overpriced';
+  recommendation: 'Good Buy' | 'Fair Price' | 'Overpriced' | 'Check Details';
   negotiationScript: string;
   listings: SaleListing[];
   marketSentiment: string;
