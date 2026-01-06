@@ -1,6 +1,12 @@
 
 import { GoogleGenAI } from "@google/genai";
 
+/**
+ * Senior Dev Note: 
+ * We rotate through Gemini 3 series models for primary intelligence.
+ * gemini-3-flash-preview: Best balance of speed/search grounding.
+ * gemini-flash-lite-latest: Optimized for high throughput/fallback.
+ */
 const GEMINI_MODELS = [
   'gemini-3-flash-preview',
   'gemini-flash-lite-latest'
@@ -16,17 +22,20 @@ export interface LLMResponse {
 }
 
 /**
- * Resilient LLM caller that handles quota rotation and provider failover.
+ * Resilient LLM caller that rotates through Gemini models on quota/server errors
+ * and falls back to Perplexity as the final redundancy layer.
  */
 export async function callLLMWithFallback(prompt: string, config: any = {}): Promise<LLMResponse> {
   const geminiKey = process.env.API_KEY;
   const perplexityKey = process.env.PERPLEXITY_API_KEY;
 
-  if (!geminiKey) throw new Error("CRITICAL_AUTH_ERROR: API_KEY_MISSING");
+  if (!geminiKey) {
+    throw new Error("CRITICAL_AUTH_ERROR: GEMINI_API_KEY_MISSING");
+  }
 
   let lastError = null;
 
-  // 1. Try Gemini model pool via official SDK
+  // 1. Try Gemini pool via official SDK
   for (const modelName of GEMINI_MODELS) {
     try {
       const ai = new GoogleGenAI({ apiKey: geminiKey });
@@ -41,24 +50,35 @@ export async function callLLMWithFallback(prompt: string, config: any = {}): Pro
         const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
         const sources = groundingChunks
           .filter((chunk: any) => chunk.web)
-          .map((chunk: any) => ({ uri: chunk.web.uri, title: chunk.web.title }));
+          .map((chunk: any) => ({ 
+            uri: chunk.web.uri, 
+            title: chunk.web.title 
+          }));
 
-        return { text, source: 'gemini', groundingSources: sources };
+        return { 
+          text, 
+          source: 'gemini', 
+          groundingSources: sources 
+        };
       }
     } catch (err: any) {
       lastError = err;
       console.warn(`QuantCasa [${modelName}] link failed, rotating...`, err.message);
+      
       // Rotate on quota (429), server errors (5xx), or model not found (404)
-      if (err.message?.includes('429') || err.message?.includes('500') || err.message?.includes('404') || err.message?.includes('not found')) {
-        continue;
-      }
+      const isRetriable = err.message?.includes('429') || 
+                          err.message?.includes('500') || 
+                          err.message?.includes('404') || 
+                          err.message?.includes('not found');
+      
+      if (isRetriable) continue;
       break; 
     }
   }
 
-  // 2. Fall back to Perplexity if enabled
+  // 2. Fall back to Perplexity if primary pool exhausted
   if (perplexityKey) {
-    console.info("Gemini pool exhausted. Initializing Perplexity fallback...");
+    console.info("Primary pool exhausted. Initializing Perplexity fallback node...");
     try {
       const ppRes = await fetch(PERPLEXITY_URL, {
         method: 'POST',
@@ -69,7 +89,7 @@ export async function callLLMWithFallback(prompt: string, config: any = {}): Pro
         body: JSON.stringify({
           model: PERPLEXITY_MODEL,
           messages: [{ role: 'user', content: prompt }],
-          temperature: 0.3,
+          temperature: 0.1, // Low temperature for high precision in property data
           max_tokens: 2000
         })
       });
@@ -83,7 +103,7 @@ export async function callLLMWithFallback(prompt: string, config: any = {}): Pro
         };
       }
     } catch (ppErr) {
-      console.error("Perplexity fallback failed:", ppErr);
+      console.error("Perplexity failover failed:", ppErr);
     }
   }
 
