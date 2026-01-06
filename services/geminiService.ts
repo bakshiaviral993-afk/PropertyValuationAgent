@@ -16,7 +16,8 @@ const runWithFallback = async (prompt: string, config: any): Promise<any> => {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("CRITICAL_AUTH_ERROR: API_KEY_MISSING");
 
-  const models = ['gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-flash-lite-latest'];
+  // Senior Dev Note: Using standard model identifiers to prevent 404 errors in production
+  const models = ['gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-flash-lite-latest'];
   let lastError = null;
 
   for (const modelName of models) {
@@ -44,6 +45,8 @@ const runWithFallback = async (prompt: string, config: any): Promise<any> => {
       return text;
     } catch (err: any) {
       lastError = err;
+      // If it's a 404, we definitely want to try the next model in the array
+      console.warn(`QuantCasa Node [${modelName}] failed:`, err.message);
     }
   }
   throw lastError || new Error("SYSTEM_HALT: All nodes failed.");
