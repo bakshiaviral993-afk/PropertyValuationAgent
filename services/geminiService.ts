@@ -12,13 +12,48 @@ const getApiKey = (): string | null => {
   return (!key || key === 'undefined' || key.trim() === '') ? null : key;
 };
 
+/**
+ * Extracts JSON from a string that might contain other text or markdown blocks.
+ * Necessary because googleSearch tool often prevents the model from outputting pure JSON.
+ */
+const extractJsonFromText = (text: string): any => {
+  try {
+    // Try pure parse first
+    return JSON.parse(text.trim());
+  } catch {
+    // Try to find JSON block
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[0]);
+      } catch (e) {
+        console.error("Failed to parse matched JSON block", e);
+      }
+    }
+    throw new Error("Could not extract valid JSON from model response.");
+  }
+};
+
 const runWithFallback = async (prompt: string, config: any): Promise<any> => {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("CRITICAL_AUTH_ERROR: API_KEY_MISSING");
 
-  // Senior Dev Note: Using standard model identifiers to prevent 404 errors in production
-  const models = ['gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-flash-lite-latest'];
+  // Senior Dev Note: Using standard model identifiers from @google/genai guidelines.
+  // gemini-3-flash-preview is the most reliable for general tasks with search.
+  // gemini-flash-lite-latest is the efficient fallback.
+  const models = ['gemini-3-flash-preview', 'gemini-flash-lite-latest'];
   let lastError = null;
+
+  // IMPORTANT: Rules for Search/Maps Grounding:
+  // 1. responseMimeType and responseSchema are NOT allowed with googleSearch/googleMaps.
+  // 2. We must handle the text response and extract JSON manually.
+  const isGroundingUsed = config.tools?.some((t: any) => t.googleSearch || t.googleMaps);
+  
+  const optimizedConfig = { ...config };
+  if (isGroundingUsed) {
+    delete optimizedConfig.responseMimeType;
+    delete optimizedConfig.responseSchema;
+  }
 
   for (const modelName of models) {
     try {
@@ -26,78 +61,77 @@ const runWithFallback = async (prompt: string, config: any): Promise<any> => {
       const response = await ai.models.generateContent({
         model: modelName,
         contents: prompt,
-        config: config
+        config: optimizedConfig
       });
       
       const text = response.text;
-      if (!text) throw new Error("Buffer empty");
+      if (!text) throw new Error("Empty response from neural node.");
       
-      if (config.responseMimeType === "application/json") {
-          const parsed = JSON.parse(text.trim());
-          const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-          const sources: GroundingSource[] = groundingChunks
-            .filter((chunk: any) => chunk.web)
-            .map((chunk: any) => ({ uri: chunk.web.uri, title: chunk.web.title }));
+      const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+      const sources: GroundingSource[] = groundingChunks
+        .filter((chunk: any) => chunk.web)
+        .map((chunk: any) => ({ 
+          uri: chunk.web.uri, 
+          title: chunk.web.title 
+        }));
 
+      if (isGroundingUsed || config.responseMimeType === "application/json") {
+          const parsed = extractJsonFromText(text);
           return { ...parsed, groundingSources: sources };
       }
       
       return text;
     } catch (err: any) {
       lastError = err;
-      // If it's a 404, we definitely want to try the next model in the array
-      console.warn(`QuantCasa Node [${modelName}] failed:`, err.message);
+      console.warn(`QuantCasa [${modelName}] link failed:`, err.message);
+      // If it's a 404 or unsupported method, try the next model.
+      if (err.message?.includes('404') || err.message?.includes('not supported')) continue;
+      else break; // For other errors like API Key, don't loop
     }
   }
-  throw lastError || new Error("SYSTEM_HALT: All nodes failed.");
+  throw lastError || new Error("SYSTEM_HALT: All neural nodes unreachable.");
 };
 
 export const getBuyAnalysis = async (data: BuyRequest): Promise<BuyResult> => {
-  const prompt = `Valuation scan for ${data.bhk} in ${data.area}, ${data.city}. Pincode: ${data.pincode}. Area: ${data.sqft}sqft. Strict JSON output.`;
-  const schema = {
-    type: Type.OBJECT,
-    properties: {
-      fairValue: { type: Type.STRING },
-      valuationRange: { type: Type.STRING },
-      recommendation: { type: Type.STRING },
-      negotiationScript: { type: Type.STRING },
-      marketSentiment: { type: Type.STRING },
-      sentimentScore: { type: Type.NUMBER },
-      registrationEstimate: { type: Type.STRING },
-      appreciationPotential: { type: Type.STRING },
-      confidenceScore: { type: Type.NUMBER },
-      valuationJustification: { type: Type.STRING },
-      listings: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING },
-            price: { type: Type.STRING },
-            address: { type: Type.STRING },
-            sourceUrl: { type: Type.STRING },
-            bhk: { type: Type.STRING },
-            builderName: { type: Type.STRING },
-            societyName: { type: Type.STRING },
-            latitude: { type: Type.NUMBER },
-            longitude: { type: Type.NUMBER }
-          }
-        }
-      }
-    },
-    required: ["fairValue", "listings"]
-  };
-  return await runWithFallback(prompt, { tools: [{ googleSearch: {} }], responseMimeType: "application/json", responseSchema: schema });
+  // We append JSON instructions because we can't use responseMimeType with search
+  const prompt = `
+    Perform a professional real estate valuation scan for:
+    Configuration: ${data.bhk}
+    Locality: ${data.area}, ${data.city} (Pincode: ${data.pincode})
+    Size: ${data.sqft} sqft
+    Facing: ${data.facing || 'Not specified'}
+
+    TASK: Use Google Search to find current market listings and price trends.
+    OUTPUT: Return ONLY a JSON object with these fields: fairValue, valuationRange, recommendation, negotiationScript, marketSentiment, sentimentScore (0-100), registrationEstimate, appreciationPotential, confidenceScore (0-100), valuationJustification, and listings (array of objects with title, price, address, sourceUrl).
+  `;
+  
+  return await runWithFallback(prompt, { tools: [{ googleSearch: {} }] });
 };
 
 export const getRentAnalysis = async (data: RentRequest): Promise<RentResult> => {
-  const prompt = `Rental analysis for ${data.bhk} in ${data.area}, ${data.city}. Return JSON.`;
-  return await runWithFallback(prompt, { tools: [{ googleSearch: {} }], responseMimeType: "application/json" });
+  const prompt = `
+    Perform a rental yield analysis for:
+    Configuration: ${data.bhk}
+    Locality: ${data.area}, ${data.city}
+    Size: ${data.sqft} sqft
+
+    TASK: Use Google Search for rental benchmarks.
+    OUTPUT: Return ONLY a JSON object with: rentalValue, yieldPercentage, rentOutAlert, depositCalc, negotiationScript, marketSummary, tenantDemandScore, confidenceScore, valuationJustification, and listings (array).
+  `;
+  return await runWithFallback(prompt, { tools: [{ googleSearch: {} }] });
 };
 
 export const getLandValuationAnalysis = async (data: LandRequest): Promise<LandResult> => {
-  const prompt = `Land plot valuation in ${data.address}, ${data.city}. Return JSON.`;
-  return await runWithFallback(prompt, { tools: [{ googleSearch: {} }], responseMimeType: "application/json" });
+  const prompt = `
+    Land plot valuation analysis for:
+    Location: ${data.address}, ${data.city}
+    Plot Size: ${data.plotSize} ${data.unit}
+    FSI: ${data.fsi}
+
+    TASK: Use Google Search for land rates and zoning news.
+    OUTPUT: Return ONLY a JSON object with: landValue, perSqmValue, devROI, negotiationStrategy, confidenceScore, zoningAnalysis, valuationJustification, and listings (array).
+  `;
+  return await runWithFallback(prompt, { tools: [{ googleSearch: {} }] });
 };
 
 export const askPropertyQuestion = async (
@@ -113,16 +147,13 @@ export const askPropertyQuestion = async (
     You are QuantCasa Property Expert. Language: ${lang === 'HI' ? 'Hindi' : 'English'}.
     
     Current Intent Mode: ${intent.toUpperCase()}.
-    ${intent === 'vastu' ? 'You are a Vastu Shastra Consultant. Focus on Ishanya, Agneya, etc.' : ''}
-    ${intent === 'feng-shui' ? 'You are a Feng Shui Master. Use Bagua map concepts, Five Elements, and Chi flow analysis.' : ''}
-    ${intent === 'interior' ? 'You are an Interior Design Architect. Suggest themes and materials.' : ''}
+    ${intent === 'vastu' ? 'Focus on Vastu Shastra energy flow.' : ''}
+    ${intent === 'feng-shui' ? 'Focus on Feng Shui Chi flow.' : ''}
+    ${intent === 'interior' ? 'Focus on aesthetic and spatial design.' : ''}
 
-    ${contextResult ? `CONTEXT: User property data: ${JSON.stringify(contextResult)}.` : ''}
+    ${contextResult ? `CONTEXT: User property data available: ${JSON.stringify(contextResult)}.` : ''}
     
-    Guidelines:
-    - If user asks for both Vastu and Feng Shui, blend the advice harmoniously.
-    - Provide non-structural, actionable remedies (crystals, colors, mirrors).
-    - Be professional and concise.
+    Be professional and helpful. Use markdown for lists or bold text.
   `;
 
   const ai = new GoogleGenAI({ apiKey });
@@ -142,9 +173,10 @@ export const generatePropertyImage = async (prompt: string): Promise<string | nu
   if (!apiKey) return null;
   try {
     const ai = new GoogleGenAI({ apiKey });
+    // Using gemini-2.5-flash-image for standard image generation as per guidelines
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
-      contents: { parts: [{ text: `Professional 4k photo of ${prompt}. Modern luxury style.` }] },
+      contents: { parts: [{ text: `High-quality architectural visualization of ${prompt}. 8k resolution, photorealistic.` }] },
       config: { imageConfig: { aspectRatio: "16:9" } }
     });
     const img = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
