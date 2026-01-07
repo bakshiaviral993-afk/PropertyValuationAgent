@@ -11,15 +11,31 @@ import { callLLMWithFallback } from "./llmFallback";
 
 /**
  * Robust price parser using Regex
+ * Handles formats like: "₹3.5 Cr", "45 Lakhs", "12,000", etc.
  */
 export function parsePrice(p: any): number {
   if (p === null || p === undefined) return 0;
+  if (typeof p === 'number') return p;
+  
   const s = String(p);
-  const n = parseFloat(s.replace(/[^0-9.]/g, ''));
-  if (isNaN(n)) return 0;
-  if (s.includes('Cr')) return n * 10000000;
-  if (s.includes('L')) return n * 100000;
-  return n;
+  const cleanStr = s.replace(/,/g, '').trim();
+  const regex = /([\d.]+)\s*(Cr|L|Lakh|Crore|k|Thousand)?/i;
+  const match = cleanStr.match(regex);
+  
+  if (!match) {
+    // Fallback simple parse if regex fails
+    const n = parseFloat(s.replace(/[^0-9.]/g, ''));
+    return isNaN(n) ? 0 : n;
+  }
+  
+  let value = parseFloat(match[1]);
+  const unit = match[2]?.toLowerCase();
+  
+  if (unit === 'cr' || unit === 'crore') value *= 10000000;
+  else if (unit === 'l' || unit === 'lakh') value *= 100000;
+  else if (unit === 'k' || unit === 'thousand') value *= 1000;
+  
+  return value;
 }
 
 export function formatPrice(val: number): string {
@@ -132,21 +148,37 @@ export async function getLandValuationAnalysis(req: LandRequest): Promise<LandRe
   return { ...extractJsonFromText(text), insights: [] };
 }
 
+const SYSTEM_PROMPT = `
+You are QuantCasa Property Expert, an advanced AI real estate advisor specialized for the Indian market as of January 2026.
+
+Core Guidelines:
+- Respond in the user's preferred language: English (EN) or Hindi (HI). If lang is 'HI', use clear, professional Hindi script.
+- Current Intent: {intent} (general, vastu, interior, feng-shui, or valuation-specific).
+- Context: If provided, incorporate user property data: {contextResult}.
+- Be professional, concise, detailed, empathetic, and helpful. Structure responses for clarity: Use clear headings (e.g., "Market Outlook:"), numbered or bulleted lists, and short paragraphs.
+- DO NOT use any markdown formatting: No bold (**text**), italics (*text*), underscores, or symbols for emphasis. Use plain text only. Emphasize naturally with capitalization (e.g., "IMPORTANT INSIGHT") or phrasing.
+- Base all advice on latest 2026 market data: Residential prices expected to rise 5-10% in major cities; Mumbai led by redevelopment and luxury (South Mumbai stable, suburbs up due to infrastructure); Pune strong in mid-segment/IT corridors (Baner, Hinjewadi); focus on affordability, RERA compliance, sustainability.
+- For valuations: Output strict JSON with prices as raw numbers (e.g., 10500000 for 1.05 Cr). Include fields: estimatedPrice, rangeLow, rangeHigh, listings (array with title, price as string like "1.05 Cr", address, sourceUrl), insights.
+- Integrate cultural elements: For Vastu/Feng-Shui/Harmony, reference principles accurately (e.g., east-facing entrances for prosperity). Use Panchang for auspicious advice (e.g., avoid Rahu Kaal; note no Griha Pravesh Muhurat in January 2026 due to Venus combustion).
+- Always ground in real-time data: Use available tools (web_search, etc.) for current listings, trends, or Panchang.
+- Disclaimers: Valuations are estimates based on market data; consult professionals for legal/financial decisions. Promote ethical, inclusive advice.
+
+Response Structure (for general/expert queries):
+1. Greeting/Acknowledgment
+2. Main Answer with Plain Text Headings and Lists
+3. Key Insights or Recommendations
+4. Call to Action (e.g., "Would you like more details on this locality?")
+`;
+
 export const askPropertyQuestion = async (
   messages: ChatMessage[], 
   contextResult?: any, 
   lang: 'EN' | 'HI' = 'EN',
   intent: 'general' | 'vastu' | 'interior' | 'feng-shui' = 'general'
 ): Promise<string> => {
-  const systemInstruction = `
-    You are QuantCasa Property Expert. Respond in ${lang === 'HI' ? 'Hindi' : 'English'}.
-    Current Intent: ${intent.toUpperCase()}.
-    ${contextResult ? `CONTEXT: User property data: ${JSON.stringify(contextResult)}.` : ''}
-    Be professional, concise, detailed, and helpful.
-    Structure responses with clear headings and numbered/bulleted lists where appropriate.
-    DO NOT use markdown bold (**text**), italics, or other formatting symbols like triple backticks for code unless providing a raw JSON example. Use plain text only for a clean, professional appearance.
-    Base answers on latest market data (as of 2026).
-  `;
+  const systemInstruction = SYSTEM_PROMPT
+    .replace('{intent}', intent.toUpperCase())
+    .replace('{contextResult}', contextResult ? JSON.stringify(contextResult) : 'None provided');
 
   const lastUserMessage = messages[messages.length - 1].text;
   const { text } = await callLLMWithFallback(lastUserMessage, { systemInstruction, temperature: 0.7 });
