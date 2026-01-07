@@ -3,16 +3,16 @@ import { GoogleGenAI } from "@google/genai";
 
 /**
  * Senior Dev Note: 
- * We rotate through Gemini 3 series models for primary intelligence.
- * gemini-3-flash-preview: Best balance of speed/search grounding.
- * gemini-flash-lite-latest: Optimized for high throughput/fallback.
+ * Primary intelligence pool: Gemini 3 series.
+ * Fallback/Resilience layer: Perplexity AI (Sonar Online) for real-time web scraping without Puppeteer.
  */
 const GEMINI_MODELS = [
   'gemini-3-flash-preview',
   'gemini-flash-lite-latest'
 ];
 
-const PERPLEXITY_MODEL = 'sonar-reasoning';
+// Perplexity 'online' models act as a managed scraper/search engine
+const PERPLEXITY_MODEL = 'llama-3.1-sonar-large-128k-online';
 const PERPLEXITY_URL = 'https://api.perplexity.ai/chat/completions';
 
 export interface LLMResponse {
@@ -22,8 +22,8 @@ export interface LLMResponse {
 }
 
 /**
- * Resilient LLM caller that rotates through Gemini models on quota/server errors
- * and falls back to Perplexity as the final redundancy layer.
+ * Resilient LLM caller that rotates through Gemini models and falls back to Perplexity.
+ * The Perplexity layer handles real-time property searching when standard grounding nodes are congested.
  */
 export async function callLLMWithFallback(prompt: string, config: any = {}): Promise<LLMResponse> {
   const geminiKey = process.env.API_KEY;
@@ -35,14 +35,17 @@ export async function callLLMWithFallback(prompt: string, config: any = {}): Pro
 
   let lastError = null;
 
-  // 1. Try Gemini pool via official SDK
+  // 1. Try Gemini primary intelligence pool
   for (const modelName of GEMINI_MODELS) {
     try {
       const ai = new GoogleGenAI({ apiKey: geminiKey });
       const response = await ai.models.generateContent({
         model: modelName,
         contents: prompt,
-        config: config
+        config: {
+          ...config,
+          // Ensure we don't accidentally use cached responses at the model level if supported
+        }
       });
 
       const text = response.text;
@@ -63,22 +66,20 @@ export async function callLLMWithFallback(prompt: string, config: any = {}): Pro
       }
     } catch (err: any) {
       lastError = err;
-      console.warn(`QuantCasa [${modelName}] link failed, rotating...`, err.message);
+      console.warn(`QuantCasa [${modelName}] node bypass initiated...`, err.message);
       
-      // Rotate on quota (429), server errors (5xx), or model not found (404)
       const isRetriable = err.message?.includes('429') || 
                           err.message?.includes('500') || 
-                          err.message?.includes('404') || 
-                          err.message?.includes('not found');
+                          err.message?.includes('404');
       
       if (isRetriable) continue;
       break; 
     }
   }
 
-  // 2. Fall back to Perplexity if primary pool exhausted
+  // 2. Failover to Perplexity AI Scraper (Sonar)
   if (perplexityKey) {
-    console.info("Primary pool exhausted. Initializing Perplexity fallback node...");
+    console.info("Switching to Perplexity AI Scraper Node for resilient property search...");
     try {
       const ppRes = await fetch(PERPLEXITY_URL, {
         method: 'POST',
@@ -86,13 +87,18 @@ export async function callLLMWithFallback(prompt: string, config: any = {}): Pro
           'Authorization': `Bearer ${perplexityKey}`,
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
+          'Pragma': 'no-cache'
         },
         body: JSON.stringify({
           model: PERPLEXITY_MODEL,
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.1, // Low temperature for high precision in property data
+          messages: [{ 
+            role: 'system', 
+            content: 'You are a professional real estate data scraper. Return accurate, current property listings for India. Provide price, location, and BHK configuration.' 
+          }, { 
+            role: 'user', 
+            content: prompt 
+          }],
+          temperature: 0.1,
           max_tokens: 2000
         })
       });
@@ -106,9 +112,9 @@ export async function callLLMWithFallback(prompt: string, config: any = {}): Pro
         };
       }
     } catch (ppErr) {
-      console.error("Perplexity failover failed:", ppErr);
+      console.error("Perplexity scraper node failed:", ppErr);
     }
   }
 
-  throw lastError || new Error("SYSTEM_HALT: All neural nodes reached quota or are unreachable.");
+  throw lastError || new Error("NEURAL_BLACKOUT: All search nodes are unreachable.");
 }
