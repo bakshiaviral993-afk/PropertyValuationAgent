@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RentResult, RentalListing, AppLang } from '../types';
 import { 
-  MapPin, ExternalLink, Globe, Info, Layers, Building2, ImageIcon, Loader2, BarChart3, LayoutGrid
+  MapPin, ExternalLink, Globe, Info, Layers, Building2, ImageIcon, Loader2, BarChart3, LayoutGrid,
+  Receipt, Wallet, TrendingUp
 } from 'lucide-react';
 import { generatePropertyImage } from '../services/geminiService';
 import { speak } from '../services/voiceService';
@@ -12,13 +13,20 @@ import { parsePrice, calculateListingStats } from '../utils/listingProcessor';
 interface RentDashboardProps {
   result: RentResult;
   lang?: AppLang;
+  onAnalyzeFinance?: () => void;
 }
 
-const formatPrice = (val: any): string => {
-  if (val === null || val === undefined) return "";
-  const str = String(val);
-  const num = parseFloat(str.replace(/[^0-9.]/g, ''));
-  if (isNaN(num)) return str;
+const formatPriceDisplay = (val: any): string => {
+  if (val === null || val === undefined) return "N/A";
+  let cleanVal = val;
+  if (typeof val === 'object') {
+    cleanVal = val.value || val.text || JSON.stringify(val);
+  } else {
+    cleanVal = String(val);
+  }
+  if (cleanVal.includes('₹') || cleanVal.toLowerCase().includes('lakh')) return cleanVal;
+  const num = parseFloat(cleanVal.replace(/[^0-9.]/g, ''));
+  if (isNaN(num)) return cleanVal;
   if (num >= 100000) return `₹${(num / 100000).toFixed(2)} L`;
   return `₹${num.toLocaleString('en-IN')}`;
 };
@@ -71,19 +79,12 @@ const DashboardMap = ({ listings = [] }: { listings?: RentalListing[] }) => {
     const L = (window as any).L;
     if (!mapRef.current || !L) return;
     if (mapInstance.current) mapInstance.current.remove();
-
     const safeListings = listings || [];
     const avgLat = safeListings.length > 0 ? safeListings.reduce((acc, l) => acc + (l.latitude || 0), 0) / safeListings.length : 19.0760;
     const avgLng = safeListings.length > 0 ? safeListings.reduce((acc, l) => acc + (l.longitude || 0), 0) / safeListings.length : 72.8777;
-
     const map = L.map(mapRef.current, { zoomControl: false }).setView([avgLat, avgLng], 13);
-    
-    const tileUrl = layerType === 'map' 
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-
+    const tileUrl = layerType === 'map' ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
     L.tileLayer(tileUrl).addTo(map);
-
     safeListings.forEach((item, idx) => {
       if (item.latitude && item.longitude) {
         const icon = L.divIcon({
@@ -94,37 +95,32 @@ const DashboardMap = ({ listings = [] }: { listings?: RentalListing[] }) => {
         L.marker([item.latitude, item.longitude], { icon }).addTo(map).bindTooltip(item.title);
       }
     });
-
     mapInstance.current = map;
     return () => { if (mapInstance.current) mapInstance.current.remove(); };
   }, [listings, layerType]);
 
   return (
-    <div className="relative w-full h-[400px] rounded-3xl overflow-hidden border border-gray-100 shadow-soft">
+    <div className="relative w-full h-[400px] rounded-3xl overflow-hidden border border-white/10 shadow-soft">
       <div ref={mapRef} className="w-full h-full" />
-      <div className="absolute top-4 left-4 flex flex-col gap-2 z-[1000]">
-        <button onClick={() => setLayerType('map')} className={`p-2 rounded-xl border transition-all ${layerType === 'map' ? 'bg-emerald-500 text-white border-emerald-500 shadow-brand' : 'bg-white text-gray-500 border-gray-100'}`}><Layers size={16} /></button>
-        <button onClick={() => setLayerType('sat')} className={`p-2 rounded-xl border transition-all ${layerType === 'sat' ? 'bg-emerald-500 text-white border-emerald-500 shadow-brand' : 'bg-white text-gray-500 border-gray-100'}`}><Globe size={16} /></button>
-      </div>
     </div>
   );
 };
 
-const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN' }) => {
+const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAnalyzeFinance }) => {
   const [viewMode, setViewMode] = useState<'dashboard' | 'map' | 'stats'>('dashboard');
   const listings = result.listings || [];
 
   useEffect(() => {
-    const rentText = formatPrice(result.rentalValue);
+    const rentText = formatPriceDisplay(result.rentalValue);
     const speechText = lang === 'HI' 
       ? `आपके क्षेत्र के लिए अनुमानित किराया ${rentText} प्रति माह है।`
       : `The estimated rental value for your area is ${rentText} per month.`;
-    
     speak(speechText, lang === 'HI' ? 'hi-IN' : 'en-IN');
   }, [result.rentalValue, lang]);
 
   const listingPrices = result.listings?.map(l => parsePrice(l.rent)) || [];
   const listingStats = calculateListingStats(listingPrices);
+  const displayConfidence = result.confidenceScore < 1 ? Math.round(result.confidenceScore * 100) : result.confidenceScore;
 
   return (
     <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
@@ -134,8 +130,8 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN' }) =>
             <Building2 size={24} className="text-emerald-500" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-white">Rental Intel</h2>
-            <p className="text-sm text-gray-500 uppercase tracking-widest font-black text-[9px]">Market-Verified Estimates</p>
+            <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Rental Intel</h2>
+            <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black opacity-60">Verified Valuation Node</p>
           </div>
         </div>
         
@@ -157,17 +153,39 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN' }) =>
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d">
-              <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest block mb-1">Monthly Rent</span>
-              <div className="text-4xl font-black text-white tracking-tighter">{formatPrice(result.rentalValue)}</div>
+            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d border-t-2 border-t-emerald-500 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Receipt size={14} className="text-emerald-500" />
+                  <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest block">Monthly Rent</span>
+                </div>
+                <div className="text-4xl font-black text-white tracking-tighter">
+                  {formatPriceDisplay(result.rentalValue)}
+                </div>
+              </div>
+              {onAnalyzeFinance && (
+                <button 
+                  onClick={onAnalyzeFinance}
+                  className="mt-6 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all w-full flex items-center justify-center gap-2"
+                >
+                  <TrendingUp size={12}/> Fiscal Simulator
+                </button>
+              )}
             </div>
-            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d">
-              <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest block mb-1">Projected Yield</span>
-              <div className="text-4xl font-black text-white tracking-tighter">{result.yieldPercentage}</div>
+            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d border-t-2 border-t-blue-500">
+              <div className="flex items-center gap-2 mb-2">
+                <Wallet size={14} className="text-blue-500" />
+                <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest block">Projected Yield</span>
+              </div>
+              <div className="text-4xl font-black text-white tracking-tighter">
+                {formatPriceDisplay(result.yieldPercentage || "3.5%")}
+              </div>
             </div>
-            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d">
-              <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest block mb-1">Confidence</span>
-              <div className="text-4xl font-black text-white tracking-tighter">{result.confidenceScore}%</div>
+            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d border-t-2 border-t-orange-500">
+              <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest block mb-2">Confidence</span>
+              <div className="text-4xl font-black text-white tracking-tighter">
+                {displayConfidence}%
+              </div>
             </div>
           </div>
 
@@ -175,11 +193,11 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN' }) =>
             {viewMode === 'dashboard' ? (
               <div className="space-y-8">
                 <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d border-l-4 border-l-emerald-500">
-                  <h3 className="text-sm font-black text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
+                  <h3 className="text-xs font-black text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
                     <Info size={18} className="text-emerald-500" /> Market Reasoning
                   </h3>
-                  <p className="text-gray-400 leading-relaxed italic text-sm">
-                    "{result.valuationJustification}"
+                  <p className="text-gray-300 leading-relaxed italic text-sm">
+                    "{formatPriceDisplay(result.valuationJustification) || "Awaiting specific market grounding signals for this locality."}"
                   </p>
                 </div>
 
@@ -193,12 +211,12 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN' }) =>
                           <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-1 font-bold uppercase tracking-widest truncate"><MapPin size={12}/> {item.address}</p>
                         </div>
                         <div className="text-right shrink-0">
-                          <div className="text-xl font-black text-emerald-500">{formatPrice(item.rent)}</div>
-                          <div className="text-[8px] text-gray-500 font-black uppercase tracking-[0.2em] mt-1">VERIFIED_LISTING</div>
+                          <div className="text-xl font-black text-emerald-500">{formatPriceDisplay(item.rent)}</div>
+                          <div className="text-[8px] text-gray-500 font-black uppercase tracking-[0.2em] mt-1">Grounding_Verified</div>
                         </div>
                       </div>
-                      <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-500 transition-all">
-                        View Details <ExternalLink size={14} />
+                      <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-500 hover:border-emerald-500 transition-all">
+                        Verify Source <ExternalLink size={14} />
                       </a>
                     </div>
                   ))}

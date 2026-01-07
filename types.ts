@@ -182,6 +182,8 @@ export interface RentRequest extends BuyRequest {}
 export interface LandRequest {
   city: string;
   address: string;
+  pincode?: string;
+  area?: string;
   plotSize: number;
   unit: string;
   fsi: number;

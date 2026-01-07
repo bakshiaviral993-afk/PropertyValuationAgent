@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { LandResult, LandListing, AppLang } from '../types';
-import { Map, ExternalLink, Globe, LayoutDashboard, Map as MapIcon, Bookmark, ImageIcon, Loader2, Zap, Info } from 'lucide-react';
+import { Map, ExternalLink, Globe, LayoutDashboard, Map as MapIcon, Bookmark, ImageIcon, Loader2, Zap, Info, Calculator, BarChart3, HardHat } from 'lucide-react';
 import { generatePropertyImage } from '../services/geminiService';
 import { speak } from '../services/voiceService';
 
 interface LandReportProps {
   result: LandResult;
   lang?: AppLang;
+  onAnalyzeFinance?: () => void;
 }
 
 const formatPrice = (val: any): string => {
@@ -67,20 +68,16 @@ const DashboardMap = ({ listings = [] }: { listings?: LandListing[] }) => {
     const L = (window as any).L;
     if (!mapRef.current || !L) return;
     if (mapInstance.current) mapInstance.current.remove();
-
     const safeListings = listings || [];
     const avgLat = safeListings.length > 0 ? safeListings.reduce((acc, l) => acc + (l.latitude || 0), 0) / safeListings.length : 19.0760;
     const avgLng = safeListings.length > 0 ? safeListings.reduce((acc, l) => acc + (l.longitude || 0), 0) / safeListings.length : 72.8777;
-
     const map = L.map(mapRef.current, { zoomControl: false }).setView([avgLat, avgLng], 12);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
-
     safeListings.forEach((item, idx) => {
       if (item.latitude && item.longitude) {
         L.marker([item.latitude, item.longitude]).addTo(map).bindTooltip(item.title);
       }
     });
-
     mapInstance.current = map;
     return () => { if (mapInstance.current) mapInstance.current.remove(); };
   }, [listings]);
@@ -92,16 +89,20 @@ const DashboardMap = ({ listings = [] }: { listings?: LandListing[] }) => {
   );
 };
 
-const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN' }) => {
+const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeFinance }) => {
   const [viewMode, setViewMode] = useState<'dashboard' | 'map'>('dashboard');
   const listings = result.listings || [];
 
   useEffect(() => {
-    const landText = formatPrice(result.landValue);
+    const landValue = result.landValue;
+    let cleanVal = landValue;
+    if (typeof landValue === 'object') {
+      cleanVal = (landValue as any).value || (landValue as any).text || JSON.stringify(landValue);
+    }
+    const landText = formatPrice(cleanVal);
     const speechText = lang === 'HI' 
       ? `इस प्लॉट का अनुमानित बाजार मूल्य ${landText} है।`
       : `The estimated market value for this plot is ${landText}.`;
-    
     speak(speechText, lang === 'HI' ? 'hi-IN' : 'en-IN');
   }, [result.landValue, lang]);
 
@@ -110,11 +111,11 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN' }) => {
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-orange-50 rounded-2xl">
-            <Map size={24} className="text-orange-500" />
+            <Calculator size={24} className="text-orange-500" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-white">Land Intel</h2>
-            <p className="text-sm text-gray-500 font-black uppercase tracking-widest text-[9px]">ROI-Focused Plot Analysis</p>
+            <h2 className="text-2xl font-black text-white">Plot Valuation Node</h2>
+            <p className="text-sm text-gray-500 font-black uppercase tracking-widest text-[9px]">Strict Grounding Engine</p>
           </div>
         </div>
         
@@ -129,16 +130,26 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN' }) => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white/5 rounded-[32px] p-6 border border-white/10 shadow-glass-3d">
-          <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Total Valuation</span>
-          <div className="text-2xl font-black text-white">{formatPrice(result.landValue)}</div>
+        <div className="bg-white/5 rounded-[32px] p-6 border border-white/10 shadow-glass-3d border-t-2 border-t-orange-500 flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Total Fair Value</span>
+            <div className="text-2xl font-black text-white">{formatPrice(result.landValue)}</div>
+          </div>
+          {onAnalyzeFinance && (
+            <button 
+              onClick={onAnalyzeFinance}
+              className="mt-4 px-4 py-2 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-500 text-[10px] font-black uppercase tracking-widest hover:bg-orange-500 hover:text-white transition-all w-full flex items-center justify-center gap-2"
+            >
+              <HardHat size={12} /> ROI Simulator
+            </button>
+          )}
         </div>
         <div className="bg-white/5 rounded-[32px] p-6 border border-white/10 shadow-glass-3d">
-          <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Per Sqm</span>
-          <div className="text-2xl font-black text-white">{formatPrice(result.perSqmValue)}</div>
+          <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Rate Breakdown</span>
+          <div className="text-xl font-black text-white">{result.perSqmValue}</div>
         </div>
         <div className="bg-white/5 rounded-[32px] p-6 border border-white/10 shadow-glass-3d">
-          <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Dev ROI</span>
+          <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Yield (Proj)</span>
           <div className="text-2xl font-black text-emerald-500">{result.devROI}</div>
         </div>
         <div className="bg-white/5 rounded-[32px] p-6 border border-white/10 shadow-glass-3d">
@@ -152,14 +163,14 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN' }) => {
           <div className="space-y-8">
             <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d border-l-4 border-l-orange-500">
               <h3 className="text-sm font-black text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
-                <Zap size={18} className="text-orange-500" /> Strategic Analysis
+                <Zap size={18} className="text-orange-500" /> Grounded Justification
               </h3>
               <p className="text-gray-400 leading-relaxed italic text-sm">
                 "{result.valuationJustification}"
               </p>
-              <div className="mt-6 pt-6 border-t border-white/5 flex items-center gap-6">
+              <div className="mt-6 pt-6 border-t border-white/5 flex flex-wrap gap-10">
                 <div>
-                  <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest block">Zoning Status</span>
+                  <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest block">Zoning Potential</span>
                   <span className="text-xs font-black text-white uppercase mt-1 block">{result.zoningAnalysis}</span>
                 </div>
                 <div>
@@ -181,8 +192,8 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN' }) => {
                       <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{item.size}</span>
                     </div>
                   </div>
-                  <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-orange-500 transition-all">
-                    View Plot <ExternalLink size={14} />
+                  <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-orange-500 transition-all">
+                    Verify Listing <ExternalLink size={14} />
                   </a>
                 </div>
               ))}

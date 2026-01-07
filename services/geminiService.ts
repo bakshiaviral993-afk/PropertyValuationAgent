@@ -11,19 +11,17 @@ import { callLLMWithFallback } from "./llmFallback";
 
 /**
  * Robust price parser using Regex
- * Handles formats like: "₹3.5 Cr", "45 Lakhs", "12,000", etc.
  */
 export function parsePrice(p: any): number {
   if (p === null || p === undefined) return 0;
   if (typeof p === 'number') return p;
   
-  const s = String(p);
+  const s = typeof p === 'object' ? JSON.stringify(p) : String(p);
   const cleanStr = s.replace(/,/g, '').trim();
   const regex = /([\d.]+)\s*(Cr|L|Lakh|Crore|k|Thousand)?/i;
   const match = cleanStr.match(regex);
   
   if (!match) {
-    // Fallback simple parse if regex fails
     const n = parseFloat(s.replace(/[^0-9.]/g, ''));
     return isNaN(n) ? 0 : n;
   }
@@ -44,10 +42,6 @@ export function formatPrice(val: number): string {
   return `₹${val.toLocaleString('en-IN')}`;
 }
 
-/**
- * Extracts JSON from a string that might contain other text or markdown blocks.
- * Necessary because search grounding tools often prevent the model from outputting pure JSON.
- */
 const extractJsonFromText = (text: string): any => {
   try {
     return JSON.parse(text.trim());
@@ -64,28 +58,13 @@ const extractJsonFromText = (text: string): any => {
   }
 };
 
-const SEARCH_PROMPT = (city: string, area: string, pincode: string, bhk: string) =>
-  `Search the internet and return the 5 most recent **real** listings for ${bhk} in ${area}, ${city}, ${pincode} from MagicBricks, 99acres, Housing.com.  
-  Each item MUST contain: title, price (₹), exact address, pincode, source URL, latitude, longitude.  
-  Output strict JSON array only, no chat.`;
-
 export async function getBuyAnalysis(req: BuyRequest): Promise<BuyResult> {
-  // 1. live listings first
-  const { text, groundingSources } = await callLLMWithFallback(
-    SEARCH_PROMPT(req.city, req.area, req.pincode, req.bhk), 
-    { 
-      tools: [{ googleSearch: {} }],
-      temperature: 0.2
-    }
-  );
+  const prompt = `Search the internet and return the 5 most recent **real** listings for ${req.bhk} in ${req.area}, ${req.city}, ${req.pincode} from MagicBricks, 99acres, Housing.com. Output strict JSON array of listings only.`;
+  const { text, groundingSources } = await callLLMWithFallback(prompt, { tools: [{ googleSearch: {} }], temperature: 0.2 });
   
   const listings: SaleListing[] = extractJsonFromText(text);
-
-  // 2. valuation from comparables
   const prices = listings.map(l => parsePrice(l.price)).filter(p => p > 0);
-  const median = prices.length > 0 
-    ? [...prices].sort((a, b) => a - b)[Math.floor(prices.length / 2)]
-    : 10000000; // Default fallback if no data
+  const median = prices.length > 0 ? [...prices].sort((a, b) => a - b)[Math.floor(prices.length / 2)] : 10000000;
 
   return {
     fairValue: formatPrice(median),
@@ -99,75 +78,88 @@ export async function getBuyAnalysis(req: BuyRequest): Promise<BuyResult> {
     appreciationPotential: "5-7% annually",
     confidenceScore: Math.min(listings.length * 20, 100),
     valuationJustification: `Based on ${listings.length} verified listings in ${req.area}, ${req.pincode}.`,
-    insights: [
-      { title: "Live Market Pulse", description: `Active demand for ${req.bhk} in ${req.area} detected via search grounding.`, type: "trend" }
-    ],
+    insights: [{ title: "Live Pulse", description: `Active demand for ${req.bhk} detected.`, type: "trend" }],
     groundingSources: groundingSources || []
   };
 }
 
 export async function getRentAnalysis(req: RentRequest): Promise<RentResult> {
   const prompt = `
-    Search the internet for rental listings for ${req.bhk} in ${req.area}, ${req.city}.
-    Output strict JSON object: {
-      "rentalValue": "string",
-      "yieldPercentage": "string",
+    Search internet for 5 REAL rental listings for ${req.bhk} in ${req.area}, ${req.city}, ${req.pincode}.
+    STRICT JSON OUTPUT:
+    {
+      "rentalValue": "string (e.g. ₹45,000)",
+      "yieldPercentage": "string (e.g. 3.2%)",
       "rentOutAlert": "string",
       "depositCalc": "string",
       "negotiationScript": "string",
       "marketSummary": "string",
       "tenantDemandScore": number,
-      "confidenceScore": number,
-      "valuationJustification": "string",
+      "confidenceScore": number (0-100),
+      "valuationJustification": "string (MUST NOT BE EMPTY)",
       "listings": [ { "title": "string", "rent": "string", "address": "string", "sourceUrl": "string", "bhk": "string", "latitude": number, "longitude": number } ]
     }
   `;
   const { text, groundingSources } = await callLLMWithFallback(prompt, { 
     tools: [{ googleSearch: {} }],
-    temperature: 0.2
+    temperature: 0.1 // High precision
   });
+  
   const parsed = extractJsonFromText(text);
-  return { ...parsed, propertiesFoundCount: parsed.listings?.length || 0, groundingSources: groundingSources || [] };
+  
+  // Safe stringification if LLM returned objects for strings
+  const sanitize = (val: any) => (typeof val === 'object' ? (val.value || val.text || JSON.stringify(val)) : String(val || ""));
+
+  return { 
+    ...parsed, 
+    rentalValue: sanitize(parsed.rentalValue),
+    yieldPercentage: sanitize(parsed.yieldPercentage),
+    valuationJustification: sanitize(parsed.valuationJustification) || `Analysis of ${parsed.listings?.length || 0} listings in ${req.area}.`,
+    propertiesFoundCount: parsed.listings?.length || 0, 
+    groundingSources: groundingSources || [] 
+  };
 }
 
 export async function getLandValuationAnalysis(req: LandRequest): Promise<LandResult> {
   const prompt = `
-    Analyze land plot value for: ${req.address}, ${req.city}. Size: ${req.plotSize} ${req.unit}, FSI: ${req.fsi}.
-    Output strict JSON object: {
-      "landValue": "string",
-      "perSqmValue": "string",
+    STRICT DEVELOPER VALIDATION: Identify REAL land listings in ${req.area}, ${req.city}.
+    The plot size is ${req.plotSize} ${req.unit}.
+    
+    TASK:
+    1. Find the Average Market Rate per ${req.unit} in this specific locality.
+    2. DO NOT hallucinate total values like "80000 Cr". 
+    3. Calculate total as: Rate per unit * ${req.plotSize}.
+    
+    Return strict JSON:
+    {
+      "landValue": "string (The calculated total price, e.g. 5.5 Cr)",
+      "perSqmValue": "string (The rate per ${req.unit}, e.g. 45000 per ${req.unit})",
       "devROI": "string",
       "negotiationStrategy": "string",
       "confidenceScore": number,
       "zoningAnalysis": "string",
-      "valuationJustification": "string",
-      "listings": [ { "title": "string", "price": "string", "size": "string", "address": "string", "sourceUrl": "string", "latitude": number, "longitude": number } ]
+      "valuationJustification": "string (Detailed reasoning citing actual listings found)",
+      "listings": [ { "title": "string", "price": "string", "size": "string", "sourceUrl": "string" } ]
     }
   `;
-  const { text } = await callLLMWithFallback(prompt, { tools: [{ googleSearch: {} }] });
-  return { ...extractJsonFromText(text), insights: [] };
+  const { text } = await callLLMWithFallback(prompt, { tools: [{ googleSearch: {} }], temperature: 0.1 });
+  const data = extractJsonFromText(text);
+  
+  const totalVal = parsePrice(data.landValue);
+  const rateVal = parsePrice(data.perSqmValue);
+  
+  const expectedTotal = rateVal * req.plotSize;
+  if (totalVal > expectedTotal * 1.5 || totalVal < expectedTotal * 0.5) {
+    data.landValue = formatPrice(expectedTotal);
+    data.valuationJustification += " (Calculation corrected for mathematical consistency).";
+  }
+
+  return { ...data, insights: [] };
 }
 
 const SYSTEM_PROMPT = `
-You are QuantCasa Property Expert, an advanced AI real estate advisor specialized for the Indian market as of January 2026.
-
-Core Guidelines:
-- Respond in the user's preferred language: English (EN) or Hindi (HI). If lang is 'HI', use clear, professional Hindi script.
-- Current Intent: {intent} (general, vastu, interior, feng-shui, or valuation-specific).
-- Context: If provided, incorporate user property data: {contextResult}.
-- Be professional, concise, detailed, empathetic, and helpful. Structure responses for clarity: Use clear headings (e.g., "Market Outlook:"), numbered or bulleted lists, and short paragraphs.
-- DO NOT use any markdown formatting: No bold (**text**), italics (*text*), underscores, or symbols for emphasis. Use plain text only. Emphasize naturally with capitalization (e.g., "IMPORTANT INSIGHT") or phrasing.
-- Base all advice on latest 2026 market data: Residential prices expected to rise 5-10% in major cities; Mumbai led by redevelopment and luxury (South Mumbai stable, suburbs up due to infrastructure); Pune strong in mid-segment/IT corridors (Baner, Hinjewadi); focus on affordability, RERA compliance, sustainability.
-- For valuations: Output strict JSON with prices as raw numbers (e.g., 10500000 for 1.05 Cr). Include fields: estimatedPrice, rangeLow, rangeHigh, listings (array with title, price as string like "1.05 Cr", address, sourceUrl), insights.
-- Integrate cultural elements: For Vastu/Feng-Shui/Harmony, reference principles accurately (e.g., east-facing entrances for prosperity). Use Panchang for auspicious advice (e.g., avoid Rahu Kaal; note no Griha Pravesh Muhurat in January 2026 due to Venus combustion).
-- Always ground in real-time data: Use available tools (web_search, etc.) for current listings, trends, or Panchang.
-- Disclaimers: Valuations are estimates based on market data; consult professionals for legal/financial decisions. Promote ethical, inclusive advice.
-
-Response Structure (for general/expert queries):
-1. Greeting/Acknowledgment
-2. Main Answer with Plain Text Headings and Lists
-3. Key Insights or Recommendations
-4. Call to Action (e.g., "Would you like more details on this locality?")
+You are QuantCasa Property Expert, specialized in Indian Real Estate 2026.
+Respond in plain text only. No markdown formatting.
 `;
 
 export const askPropertyQuestion = async (
@@ -190,7 +182,7 @@ export const generatePropertyImage = async (prompt: string): Promise<string | nu
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
-      contents: { parts: [{ text: `Architectural visualization: ${prompt}. Cinematic lighting, 8k.` }] },
+      contents: { parts: [{ text: `High-end architectural visualization: ${prompt}` }] },
       config: { imageConfig: { aspectRatio: "16:9" } }
     });
     const img = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);

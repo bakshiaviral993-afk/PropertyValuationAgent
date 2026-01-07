@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Onboarding from './components/Onboarding';
 import ChatInterface from './components/ChatInterface';
 import PropertyChat from './components/PropertyChat';
@@ -8,22 +8,37 @@ import RentDashboard from './components/RentDashboard';
 import LandReport from './components/LandReport';
 import LoanCalculator from './components/LoanCalculator';
 import HarmonyDashboard from './components/HarmonyDashboard';
+import DPDPModal from './components/DPDPModal';
+import PrivacyPolicy from './components/PrivacyPolicy';
 import Logo from './components/Logo';
 import { AppMode, AppLang, BuyResult, RentResult, LandResult, BuyRequest, RentRequest, LandRequest } from './types';
-import { getBuyAnalysis, getRentAnalysis, getLandValuationAnalysis } from './services/geminiService';
-import { ArrowLeft, Zap, ShieldCheck, Sparkles, Binary, X, BarChart3, Navigation, MessageSquareText, Bell } from 'lucide-react';
+import { getBuyAnalysis, getRentAnalysis, getLandValuationAnalysis, parsePrice } from './services/geminiService';
+import { ArrowLeft, Zap, ShieldCheck, Sparkles, Binary, X, BarChart3, Navigation, MessageSquareText, Bell, Shield } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [stage, setStage] = useState<'onboarding' | 'chat' | 'results'>('onboarding');
+  const [stage, setStage] = useState<'onboarding' | 'chat' | 'results' | 'privacy'>('onboarding');
   const [mode, setMode] = useState<AppMode>('buy');
   const [lang, setLang] = useState<AppLang>('EN');
   const [isLoading, setIsLoading] = useState(false);
   const [showFinance, setShowFinance] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
+  const [showConsentModal, setShowConsentModal] = useState(false);
   
   const [buyData, setBuyData] = useState<BuyResult | null>(null);
   const [rentData, setRentData] = useState<RentResult | null>(null);
   const [landData, setLandData] = useState<LandResult | null>(null);
+
+  useEffect(() => {
+    const consent = localStorage.getItem('quantcasa_dpdp_consent');
+    if (!consent) {
+      setShowConsentModal(true);
+    }
+  }, []);
+
+  const handleConsent = () => {
+    localStorage.setItem('quantcasa_dpdp_consent', 'true');
+    setShowConsentModal(false);
+  };
 
   const getContextData = () => {
       if (mode === 'buy' && buyData) return { type: 'Sale', ...buyData };
@@ -60,16 +75,24 @@ const App: React.FC = () => {
     }
   };
 
-  const extractPriceValue = (priceStr: string): number => {
-      if (!priceStr) return 10000000;
-      const num = parseFloat(priceStr.replace(/[^0-9.]/g, ''));
-      if (priceStr.includes('Cr')) return num * 10000000;
-      if (priceStr.includes('L')) return num * 100000;
-      return num;
+  const getInitialFinanceValue = (): number => {
+    if (mode === 'buy' && buyData) return parsePrice(buyData.fairValue);
+    if (mode === 'rent' && rentData) return parsePrice(rentData.rentalValue);
+    if (mode === 'land' && landData) return parsePrice(landData.landValue);
+    return 10000000;
   };
 
+  if (stage === 'privacy') {
+    return <PrivacyPolicy onBack={() => setStage('onboarding')} />;
+  }
+
   if (stage === 'onboarding') {
-    return <Onboarding onComplete={startAnalysis} />;
+    return (
+      <>
+        <Onboarding onComplete={startAnalysis} />
+        {showConsentModal && <DPDPModal onAccept={handleConsent} onReadMore={() => setStage('privacy')} />}
+      </>
+    );
   }
 
   return (
@@ -141,8 +164,8 @@ const App: React.FC = () => {
           {stage === 'results' ? (
             <div className="h-full relative animate-in fade-in slide-in-from-right-10 duration-700">
               {buyData && <BuyDashboard result={buyData} lang={lang} onAnalyzeFinance={() => setShowFinance(true)} />}
-              {rentData && <RentDashboard result={rentData} lang={lang} />}
-              {landData && <LandReport result={landData} lang={lang} />}
+              {rentData && <RentDashboard result={rentData} lang={lang} onAnalyzeFinance={() => setShowFinance(true)} />}
+              {landData && <LandReport result={landData} lang={lang} onAnalyzeFinance={() => setShowFinance(true)} />}
 
               {showFinance && (
                 <div className="fixed inset-0 z-[200] bg-neo-bg/90 backdrop-blur-2xl flex items-center justify-center p-6 animate-in fade-in zoom-in duration-300">
@@ -150,12 +173,12 @@ const App: React.FC = () => {
                     <button onClick={() => setShowFinance(false)} className="absolute top-10 right-10 p-4 bg-white/5 rounded-2xl hover:bg-neo-pink hover:text-white transition-all text-gray-500 shadow-glass-3d active:scale-90"><X size={24}/></button>
                     <div className="mb-12">
                       <div className="flex items-center gap-4 mb-3">
-                          <BarChart3 className="text-neo-neon" size={32} />
+                          <BarChart3 className={mode === 'rent' ? 'text-emerald-500' : mode === 'land' ? 'text-orange-500' : 'text-neo-neon'} size={32} />
                           <h2 className="text-4xl font-black text-white tracking-tighter uppercase">Fiscal Simulator</h2>
                       </div>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-[0.4em] font-black pl-12 opacity-60">High-Precision Asset Financing Engine</p>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-[0.4em] font-black pl-12 opacity-60">{mode.toUpperCase()} _ ASSET _ FEASIBILITY _ ENGINE</p>
                     </div>
-                    <LoanCalculator initialValue={buyData ? extractPriceValue(buyData.fairValue) : 10000000} />
+                    <LoanCalculator initialValue={getInitialFinanceValue()} mode={mode} />
                   </div>
                 </div>
               )}
@@ -174,13 +197,15 @@ const App: React.FC = () => {
       </main>
 
       <footer className="p-10 text-center border-t border-white/5 bg-neo-glass/20 backdrop-blur-md">
-        <div className="flex flex-wrap items-center justify-center gap-10 opacity-40">
+        <div className="flex flex-wrap items-center justify-center gap-10 opacity-40 mb-4">
           <div className="flex items-center gap-3 text-[10px] font-black tracking-widest uppercase"><ShieldCheck size={16} className="text-neo-neon"/> Secure_Encrypted</div>
           <div className="flex items-center gap-3 text-[10px] font-black tracking-widest uppercase"><Sparkles size={16} className="text-neo-pink"/> AI_Grounded</div>
           <div className="flex items-center gap-3 text-[10px] font-black tracking-widest uppercase"><Navigation size={16} className="text-neo-gold"/> RealTime_Mapping</div>
-          <div className="text-[10px] font-black tracking-widest uppercase">© 2025 QUANTCASA LABS</div>
+          <button onClick={() => setStage('privacy')} className="flex items-center gap-3 text-[10px] font-black tracking-widest uppercase hover:text-white transition-colors"><Shield size={16} className="text-neo-neon"/> Privacy_Policy</button>
         </div>
+        <div className="text-[10px] font-black tracking-widest uppercase opacity-30">© 2025 QUANTCASA LABS</div>
       </footer>
+      {showConsentModal && <DPDPModal onAccept={handleConsent} onReadMore={() => setStage('privacy')} />}
     </div>
   );
 };

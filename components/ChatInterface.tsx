@@ -14,7 +14,7 @@ interface ChatInterfaceProps {
 
 const CITY_LOCALITY_MAP: Record<string, { localities: string[], pincodes: Record<string, string[]> }> = {
   'Mumbai': {
-    localities: ['Bandra West', 'Worli', 'Andheri West', 'Powai', 'Juhu', 'Colaba', 'Borivali', 'Dadar', 'Malad', 'Khar'],
+    localities: ['Bandra West', 'Worli', 'Andheri West', 'Powai', 'Juhu', 'Colaba', 'Borivali', 'Dadar', 'Malad', 'Khar', 'Santacruz', 'Vile Parle', 'Goregaon', 'Kandivali', 'Chembur', 'Mulund', 'Ghatkopar', 'Walkeshwar', 'Malabar Hill'],
     pincodes: { 
       'Bandra West': ['400050'], 
       'Worli': ['400018'], 
@@ -25,17 +25,31 @@ const CITY_LOCALITY_MAP: Record<string, { localities: string[], pincodes: Record
       'Borivali': ['400091'],
       'Dadar': ['400014'],
       'Malad': ['400064'],
-      'Khar': ['400052']
+      'Khar': ['400052'],
+      'Santacruz': ['400054'],
+      'Vile Parle': ['400057'],
+      'Goregaon': ['400063'],
+      'Kandivali': ['400067'],
+      'Chembur': ['400071'],
+      'Mulund': ['400080'],
+      'Ghatkopar': ['400077'],
+      'Walkeshwar': ['400006'],
+      'Malabar Hill': ['400006']
     }
   },
   'Pune': {
-    localities: ['Kharadi', 'Baner', 'Wagholi', 'Hinjewadi', 'Kothrud'],
+    localities: ['Kharadi', 'Baner', 'Wagholi', 'Hinjewadi', 'Kothrud', 'Aundh', 'Viman Nagar', 'Hadapsar', 'Bavdhan', 'Pimple Saudagar'],
     pincodes: { 
       'Kharadi': ['411014'], 
       'Baner': ['411045'], 
       'Wagholi': ['412207'],
       'Hinjewadi': ['411057'],
-      'Kothrud': ['411038']
+      'Kothrud': ['411038'],
+      'Aundh': ['411007'],
+      'Viman Nagar': ['411014'],
+      'Hadapsar': ['411028'],
+      'Bavdhan': ['411021'],
+      'Pimple Saudagar': ['411027']
     }
   }
 };
@@ -51,20 +65,36 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isManualEntry, setIsManualEntry] = useState(false);
 
-  const steps: WizardStep[] = [
-    { field: 'city', question: lang === 'HI' ? "नमस्ते! आप किस शहर में घर देख रहे हैं?" : "Namaste! Which city are you looking in?", type: 'city-picker' },
-    { field: 'area', question: lang === 'HI' ? "अपना इलाका चुनें या दर्ज करें:" : "Pick or type your locality:", type: 'locality-picker' },
-    { field: 'pincode', question: lang === 'HI' ? "पिन कोड दर्ज करें:" : "Enter PIN code:", type: 'number', placeholder: 'e.g. 400050' },
-    { field: 'bhk', question: lang === 'HI' ? "कितने बैडरूम (BHK)?" : "How many bedrooms (BHK)?", type: 'select', options: ['1 BHK', '2 BHK', '3 BHK', '4+ BHK'] },
-    { field: 'sqft', question: lang === 'HI' ? "घर का साइज (वर्ग फुट):" : "House size (sq. ft.):", type: 'number', placeholder: 'e.g. 850' },
-    { field: 'facing', question: lang === 'HI' ? "घर की दिशा (वास्तु):" : "House facing (Vastu):", type: 'select', options: ['East', 'North', 'West', 'South'] },
-  ];
+  const getSteps = (): WizardStep[] => {
+    const baseSteps: WizardStep[] = [
+      { field: 'city', question: lang === 'HI' ? "नमस्ते! आप किस शहर में संपत्ति देख रहे हैं?" : "Namaste! Which city are you looking in?", type: 'city-picker' },
+      { field: 'area', question: lang === 'HI' ? "अपना इलाका चुनें या दर्ज करें:" : "Pick or type your locality:", type: 'locality-picker' },
+      { field: 'pincode', question: lang === 'HI' ? "पिन कोड दर्ज करें:" : "Enter PIN code:", type: 'number', placeholder: 'e.g. 400050' },
+    ];
 
+    if (mode === 'land') {
+      return [
+        ...baseSteps,
+        { field: 'unit', question: lang === 'HI' ? "जमीन की इकाई चुनें (Unit):" : "Select Land Area Unit:", type: 'select', options: ['sqft', 'Acres', 'Hectares', 'sq. yds'] },
+        { field: 'plotSize', question: lang === 'HI' ? "जमीन का आकार दर्ज करें (Value):" : "Enter Land Area Value:", type: 'number', placeholder: 'e.g. 2500' },
+        { field: 'fsi', question: lang === 'HI' ? "अनुमत FSI (यदि ज्ञात हो, अन्यथा 1.0):" : "Permissible FSI (if known, else 1.0):", type: 'number', placeholder: 'e.g. 1.5' },
+      ];
+    }
+
+    return [
+      ...baseSteps,
+      { field: 'bhk', question: lang === 'HI' ? "कितने बैडरूम (BHK)?" : "How many bedrooms (BHK)?", type: 'select', options: ['1 BHK', '2 BHK', '3 BHK', '4+ BHK'] },
+      { field: 'sqft', question: lang === 'HI' ? "घर का साइज (वर्ग फुट):" : "House size (sq. ft.):", type: 'number', placeholder: 'e.g. 850' },
+      { field: 'facing', question: lang === 'HI' ? "घर की दिशा (वास्तु):" : "House facing (Vastu):", type: 'select', options: ['East', 'North', 'West', 'South'] },
+    ];
+  };
+
+  const steps = getSteps();
   const currentStep = steps[currentStepIndex];
 
   useEffect(() => {
     setMessages([{ id: 'start', sender: 'bot', text: steps[0].question }]);
-  }, [lang]);
+  }, [lang, mode]);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -76,14 +106,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
     let updatedValue = val;
     let nextFormData = { ...formData, [currentStep.field]: updatedValue };
 
-    // BUG FIX: Auto-populate Pincode if Locality is selected from map
-    if (currentStep.field === 'area' && formData.city && CITY_LOCALITY_MAP[formData.city]) {
-      const cityData = CITY_LOCALITY_MAP[formData.city];
+    if (currentStep.field === 'area' && nextFormData.city && CITY_LOCALITY_MAP[nextFormData.city]) {
+      const cityData = CITY_LOCALITY_MAP[nextFormData.city];
       const foundPincodes = cityData.pincodes[val];
       if (foundPincodes && foundPincodes.length > 0) {
-          // Store the auto-found pincode
           nextFormData.pincode = foundPincodes[0];
-          console.log(`[QuantCasa] Auto-populating Pincode: ${foundPincodes[0]}`);
       }
     }
 
@@ -93,12 +120,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
     let nextIdx = currentStepIndex + 1;
     setIsManualEntry(false);
     
-    // Pre-fill input value for next step if it was auto-populated (like Pincode)
     if (nextIdx < steps.length && steps[nextIdx].field === 'pincode' && nextFormData.pincode) {
-        setInputValue(nextFormData.pincode);
-    } else {
-        setInputValue('');
+        const autoPincode = nextFormData.pincode;
+        setMessages(prev => [...prev, { id: `b-auto-${Date.now()}`, sender: 'bot', text: lang === 'HI' ? `पिनकोड ${autoPincode} मिला।` : `Pincode ${autoPincode} detected for ${val}.` }]);
+        nextIdx++; 
     }
+
+    setInputValue('');
 
     if (nextIdx < steps.length) {
       setCurrentStepIndex(nextIdx);
@@ -112,7 +140,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
 
   const toggleListening = () => {
     if (isListening) return;
-    // Senior Dev Fix: SpeechInput requires 4 arguments (onResult, onEnd, onVol, lang)
     const voiceInput = new SpeechInput(
       (text, isFinal) => {
         if (isFinal) {
@@ -121,7 +148,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
         }
       },
       () => setIsListening(false),
-      () => {}, // No volume meter required here in step wizard
+      () => {},
       lang === 'HI' ? 'hi-IN' : 'en-IN'
     );
     setIsListening(true);
