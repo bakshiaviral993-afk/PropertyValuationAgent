@@ -4,11 +4,12 @@ import { LandResult, LandListing, AppLang } from '../types';
 import { Map, ExternalLink, Globe, LayoutDashboard, Map as MapIcon, Bookmark, ImageIcon, Loader2, Zap, Info, Calculator, BarChart3, HardHat } from 'lucide-react';
 import { generatePropertyImage } from '../services/geminiService';
 import { speak } from '../services/voiceService';
+import { parsePrice } from '../services/geminiService';
 
 interface LandReportProps {
   result: LandResult;
   lang?: AppLang;
-  onAnalyzeFinance?: () => void;
+  onAnalyzeFinance?: (value: number) => void;
 }
 
 const formatPrice = (val: any): string => {
@@ -137,7 +138,7 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
           </div>
           {onAnalyzeFinance && (
             <button 
-              onClick={onAnalyzeFinance}
+              onClick={() => onAnalyzeFinance(parsePrice(result.landValue))}
               className="mt-4 px-4 py-2 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-500 text-[10px] font-black uppercase tracking-widest hover:bg-orange-500 hover:text-white transition-all w-full flex items-center justify-center gap-2"
             >
               <HardHat size={12} /> ROI Simulator

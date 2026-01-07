@@ -84,7 +84,10 @@ export async function callLLMWithFallback(prompt: string, config: any = {}): Pro
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${perplexityKey}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
         },
         body: JSON.stringify({
           model: PERPLEXITY_MODEL,
