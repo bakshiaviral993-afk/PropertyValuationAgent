@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import Onboarding from './components/Onboarding';
 import ChatInterface from './components/ChatInterface';
 import PropertyChat from './components/PropertyChat';
@@ -181,6 +182,7 @@ const App: React.FC = () => {
           <div className="text-[10px] font-black tracking-widest uppercase">© 2025 QUANTCASA LABS</div>
         </div>
       </footer>
+      <Analytics />
     </div>
   );
 };
