@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Onboarding from './components/Onboarding';
 import ChatInterface from './components/ChatInterface';
@@ -7,13 +6,14 @@ import BuyDashboard from './components/BuyDashboard';
 import RentDashboard from './components/RentDashboard';
 import LandReport from './components/LandReport';
 import LoanCalculator from './components/LoanCalculator';
+import ValuationCalculator from './components/ValuationCalculator';
 import HarmonyDashboard from './components/HarmonyDashboard';
 import DPDPModal from './components/DPDPModal';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import Logo from './components/Logo';
 import { AppMode, AppLang, BuyResult, RentResult, LandResult, BuyRequest, RentRequest, LandRequest } from './types';
 import { getBuyAnalysis, getRentAnalysis, getLandValuationAnalysis, parsePrice } from './services/geminiService';
-import { ArrowLeft, Zap, ShieldCheck, Sparkles, Binary, X, BarChart3, Navigation, MessageSquareText, Bell, Shield } from 'lucide-react';
+import { ArrowLeft, Zap, ShieldCheck, Sparkles, Binary, X, BarChart3, Navigation, MessageSquareText, Bell, Shield, Calculator } from 'lucide-react';
 
 const App: React.FC = () => {
   const [stage, setStage] = useState<'onboarding' | 'chat' | 'results' | 'privacy'>('onboarding');
@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [lang, setLang] = useState<AppLang>('EN');
   const [isLoading, setIsLoading] = useState(false);
   const [showFinance, setShowFinance] = useState(false);
+  const [showQuickCalc, setShowQuickCalc] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
   const [showConsentModal, setShowConsentModal] = useState(false);
   
@@ -98,7 +99,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-neo-bg text-white flex flex-col font-sans selection:bg-neo-neon/40 overflow-x-hidden">
       <header className="px-6 md:px-10 py-6 border-b border-white/5 bg-neo-glass/60 backdrop-blur-2xl sticky top-0 z-[100] flex items-center justify-between">
-        <div className="flex items-center gap-4 cursor-pointer group" onClick={() => { setStage('onboarding'); setBuyData(null); setRentData(null); setLandData(null); setShowFinance(false); }}>
+        <div className="flex items-center gap-4 cursor-pointer group" onClick={() => { setStage('onboarding'); setBuyData(null); setRentData(null); setLandData(null); setShowFinance(false); setShowQuickCalc(false); }}>
           <div className="w-10 h-10 md:w-12 md:h-12 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-white shadow-neo-glow transition-all group-hover:rotate-12 group-hover:scale-110 group-hover:border-neo-neon/50">
             <Logo size={28} />
           </div>
@@ -108,6 +109,13 @@ const App: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-4">
+          <button 
+            onClick={() => setShowQuickCalc(!showQuickCalc)}
+            className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-neo-neon hover:bg-white/10 transition-all border border-white/10"
+            title="Quick Calculator"
+          >
+            <Calculator size={20} />
+          </button>
           <button 
             onClick={() => setShowAlerts(!showAlerts)}
             className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-neo-gold hover:bg-white/10 transition-all border border-white/10 relative"
@@ -147,6 +155,15 @@ const App: React.FC = () => {
                 <p className="text-xs text-gray-300">Mumbai residential index projected to rise 2.5% this quarter.</p>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Calculator Modal */}
+      {showQuickCalc && (
+        <div className="fixed inset-0 z-[300] bg-neo-bg/80 backdrop-blur-xl flex items-center justify-center p-6 animate-in zoom-in duration-300">
+          <div className="w-full max-w-2xl relative">
+            <ValuationCalculator onClose={() => setShowQuickCalc(false)} />
           </div>
         </div>
       )}
