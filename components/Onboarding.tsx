@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
-import { Home, Building2, Map as MapIcon, ArrowRight, CheckCircle2, Globe, Zap, ShieldCheck, Sparkles } from 'lucide-react';
+import { Building2, Map as MapIcon, ArrowRight, Globe, Zap, ShieldCheck, Sparkles } from 'lucide-react';
+import Logo from './Logo';
 import { AppMode, AppLang } from '../types';
 import { speak } from '../services/voiceService';
 
@@ -39,7 +40,6 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
   const handleLangSelect = (l: AppLang) => {
     setLang(l);
-    // Voice is triggered by user gesture (click) to satisfy browser security
     speak(TRANSLATIONS[l].greeting, l === 'EN' ? 'en-IN' : 'hi-IN');
   };
 
@@ -69,6 +69,11 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
         {!showModes ? (
           <div className="text-center space-y-8 animate-in fade-in zoom-in duration-700">
+            <div className="flex justify-center mb-8">
+               <div className="p-8 rounded-[40px] bg-white/5 border border-white/10 shadow-neo-glow">
+                 <Logo size={80} />
+               </div>
+            </div>
             <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-neo-neon/10 border border-neo-neon/20 rounded-full text-neo-neon text-[10px] font-black uppercase tracking-[0.3em] shadow-neo-glow">
               <Zap size={14} className="animate-pulse" /> Free Intelligence • Direct Access
             </div>
@@ -96,7 +101,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
-                { id: 'buy', title: t.buy, desc: 'Capital asset valuation and acquisition insights', icon: <Home /> },
+                { id: 'buy', title: t.buy, desc: 'Capital asset valuation and acquisition insights', icon: <Logo size={32} /> },
                 { id: 'rent', title: t.rent, desc: 'Yield analysis and leasehold market estimates', icon: <Building2 /> },
                 { id: 'land', title: t.land, desc: 'Development potential and zoning ROI projections', icon: <MapIcon /> },
                 { id: 'expert', title: t.expert, desc: 'Conversational AI for legal, Vastu and micro-trends', icon: <Sparkles /> }
@@ -107,7 +112,11 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                   className="group bg-white/5 p-8 rounded-[40px] border border-white/10 shadow-glass-3d hover:border-neo-neon/40 transition-all text-left space-y-6 hover:-translate-y-3"
                 >
                   <div className={`w-16 h-16 rounded-3xl flex items-center justify-center transition-all duration-500 bg-white/5 text-neo-neon group-hover:bg-neo-neon group-hover:text-white shadow-neo-glow`}>
-                    {React.cloneElement(mode.icon as React.ReactElement, { size: 32 })}
+                    {typeof mode.icon === 'object' && React.isValidElement(mode.icon) ? (
+                        mode.icon
+                    ) : (
+                        React.cloneElement(mode.icon as React.ReactElement, { size: 32 })
+                    )}
                   </div>
                   <div>
                     <h3 className="text-2xl font-black text-white tracking-tighter uppercase">{mode.title}</h3>

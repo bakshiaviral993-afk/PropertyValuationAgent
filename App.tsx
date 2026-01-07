@@ -8,9 +8,10 @@ import RentDashboard from './components/RentDashboard';
 import LandReport from './components/LandReport';
 import LoanCalculator from './components/LoanCalculator';
 import HarmonyDashboard from './components/HarmonyDashboard';
+import Logo from './components/Logo';
 import { AppMode, AppLang, BuyResult, RentResult, LandResult, BuyRequest, RentRequest, LandRequest } from './types';
 import { getBuyAnalysis, getRentAnalysis, getLandValuationAnalysis } from './services/geminiService';
-import { ArrowLeft, Home, Zap, ShieldCheck, Sparkles, Binary, X, BarChart3, Navigation, MessageSquareText, Bell } from 'lucide-react';
+import { ArrowLeft, Zap, ShieldCheck, Sparkles, Binary, X, BarChart3, Navigation, MessageSquareText, Bell } from 'lucide-react';
 
 const App: React.FC = () => {
   const [stage, setStage] = useState<'onboarding' | 'chat' | 'results'>('onboarding');
@@ -24,7 +25,6 @@ const App: React.FC = () => {
   const [rentData, setRentData] = useState<RentResult | null>(null);
   const [landData, setLandData] = useState<LandResult | null>(null);
 
-  // For passing context to Expert Chat
   const getContextData = () => {
       if (mode === 'buy' && buyData) return { type: 'Sale', ...buyData };
       if (mode === 'rent' && rentData) return { type: 'Rental', ...rentData };
@@ -76,8 +76,8 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-neo-bg text-white flex flex-col font-sans selection:bg-neo-neon/40 overflow-x-hidden">
       <header className="px-6 md:px-10 py-6 border-b border-white/5 bg-neo-glass/60 backdrop-blur-2xl sticky top-0 z-[100] flex items-center justify-between">
         <div className="flex items-center gap-4 cursor-pointer group" onClick={() => { setStage('onboarding'); setBuyData(null); setRentData(null); setLandData(null); setShowFinance(false); }}>
-          <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-neo-neon to-neo-pink rounded-2xl flex items-center justify-center text-white shadow-neo-glow transition-all group-hover:rotate-12 group-hover:scale-110">
-            <Home size={24} />
+          <div className="w-10 h-10 md:w-12 md:h-12 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-white shadow-neo-glow transition-all group-hover:rotate-12 group-hover:scale-110 group-hover:border-neo-neon/50">
+            <Logo size={28} />
           </div>
           <div className="hidden sm:block">
             <h1 className="font-black text-xl md:text-2xl text-white tracking-tighter leading-none neon-text-glow">QuantCasa</h1>
@@ -163,7 +163,7 @@ const App: React.FC = () => {
           ) : (
             <div className="hidden lg:flex h-full flex-col items-center justify-center text-center p-12 opacity-30">
               <div className="relative mb-12">
-                <Binary size={120} className="text-neo-neon animate-pulse" />
+                <Logo size={120} className="animate-pulse" />
                 <div className="absolute inset-0 bg-neo-neon blur-[100px] opacity-20" />
               </div>
               <h2 className="text-5xl font-black text-white tracking-tighter uppercase mb-6 leading-none">Awaiting Signal...</h2>
