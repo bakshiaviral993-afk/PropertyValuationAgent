@@ -179,16 +179,25 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
                       <AIListingImage listing={l} />
                     )}
                   </div>
-                  <div className="flex justify-between items-start mb-2 gap-4">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-black text-white text-lg leading-tight line-clamp-2">{l.title}</h4>
-                      <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-1 truncate">
-                        <MapPin size={12} className="shrink-0" /> {l.address}, {l.pincode}
-                      </p>
+                  <div className="flex flex-col gap-3 mb-4">
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-black text-white text-lg leading-tight line-clamp-2 break-words">
+                          {l.title}
+                        </h4>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-lg font-black text-neo-neon whitespace-nowrap">
+                          {formatPrice(parsePrice(l.price))}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      <div className="text-xl font-black text-neo-neon whitespace-nowrap">{formatPrice(parsePrice(l.price))}</div>
-                      <span className="text-[8px] text-gray-500 font-black uppercase tracking-widest block mt-1">LIVE_MARKET</span>
+                    <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold uppercase tracking-widest border-t border-white/5 pt-3">
+                      <div className="flex items-center gap-1 truncate max-w-[150px]">
+                        <MapPin size={10} className="shrink-0" />
+                        <span className="truncate">{l.address}</span>
+                      </div>
+                      <span className="text-neo-neon opacity-60">LIVE_MARKET</span>
                     </div>
                   </div>
                   <div className="w-full py-3 rounded-xl bg-white/5 border border-white/10 text-center text-[10px] font-black uppercase tracking-widest mt-auto group-hover:bg-neo-neon transition-all">

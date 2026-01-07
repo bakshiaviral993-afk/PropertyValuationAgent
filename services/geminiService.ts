@@ -60,7 +60,6 @@ export async function getBuyAnalysis(req: BuyRequest): Promise<BuyResult> {
     { 
       tools: [{ googleSearch: {} }],
       temperature: 0.2
-      // responseMimeType: 'application/json' is removed to avoid conflict with googleSearch tool
     }
   );
   
@@ -110,7 +109,6 @@ export async function getRentAnalysis(req: RentRequest): Promise<RentResult> {
   const { text, groundingSources } = await callLLMWithFallback(prompt, { 
     tools: [{ googleSearch: {} }],
     temperature: 0.2
-    // responseMimeType: 'application/json' is removed to avoid conflict with googleSearch tool
   });
   const parsed = extractJsonFromText(text);
   return { ...parsed, propertiesFoundCount: parsed.listings?.length || 0, groundingSources: groundingSources || [] };
@@ -141,10 +139,13 @@ export const askPropertyQuestion = async (
   intent: 'general' | 'vastu' | 'interior' | 'feng-shui' = 'general'
 ): Promise<string> => {
   const systemInstruction = `
-    You are QuantCasa Property Expert. Language: ${lang === 'HI' ? 'Hindi' : 'English'}.
+    You are QuantCasa Property Expert. Respond in ${lang === 'HI' ? 'Hindi' : 'English'}.
     Current Intent: ${intent.toUpperCase()}.
     ${contextResult ? `CONTEXT: User property data: ${JSON.stringify(contextResult)}.` : ''}
-    Be professional, concise, and helpful. Use markdown for bolding.
+    Be professional, concise, detailed, and helpful.
+    Structure responses with clear headings and numbered/bulleted lists where appropriate.
+    DO NOT use markdown bold (**text**), italics, or other formatting symbols like triple backticks for code unless providing a raw JSON example. Use plain text only for a clean, professional appearance.
+    Base answers on latest market data (as of 2026).
   `;
 
   const lastUserMessage = messages[messages.length - 1].text;
