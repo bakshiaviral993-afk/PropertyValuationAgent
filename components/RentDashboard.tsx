@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { RentResult, RentalListing, AppLang } from '../types';
 import { 
   MapPin, ExternalLink, Globe, Info, Layers, Building2, ImageIcon, Loader2, BarChart3, LayoutGrid,
-  Receipt, Wallet, TrendingUp
+  Receipt, Wallet, TrendingUp, Gavel, Target, ShieldAlert, MessageSquare
 } from 'lucide-react';
 import { generatePropertyImage } from '../services/geminiService';
 import { speak } from '../services/voiceService';
@@ -122,8 +122,12 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
   const listingStats = calculateListingStats(listingPrices);
   const displayConfidence = result.confidenceScore < 1 ? Math.round(result.confidenceScore * 100) : result.confidenceScore;
 
+  const rentValueNum = parsePrice(result.rentalValue);
+  const targetRent = rentValueNum * 0.92;
+  const walkawayRent = rentValueNum * 1.10;
+
   return (
-    <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+    <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 pb-20">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-emerald-50 rounded-2xl">
@@ -192,6 +196,59 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
           <div className="flex-1 overflow-y-auto pr-2 pb-10 scrollbar-hide">
             {viewMode === 'dashboard' ? (
               <div className="space-y-8">
+                {/* NEW: Lease Negotiation Hub */}
+                <div className="bg-neo-gold/5 border border-neo-gold/20 rounded-[48px] p-10 shadow-gold-glow">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
+                    <div className="flex items-center gap-4">
+                      <div className="p-4 bg-neo-gold/10 rounded-2xl text-neo-gold">
+                        <Target size={28} />
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Lease Negotiation</h3>
+                        <p className="text-[10px] text-neo-gold font-black uppercase tracking-[0.4em]">Leasehold_Optimization</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-4 w-full md:w-auto">
+                      <div className="flex-1 md:flex-none p-4 bg-neo-bg/50 border border-neo-gold/20 rounded-2xl">
+                        <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest block mb-1">Neural Bid</span>
+                        <div className="text-lg font-black text-neo-gold">₹{Math.round(targetRent).toLocaleString()}/mo</div>
+                      </div>
+                      <div className="flex-1 md:flex-none p-4 bg-neo-bg/50 border border-neo-pink/20 rounded-2xl">
+                        <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest block mb-1 text-neo-pink">Ceiling</span>
+                        <div className="text-lg font-black text-neo-pink">₹{Math.round(walkawayRent).toLocaleString()}/mo</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 text-neo-gold">
+                        <MessageSquare size={16} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Lease Script</span>
+                      </div>
+                      <div className="p-6 bg-black/40 border border-white/5 rounded-3xl text-sm text-gray-300 leading-relaxed italic">
+                        "{result.negotiationScript || "Leverage the area's current vacancy rates and tenant demand scores to anchor your offer below asking."}"
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 text-neo-pink">
+                        <ShieldAlert size={16} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Exit Triggers</span>
+                      </div>
+                      <ul className="space-y-3">
+                        <li className="flex gap-3 text-xs text-gray-400">
+                          <div className="w-1.5 h-1.5 rounded-full bg-neo-gold mt-1.5 shadow-gold-glow shrink-0" />
+                          <span>Avoid lock-ins exceeding 11 months unless yield is protected via a rent-free fit-out period.</span>
+                        </li>
+                        <li className="flex gap-3 text-xs text-gray-400">
+                          <div className="w-1.5 h-1.5 rounded-full bg-neo-pink mt-1.5 shadow-pink-glow shrink-0" />
+                          <span>Walk away if deposit exceeds 6 months or maintenance inclusive exceeds ₹{Math.round(walkawayRent * 1.05).toLocaleString()}.</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d border-l-4 border-l-emerald-500">
                   <h3 className="text-xs font-black text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
                     <Info size={18} className="text-emerald-500" /> Market Reasoning

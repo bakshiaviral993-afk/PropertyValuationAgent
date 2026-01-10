@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, Sparkles, Mic, MicOff, Trash2, Volume2, VolumeX, Compass, Paintbrush, Wind, Headphones, Image as ImageIcon, Loader2, Info, AlertCircle, Zap } from 'lucide-react';
 import { ChatMessage, AppLang } from '../types';
@@ -62,11 +61,26 @@ const PropertyChat: React.FC<PropertyChatProps> = ({ contextResult, lang, initia
 
     try {
       const responseText = await askPropertyQuestion([...messages, userMsg], contextResult, lang, intent);
-      const botMsg: ChatMessage = { id: `b-${Date.now()}`, sender: 'bot', text: responseText };
+      
+      let generatedImg: string | undefined = undefined;
+      // Trigger image generation for interior or visual modes
+      if (intent === 'interior' || intent === 'vastu') {
+        const highlightMatch = responseText.match(/HIGHLIGHT::([\s\S]*?)DETAIL::/i);
+        const imgPrompt = highlightMatch ? highlightMatch[1].trim() : messageText;
+        generatedImg = await generatePropertyImage(`${intent} design visualization: ${imgPrompt}`) || undefined;
+      }
+
+      const botMsg: ChatMessage = { 
+        id: `b-${Date.now()}`, 
+        sender: 'bot', 
+        text: responseText,
+        image: generatedImg
+      };
       setMessages(prev => [...prev, botMsg]);
       
       if (isAutoSpeak || isHandsFree) {
-        speak(responseText, lang === 'HI' ? 'hi-IN' : 'en-IN', () => {
+        const speechText = responseText.replace(/HIGHLIGHT::|DETAIL::/gi, '');
+        speak(speechText, lang === 'HI' ? 'hi-IN' : 'en-IN', () => {
           if (isHandsFree) {
             setTimeout(() => toggleListening(), 1000);
           }
@@ -112,6 +126,35 @@ const PropertyChat: React.FC<PropertyChatProps> = ({ contextResult, lang, initia
     voiceInputRef.current.start();
   };
 
+  const renderMessageContent = (m: ChatMessage) => {
+    const text = m.text;
+    const highlightMatch = text.match(/HIGHLIGHT::([\s\S]*?)DETAIL::([\s\S]*)/i);
+    
+    return (
+      <div className="space-y-4">
+        {m.image && (
+          <div className="w-full aspect-video rounded-2xl overflow-hidden border border-white/10 mb-2 animate-in fade-in zoom-in duration-700 shadow-neo-glow relative group">
+            <img src={m.image} alt="AI Visual" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" />
+            <div className="absolute top-3 right-3 px-2 py-1 bg-black/60 rounded text-[8px] font-black text-neo-neon uppercase tracking-widest border border-neo-neon/30">AI_Rendered</div>
+          </div>
+        )}
+        
+        {highlightMatch ? (
+          <div className="space-y-3">
+            <div className="text-neo-neon font-black uppercase text-xs sm:text-sm tracking-widest border-l-4 border-neo-neon pl-4 py-2 bg-neo-neon/5 rounded-r-xl shadow-[inset_1px_0_10px_rgba(88,95,216,0.1)]">
+              {highlightMatch[1].trim()}
+            </div>
+            <div className="text-sm text-gray-300 leading-relaxed pl-1 px-1">
+              {highlightMatch[2].trim()}
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm leading-relaxed">{text}</p>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="h-full flex flex-col bg-neo-bg rounded-[48px] shadow-neo-glow overflow-hidden border border-white/10 relative">
       <div className={`absolute top-1/4 left-1/4 w-64 h-64 rounded-full blur-[120px] pointer-events-none transition-all duration-1000 ${isListening ? 'bg-neo-pink/20 opacity-100' : 'bg-neo-neon/10 opacity-50'}`} />
@@ -128,9 +171,7 @@ const PropertyChat: React.FC<PropertyChatProps> = ({ contextResult, lang, initia
             </div>
             <div>
               <h2 className="text-lg font-black text-white tracking-tighter uppercase leading-none">Expert Bot</h2>
-              <span className="text-[7px] text-gray-500 font-black uppercase tracking-[0.4em]">
-                {isListening ? (micVolume > 5 ? 'Direct Hardware Sync' : 'Capturing Baseline...') : 'Neural Link Active'}
-              </span>
+              <span className="text-[7px] text-gray-500 font-black uppercase tracking-[0.4em]">Neural Link Active</span>
             </div>
           </div>
           <div className="flex gap-2">
@@ -145,7 +186,7 @@ const PropertyChat: React.FC<PropertyChatProps> = ({ contextResult, lang, initia
 
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
            {['general', 'vastu', 'feng-shui', 'interior'].map(id => (
-             <button key={id} onClick={() => setIntent(id as any)} className={`flex-1 min-w-[85px] flex items-center justify-center gap-2 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${intent === id ? 'bg-neo-neon border-neo-neon text-white shadow-neo-glow' : 'bg-white/5 border-white/5 text-gray-500'}`}>
+             <button key={id} onClick={() => setIntent(id as any)} className={`flex-1 min-w-[85px] flex items-center justify-center gap-2 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${intent === id ? 'bg-neo-neon border-neo-neon text-white shadow-neo-glow' : 'bg-white/5 border-white/5 text-gray-500 hover:text-gray-300 hover:border-white/10'}`}>
                 {id === 'vastu' ? <Compass size={14}/> : id === 'feng-shui' ? <Wind size={14}/> : id === 'interior' ? <Paintbrush size={14}/> : <Bot size={14}/>}
                 {id}
              </button>
@@ -160,7 +201,7 @@ const PropertyChat: React.FC<PropertyChatProps> = ({ contextResult, lang, initia
              <div className="flex gap-3 max-w-[90%]">
                 {m.sender === 'bot' && <div className="w-8 h-8 rounded-xl bg-neo-neon/10 border border-neo-neon/20 flex items-center justify-center text-neo-neon shrink-0"><Bot size={16} /></div>}
                 <div className={`px-5 py-3 rounded-[24px] text-sm font-medium leading-relaxed shadow-sm ${m.sender === 'user' ? 'bg-gradient-to-br from-neo-neon to-blue-600 text-white rounded-tr-none shadow-neo-glow' : 'bg-neo-glass text-gray-200 rounded-tl-none border border-white/10'}`}>
-                  {m.text}
+                  {m.sender === 'bot' ? renderMessageContent(m) : m.text}
                 </div>
              </div>
           </div>
@@ -176,27 +217,7 @@ const PropertyChat: React.FC<PropertyChatProps> = ({ contextResult, lang, initia
         <div ref={scrollRef} />
       </div>
 
-      {/* Hardware Pulse Visualizer */}
-      {isListening && (
-        <div className="absolute bottom-32 left-0 right-0 flex justify-center items-end gap-1.5 px-10 pointer-events-none h-24 z-30">
-           {[...Array(16)].map((_, i) => {
-             const height = Math.max(6, (micVolume * (0.4 + Math.random() * 1.2)) / 1.5);
-             return (
-               <div 
-                 key={i} 
-                 className="w-2 bg-neo-pink rounded-full transition-all duration-75 shadow-pink-glow"
-                 style={{ 
-                    height: `${height}px`, 
-                    opacity: 0.2 + (micVolume/60),
-                    transform: `scaleY(${1 + (micVolume/300)})` 
-                 }}
-               />
-             );
-           })}
-        </div>
-      )}
-
-      {/* Input Module */}
+      {/* Visualizer & Input Block */}
       <div className="p-8 bg-neo-glass/80 backdrop-blur-2xl border-t border-white/5 z-20">
         <div className="relative flex gap-3">
           <button 
@@ -204,24 +225,16 @@ const PropertyChat: React.FC<PropertyChatProps> = ({ contextResult, lang, initia
             className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all border relative overflow-hidden ${isListening ? 'bg-neo-pink border-neo-pink text-white shadow-pink-glow' : 'bg-white/5 border-white/10 text-gray-400 hover:text-neo-neon'}`}
           >
             {isListening ? <MicOff size={24} className="z-10"/> : <Mic size={24} className="z-10"/>}
-            {isListening && (
-               <div 
-                 className="absolute inset-0 bg-white/10 transition-transform duration-100 origin-bottom" 
-                 style={{ transform: `scaleY(${Math.min(1, micVolume/100)})` }}
-               />
-            )}
           </button>
-          <div className="flex-1 relative">
-            <input 
-              type="text"
-              placeholder={isListening ? (micVolume > 5 ? "Direct Sync Active..." : "Listening...") : "Ask anything..."}
-              className={`w-full h-14 bg-white/5 border rounded-2xl px-6 text-sm font-bold text-white outline-none placeholder:text-gray-600 transition-all ${isListening ? 'border-neo-pink ring-1 ring-neo-pink/30 shadow-pink-glow-sm' : 'border-white/10 focus:border-neo-neon'}`}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              disabled={isLoading}
-            />
-          </div>
+          <input 
+            type="text"
+            placeholder={isListening ? "Listening..." : "Ask anything..."}
+            className={`flex-1 h-14 bg-white/5 border rounded-2xl px-6 text-sm font-bold text-white outline-none placeholder:text-gray-600 transition-all ${isListening ? 'border-neo-pink ring-1 ring-neo-pink/30' : 'border-white/10 focus:border-neo-neon'}`}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+            disabled={isLoading}
+          />
           <button 
             onClick={() => handleSend()}
             disabled={!inputValue.trim() || isLoading}

@@ -17,10 +17,35 @@ const ValuationCalculator: React.FC<ValuationCalculatorProps> = ({ onClose }) =>
   const [result, setResult] = useState<any>(null);
   const [showWalkaway, setShowWalkaway] = useState(false);
 
+  // New Heuristic Weights based on user prompt logic
+  const rule_weight = 0.85;
+  const confidence_weight = 0.92;
+
   const calculateBuyValue = () => {
-    const baseRate = formData.city.toLowerCase().includes('wagholi') ? 6800 : 8500;
-    const value = (formData.sqft * baseRate * 1.08) / 100000;
-    return Math.round(value * 100) / 100;
+    const isWagholi = formData.city.toLowerCase().includes('wagholi');
+    
+    // 1. Market Rule Price
+    const baseRate = isWagholi ? 6800 : 8500;
+    const rule_price = (formData.sqft * baseRate * 1.08) / 100000;
+    
+    // 2. Guideline Rate (Govt Reference)
+    const guidelineRate = isWagholi ? 4500 : 5500;
+    const guidelineValue = (formData.sqft * guidelineRate) / 100000;
+
+    // 3. Mock ML Price (Simulated intelligence layer)
+    const ml_price = rule_price * (0.95 + Math.random() * 0.1);
+
+    /**
+     * ADVANCED VALUATION ENGINE:
+     * final = max(guidelineRate * area, ML_price * confidence_weight, rule_price * rule_weight)
+     */
+    const final = Math.max(
+      guidelineValue,
+      ml_price * confidence_weight,
+      rule_price * rule_weight
+    );
+
+    return Math.round(final * 100) / 100;
   };
 
   const calculateRentValue = () => {
@@ -31,9 +56,14 @@ const ValuationCalculator: React.FC<ValuationCalculatorProps> = ({ onClose }) =>
   };
 
   const calculateLandValue = () => {
-    const ratePerSqyd = formData.city.toLowerCase().includes('wagholi') ? 4500 : 6500; // Simplified
-    const value = (formData.landSize * ratePerSqyd) / 100000;
-    return Math.round(value * 100) / 100;
+    const isWagholi = formData.city.toLowerCase().includes('wagholi');
+    const ratePerSqyd = isWagholi ? 4500 : 6500;
+    const rule_price = (formData.landSize * ratePerSqyd) / 100000;
+    const guidelineRate = isWagholi ? 3200 : 4200;
+    const guidelineValue = (formData.landSize * guidelineRate) / 100000;
+    
+    const final = Math.max(guidelineValue, rule_price * rule_weight);
+    return Math.round(final * 100) / 100;
   };
 
   const handleCalculate = () => {
@@ -62,7 +92,7 @@ const ValuationCalculator: React.FC<ValuationCalculatorProps> = ({ onClose }) =>
           </div>
           <div>
             <h2 className="text-2xl font-black text-white tracking-tighter uppercase">Quick Calc</h2>
-            <p className="text-[10px] text-gray-500 uppercase tracking-[0.4em] font-black opacity-60">Heuristic Engine v1.0</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-[0.4em] font-black opacity-60">Hybrid Intelligence Node v2.1</p>
           </div>
         </div>
         {onClose && (

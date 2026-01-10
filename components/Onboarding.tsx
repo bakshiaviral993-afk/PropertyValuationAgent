@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Building2, Map as MapIcon, ArrowRight, Globe, Zap, ShieldCheck, Sparkles } from 'lucide-react';
+import { Building2, Map as MapIcon, ArrowRight, Globe, Zap, ShieldCheck, Sparkles, ShoppingBag, Briefcase, Calculator } from 'lucide-react';
 import Logo from './Logo';
 import { AppMode, AppLang } from '../types';
 import { speak } from '../services/voiceService';
@@ -17,6 +17,8 @@ const TRANSLATIONS = {
     rent: "Rent 🏘️",
     land: "Land 🏗️",
     expert: "AI Expert ✨",
+    essentials: "Essentials 🛍️",
+    commercial: "Commercial 🏢",
     started: "Get started",
     greeting: "Welcome to QuantCasa. I am your property intelligence agent. Let's find your asset value together."
   },
@@ -27,6 +29,8 @@ const TRANSLATIONS = {
     rent: "किराया 🏘️",
     land: "ज़मीन 🏗️",
     expert: "एआई विशेषज्ञ ✨",
+    essentials: "आवश्यकताएं 🛍️",
+    commercial: "व्यावसायिक 🏢",
     started: "शुरू करें",
     greeting: "QuantCasa में आपका स्वागत है। मैं आपका प्रॉपर्टी इंटेलिजेंस एजेंट हूँ। आइए मिलकर आपकी संपत्ति का मूल्य खोजें।"
   }
@@ -50,7 +54,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         <div className="absolute bottom-20 right-10 w-64 h-64 bg-neo-pink rounded-full blur-[100px]" />
       </div>
 
-      <div className="max-w-4xl w-full space-y-12 relative z-10">
+      <div className="max-w-6xl w-full space-y-12 relative z-10">
         <div className="flex justify-center sm:justify-end gap-3">
           {(['EN', 'HI'] as AppLang[]).map((l) => (
             <button
@@ -99,12 +103,14 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                <p className="text-gray-500 mt-3 font-medium uppercase text-xs tracking-widest">Identify target asset class or expertise required</p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
-                { id: 'buy', title: t.buy, desc: 'Capital asset valuation and acquisition insights', icon: <Logo size={32} /> },
-                { id: 'rent', title: t.rent, desc: 'Yield analysis and leasehold market estimates', icon: <Building2 /> },
-                { id: 'land', title: t.land, desc: 'Development potential and zoning ROI projections', icon: <MapIcon /> },
-                { id: 'expert', title: t.expert, desc: 'Conversational AI for legal, Vastu and micro-trends', icon: <Sparkles /> }
+                { id: 'buy', title: t.buy, desc: 'Residential capital asset valuation and acquisition', icon: <Logo size={32} /> },
+                { id: 'rent', title: t.rent, desc: 'Leasehold market estimates and yield analysis', icon: <Building2 /> },
+                { id: 'land', title: t.land, desc: 'Plot valuation, FSI analysis and development ROI', icon: <MapIcon /> },
+                { id: 'commercial', title: t.commercial, desc: 'Shops, Offices, and Warehouses. Buy or Lease.', icon: <Briefcase /> },
+                { id: 'essentials', title: t.essentials, desc: 'Discover local vendors, chemists, and life pulse', icon: <ShoppingBag /> },
+                { id: 'expert', title: t.expert, desc: 'Conversational AI for legal, Vastu and trends', icon: <Sparkles /> }
               ].map((mode) => (
                 <button
                   key={mode.id}

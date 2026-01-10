@@ -1,8 +1,24 @@
 
 import { ReactNode } from 'react';
 
-export type AppMode = 'buy' | 'rent' | 'land' | 'expert' | 'harmony';
+export type AppMode = 'buy' | 'rent' | 'land' | 'expert' | 'harmony' | 'essentials' | 'commercial';
 export type AppLang = 'EN' | 'HI';
+
+export interface EssentialService {
+  name: string;
+  contact: string;
+  address: string;
+  rating: string;
+  distance: string;
+  isOpen: boolean;
+  sourceUrl: string;
+}
+
+export interface EssentialResult {
+  category: string;
+  services: EssentialService[];
+  neighborhoodContext: string;
+}
 
 export enum StepField {
   State = 'state',
@@ -27,6 +43,44 @@ export enum StepField {
   HasAmenities = 'hasAmenities',
   AmenitiesCharges = 'amenitiesCharges',
   FSI = 'fsi'
+}
+
+export interface CommercialListing {
+  title: string;
+  price: string;
+  address: string;
+  type: 'Shop' | 'Office' | 'Warehouse';
+  intent: 'Buy' | 'Rent' | 'Lease';
+  sourceUrl: string;
+  sqft: number;
+  image?: string;
+}
+
+export interface CommercialResult {
+  fairValue: string;
+  yieldPotential: string;
+  footfallScore: number;
+  negotiationScript: string;
+  listings: CommercialListing[];
+  businessInsights: string;
+  confidenceScore: number;
+  groundingSources: GroundingSource[];
+}
+
+export interface BuyResult {
+  fairValue: string;
+  valuationRange: string;
+  recommendation: 'Good Buy' | 'Fair Price' | 'Overpriced' | 'Check Details';
+  negotiationScript: string;
+  listings: SaleListing[];
+  marketSentiment: string;
+  sentimentScore: number; 
+  registrationEstimate: string;
+  appreciationPotential: string;
+  confidenceScore: number;
+  valuationJustification: string;
+  insights: NeighborhoodInsight[];
+  groundingSources: GroundingSource[];
 }
 
 export interface UserProfile {
@@ -103,24 +157,6 @@ export interface GroundingSource {
   title: string;
 }
 
-export interface BuyResult {
-  fairValue: string;
-  valuationRange: string;
-  recommendation: 'Good Buy' | 'Fair Price' | 'Overpriced' | 'Check Details';
-  negotiationScript: string;
-  listings: SaleListing[];
-  marketSentiment: string;
-  sentimentScore: number; // 0 to 100 (Bearish to Bullish)
-  registrationEstimate: string;
-  appreciationPotential: string;
-  confidenceScore: number;
-  valuationJustification: string;
-  breakdown?: ValuationBreakdown;
-  neighborhoodScore?: NeighborhoodScore;
-  insights: NeighborhoodInsight[];
-  groundingSources: GroundingSource[];
-}
-
 export interface RentResult {
   rentalValue: string;
   yieldPercentage: string;
@@ -153,6 +189,7 @@ export interface ChatMessage {
   id: string;
   sender: 'user' | 'bot';
   text: string;
+  image?: string;
 }
 
 export interface WizardStep {
@@ -189,6 +226,15 @@ export interface LandRequest {
   fsi: number;
 }
 
+export interface CommercialRequest {
+  city: string;
+  area: string;
+  pincode: string;
+  type: 'Shop' | 'Office' | 'Warehouse';
+  intent: 'Buy' | 'Rent' | 'Lease';
+  sqft: number;
+}
+
 export interface PanchangData {
   tithi: string;
   nakshatra: string;
@@ -206,9 +252,6 @@ export interface HarmonyReport {
   remedies: string[];
 }
 
-/**
- * Added missing types for ValuationReport.tsx and Sidebar.tsx
- */
 export interface Comparable {
   projectName: string;
   price: number;

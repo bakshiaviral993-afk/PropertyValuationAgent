@@ -1,7 +1,20 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <script>
+      // Define process.env globally to satisfy library requirements and our code
+      window.process = { 
+        env: { 
+          NODE_ENV: 'production',
+          API_KEY: '',
+          DATABASE_URL: ''
+        } 
+      };
+      // Make process accessible directly if window.process exists
+      if (typeof process === 'undefined') {
+        window.process = window.process || { env: {} };
+      }
+    </script>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18,7 +31,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     
-    <!-- Leaflet Ecosystem -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -78,7 +90,6 @@
       .pink-text-glow {
         text-shadow: 0 0 15px rgba(255, 107, 157, 0.6);
       }
-      /* Custom scrollbar for Neo-Quantum */
       ::-webkit-scrollbar { width: 6px; }
       ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb { background: #585FD8; border-radius: 10px; }
@@ -87,16 +98,23 @@
     <script type="importmap">
 {
   "imports": {
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "canvas-confetti": "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/+esm",
-    "html2canvas": "https://esm.sh/html2canvas@^1.4.1",
-    "jspdf": "https://esm.sh/jspdf@^4.0.0",
-    "next/": "https://esm.sh/next@^16.1.1/"
+    "react": "https://esm.sh/react@18.3.1",
+    "react-dom": "https://esm.sh/react-dom@18.3.1",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+    "lucide-react": "https://esm.sh/lucide-react@0.468.0?deps=react@18.3.1",
+    "framer-motion": "https://esm.sh/framer-motion@11.11.17?deps=react@18.3.1,react-dom@18.3.1",
+    "recharts": "https://esm.sh/recharts@2.13.3?deps=react@18.3.1,react-dom@18.3.1",
+    "@google/genai": "https://esm.sh/@google/genai@1.30.0",
+    "canvas-confetti": "https://esm.sh/canvas-confetti@1.9.3",
+    "html2canvas": "https://esm.sh/html2canvas@1.4.1",
+    "jspdf": "https://esm.sh/jspdf@2.5.1",
+    "@prisma/client": "https://esm.sh/@prisma/client@latest",
+    "@prisma/extension-accelerate": "https://esm.sh/@prisma/extension-accelerate@latest",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "convex/": "https://esm.sh/convex@^1.31.3/",
+    "prisma/": "https://esm.sh/prisma@^7.2.0/"
   }
 }
 </script>

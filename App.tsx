@@ -1,26 +1,32 @@
+
 import React, { useState, useEffect } from 'react';
+import HeroGate from './components/HeroGate';
 import Onboarding from './components/Onboarding';
 import ChatInterface from './components/ChatInterface';
 import PropertyChat from './components/PropertyChat';
 import BuyDashboard from './components/BuyDashboard';
 import RentDashboard from './components/RentDashboard';
 import LandReport from './components/LandReport';
+import CommercialDashboard from './components/CommercialDashboard';
 import LoanCalculator from './components/LoanCalculator';
 import ValuationCalculator from './components/ValuationCalculator';
+import LoanApprovalAIScreen from './components/LoanApprovalAIScreen';
 import HarmonyDashboard from './components/HarmonyDashboard';
+import EssentialsDashboard from './components/EssentialsDashboard';
 import DPDPModal from './components/DPDPModal';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import Logo from './components/Logo';
-import { AppMode, AppLang, BuyResult, RentResult, LandResult, BuyRequest, RentRequest, LandRequest } from './types';
-import { getBuyAnalysis, getRentAnalysis, getLandValuationAnalysis, parsePrice } from './services/geminiService';
-import { ArrowLeft, Zap, ShieldCheck, Sparkles, Binary, X, BarChart3, Navigation, MessageSquareText, Bell, Shield, Calculator } from 'lucide-react';
+import { AppMode, AppLang, BuyResult, RentResult, LandResult, CommercialResult, BuyRequest, RentRequest, LandRequest, CommercialRequest } from './types';
+import { getBuyAnalysis, getRentAnalysis, getLandValuationAnalysis, getCommercialAnalysis, parsePrice } from './services/geminiService';
+import { ArrowLeft, Zap, ShieldCheck, Sparkles, Binary, X, BarChart3, Navigation, MessageSquareText, Bell, Shield, Calculator, ShieldCheck as ShieldIcon, ShoppingBag, Briefcase } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [stage, setStage] = useState<'onboarding' | 'chat' | 'results' | 'privacy'>('onboarding');
+  const [stage, setStage] = useState<'gate' | 'onboarding' | 'chat' | 'results' | 'privacy'>('gate');
   const [mode, setMode] = useState<AppMode>('buy');
   const [lang, setLang] = useState<AppLang>('EN');
   const [isLoading, setIsLoading] = useState(false);
   const [showFinance, setShowFinance] = useState(false);
+  const [financeTab, setFinanceTab] = useState<'calc' | 'approval'>('calc');
   const [showQuickCalc, setShowQuickCalc] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
   const [showConsentModal, setShowConsentModal] = useState(false);
@@ -28,6 +34,10 @@ const App: React.FC = () => {
   const [buyData, setBuyData] = useState<BuyResult | null>(null);
   const [rentData, setRentData] = useState<RentResult | null>(null);
   const [landData, setLandData] = useState<LandResult | null>(null);
+  const [commercialData, setCommercialData] = useState<CommercialResult | null>(null);
+  
+  const [locationContext, setLocationContext] = useState({ city: '', area: '', pincode: '' });
+  const [commercialMeta, setCommercialMeta] = useState({ type: 'Shop' as 'Shop' | 'Office' | 'Warehouse', sqft: 0 });
 
   useEffect(() => {
     const consent = localStorage.getItem('quantcasa_dpdp_consent');
@@ -45,6 +55,7 @@ const App: React.FC = () => {
       if (mode === 'buy' && buyData) return { type: 'Sale', ...buyData };
       if (mode === 'rent' && rentData) return { type: 'Rental', ...rentData };
       if (mode === 'land' && landData) return { type: 'Land', ...landData };
+      if (mode === 'commercial' && commercialData) return { type: 'Commercial', ...commercialData };
       return null;
   };
 
@@ -56,6 +67,14 @@ const App: React.FC = () => {
 
   const handleComplete = async (data: any) => {
     setIsLoading(true);
+    if (data.city) setLocationContext({ city: data.city, area: data.area || '', pincode: data.pincode || '' });
+    
+    if (mode === 'essentials') {
+      setIsLoading(false);
+      setStage('results');
+      return;
+    }
+
     try {
       if (mode === 'buy') {
         const result = await getBuyAnalysis(data as BuyRequest);
@@ -66,11 +85,15 @@ const App: React.FC = () => {
       } else if (mode === 'land') {
         const result = await getLandValuationAnalysis(data as LandRequest);
         setLandData(result);
+      } else if (mode === 'commercial') {
+        setCommercialMeta({ type: data.type, sqft: data.sqft });
+        const result = await getCommercialAnalysis(data as CommercialRequest);
+        setCommercialData(result);
       }
       setStage('results');
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "An unexpected error occurred in the valuation node. Please check your connection or try again.");
+      alert(err.message || "An unexpected error occurred in the valuation node.");
     } finally {
       setIsLoading(false);
     }
@@ -80,8 +103,13 @@ const App: React.FC = () => {
     if (mode === 'buy' && buyData) return parsePrice(buyData.fairValue);
     if (mode === 'rent' && rentData) return parsePrice(rentData.rentalValue);
     if (mode === 'land' && landData) return parsePrice(landData.landValue);
+    if (mode === 'commercial' && commercialData) return parsePrice(commercialData.fairValue);
     return 10000000;
   };
+
+  if (stage === 'gate') {
+    return <HeroGate onEnter={() => setStage('onboarding')} />;
+  }
 
   if (stage === 'privacy') {
     return <PrivacyPolicy onBack={() => setStage('onboarding')} />;
@@ -99,16 +127,23 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-neo-bg text-white flex flex-col font-sans selection:bg-neo-neon/40 overflow-x-hidden">
       <header className="px-6 md:px-10 py-6 border-b border-white/5 bg-neo-glass/60 backdrop-blur-2xl sticky top-0 z-[100] flex items-center justify-between">
-        <div className="flex items-center gap-4 cursor-pointer group" onClick={() => { setStage('onboarding'); setBuyData(null); setRentData(null); setLandData(null); setShowFinance(false); setShowQuickCalc(false); }}>
+        <div className="flex items-center gap-4 cursor-pointer group" onClick={() => { setStage('onboarding'); setBuyData(null); setRentData(null); setLandData(null); setCommercialData(null); setShowFinance(false); setShowQuickCalc(false); }}>
           <div className="w-10 h-10 md:w-12 md:h-12 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-white shadow-neo-glow transition-all group-hover:rotate-12 group-hover:scale-110 group-hover:border-neo-neon/50">
             <Logo size={28} />
           </div>
           <div className="hidden sm:block">
             <h1 className="font-black text-xl md:text-2xl text-white tracking-tighter leading-none neon-text-glow">QuantCasa</h1>
-            <span className="text-[8px] font-black text-neo-neon uppercase tracking-[0.4em] opacity-80">INTELLIGENCE_LAYER_V5.2</span>
+            <span className="text-[8px] font-black text-neo-neon uppercase tracking-[0.4em] opacity-80">INTELLIGENCE_LAYER_V5.3</span>
           </div>
         </div>
         <div className="flex gap-4">
+          <button 
+            onClick={() => { setMode('essentials'); setStage('chat'); }}
+            className={`w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center transition-all border border-white/10 ${mode === 'essentials' ? 'text-neo-pink border-neo-pink/50 shadow-pink-glow' : 'text-gray-400'}`}
+            title="Local Essentials"
+          >
+            <ShoppingBag size={20} />
+          </button>
           <button 
             onClick={() => setShowQuickCalc(!showQuickCalc)}
             className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-neo-neon hover:bg-white/10 transition-all border border-white/10"
@@ -123,7 +158,7 @@ const App: React.FC = () => {
             <Bell size={20} />
             <span className="absolute top-2 right-2 w-2 h-2 bg-neo-pink rounded-full animate-pulse shadow-pink-glow" />
           </button>
-          {stage === 'results' && (
+          {stage === 'results' && !['essentials', 'expert'].includes(mode) && (
              <button 
               onClick={() => { setMode('expert'); setStage('chat'); }} 
               className="h-10 px-6 rounded-2xl bg-neo-neon/10 text-neo-neon text-[10px] font-black hover:bg-neo-neon hover:text-white transition-all flex items-center gap-2 border border-neo-neon/20 uppercase tracking-widest shadow-neo-glow active:scale-95"
@@ -152,7 +187,7 @@ const App: React.FC = () => {
               </div>
               <div className="p-4 bg-neo-gold/10 border border-neo-gold/20 rounded-2xl">
                 <p className="text-[10px] text-neo-gold font-black uppercase mb-1">Market Alert</p>
-                <p className="text-xs text-gray-300">Mumbai residential index projected to rise 2.5% this quarter.</p>
+                <p className="text-xs text-gray-300">Mumbai commercial index projected to rise 4.2% this quarter.</p>
               </div>
             </div>
           </div>
@@ -180,22 +215,60 @@ const App: React.FC = () => {
         <div className="flex-1 min-w-0">
           {stage === 'results' ? (
             <div className="h-full relative animate-in fade-in slide-in-from-right-10 duration-700">
-              {buyData && <BuyDashboard result={buyData} lang={lang} onAnalyzeFinance={() => setShowFinance(true)} />}
-              {rentData && <RentDashboard result={rentData} lang={lang} onAnalyzeFinance={() => setShowFinance(true)} />}
-              {landData && <LandReport result={landData} lang={lang} onAnalyzeFinance={() => setShowFinance(true)} />}
+              {mode === 'essentials' && <EssentialsDashboard city={locationContext.city} area={locationContext.area} />}
+              {buyData && mode === 'buy' && <BuyDashboard result={buyData} lang={lang} onAnalyzeFinance={() => { setFinanceTab('calc'); setShowFinance(true); }} />}
+              {rentData && mode === 'rent' && <RentDashboard result={rentData} lang={lang} onAnalyzeFinance={() => { setFinanceTab('calc'); setShowFinance(true); }} />}
+              {landData && mode === 'land' && <LandReport result={landData} lang={lang} onAnalyzeFinance={() => { setFinanceTab('calc'); setShowFinance(true); }} />}
+              {commercialData && mode === 'commercial' && (
+                <CommercialDashboard 
+                  result={commercialData} 
+                  lang={lang} 
+                  onAnalyzeFinance={() => { setFinanceTab('calc'); setShowFinance(true); }}
+                  city={locationContext.city}
+                  area={locationContext.area}
+                  pincode={locationContext.pincode}
+                  initialType={commercialMeta.type}
+                  initialSqft={commercialMeta.sqft}
+                />
+              )}
 
               {showFinance && (
                 <div className="fixed inset-0 z-[200] bg-neo-bg/90 backdrop-blur-2xl flex items-center justify-center p-6 animate-in fade-in zoom-in duration-300">
                   <div className="w-full max-w-5xl max-h-[90vh] bg-neo-bg border border-white/10 rounded-[64px] p-10 md:p-16 overflow-y-auto relative shadow-neo-glow border-t-white/20">
                     <button onClick={() => setShowFinance(false)} className="absolute top-10 right-10 p-4 bg-white/5 rounded-2xl hover:bg-neo-pink hover:text-white transition-all text-gray-500 shadow-glass-3d active:scale-90"><X size={24}/></button>
-                    <div className="mb-12">
-                      <div className="flex items-center gap-4 mb-3">
-                          <BarChart3 className={mode === 'rent' ? 'text-emerald-500' : mode === 'land' ? 'text-orange-500' : 'text-neo-neon'} size={32} />
-                          <h2 className="text-4xl font-black text-white tracking-tighter uppercase">Fiscal Simulator</h2>
+                    
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+                      <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-4">
+                              <BarChart3 className={mode === 'rent' || mode === 'commercial' ? 'text-emerald-500' : mode === 'land' ? 'text-orange-500' : 'text-neo-neon'} size={32} />
+                              <h2 className="text-4xl font-black text-white tracking-tighter uppercase">Fiscal Simulator</h2>
+                          </div>
+                          <p className="text-[10px] text-gray-500 uppercase tracking-[0.4em] font-black opacity-60">
+                            {financeTab === 'calc' ? `${mode.toUpperCase()} _ ASSET _ FEASIBILITY` : "LENDING _ AI _ NODE"}
+                          </p>
                       </div>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-[0.4em] font-black pl-12 opacity-60">{mode.toUpperCase()} _ ASSET _ FEASIBILITY _ ENGINE</p>
+
+                      <div className="bg-white/5 p-1.5 rounded-2xl border border-white/10 flex gap-2">
+                        <button 
+                          onClick={() => setFinanceTab('calc')}
+                          className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${financeTab === 'calc' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}
+                        >
+                          Calculator
+                        </button>
+                        <button 
+                          onClick={() => setFinanceTab('approval')}
+                          className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${financeTab === 'approval' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}
+                        >
+                          <ShieldIcon size={14}/> AI Approval
+                        </button>
+                      </div>
                     </div>
-                    <LoanCalculator initialValue={getInitialFinanceValue()} mode={mode} />
+
+                    {financeTab === 'calc' ? (
+                      <LoanCalculator initialValue={getInitialFinanceValue()} mode={mode} />
+                    ) : (
+                      <LoanApprovalAIScreen fairValuePrice={getInitialFinanceValue()} />
+                    )}
                   </div>
                 </div>
               )}

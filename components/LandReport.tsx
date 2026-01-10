@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { LandResult, LandListing, AppLang } from '../types';
-import { Map, ExternalLink, Globe, LayoutDashboard, Map as MapIcon, Bookmark, ImageIcon, Loader2, Zap, Info, Calculator, BarChart3, HardHat } from 'lucide-react';
+import { Map, ExternalLink, Globe, LayoutDashboard, Map as MapIcon, Bookmark, ImageIcon, Loader2, Zap, Info, Calculator, BarChart3, HardHat, Gavel, Target, ShieldAlert, MessageSquare } from 'lucide-react';
 import { generatePropertyImage } from '../services/geminiService';
 import { speak } from '../services/voiceService';
 import { parsePrice } from '../services/geminiService';
@@ -107,8 +107,12 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
     speak(speechText, lang === 'HI' ? 'hi-IN' : 'en-IN');
   }, [result.landValue, lang]);
 
+  const landValNum = parsePrice(result.landValue);
+  const targetBid = landValNum * 0.90;
+  const walkawayCap = landValNum * 1.12;
+
   return (
-    <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-right-8 duration-1000">
+    <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-right-8 duration-1000 pb-20">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-orange-50 rounded-2xl">
@@ -138,7 +142,7 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
           </div>
           {onAnalyzeFinance && (
             <button 
-              onClick={() => onAnalyzeFinance(parsePrice(result.landValue))}
+              onClick={() => onAnalyzeFinance(landValNum)}
               className="mt-4 px-4 py-2 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-500 text-[10px] font-black uppercase tracking-widest hover:bg-orange-500 hover:text-white transition-all w-full flex items-center justify-center gap-2"
             >
               <HardHat size={12} /> ROI Simulator
@@ -162,6 +166,59 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
       <div className="flex-1 overflow-y-auto pr-2 pb-10 scrollbar-hide">
         {viewMode === 'dashboard' ? (
           <div className="space-y-8">
+            {/* NEW: Plot Acquisition Hub */}
+            <div className="bg-neo-gold/5 border border-neo-gold/20 rounded-[48px] p-10 shadow-gold-glow">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
+                <div className="flex items-center gap-4">
+                  <div className="p-4 bg-neo-gold/10 rounded-2xl text-neo-gold">
+                    <Gavel size={28} />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Plot Acquisition Node</h3>
+                    <p className="text-[10px] text-neo-gold font-black uppercase tracking-[0.4em]">Strategic_Bidding_Enabled</p>
+                  </div>
+                </div>
+                <div className="flex gap-4 w-full md:w-auto">
+                  <div className="flex-1 md:flex-none p-4 bg-neo-bg/50 border border-neo-gold/20 rounded-2xl">
+                    <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest block mb-1">Aggressive Bid</span>
+                    <div className="text-lg font-black text-neo-gold">{formatPrice(targetBid)}</div>
+                  </div>
+                  <div className="flex-1 md:flex-none p-4 bg-neo-bg/50 border border-neo-pink/20 rounded-2xl">
+                    <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest block mb-1 text-neo-pink">Price Cap</span>
+                    <div className="text-lg font-black text-neo-pink">{formatPrice(walkawayCap)}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-neo-gold">
+                    <MessageSquare size={16} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Tactical Strategy</span>
+                  </div>
+                  <div className="p-6 bg-black/40 border border-white/5 rounded-3xl text-sm text-gray-300 leading-relaxed italic">
+                    "{result.negotiationStrategy || "Identify and highlight existing encumbrances or boundary complexities to justify the aggressive target bid."}"
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-neo-pink">
+                    <ShieldAlert size={16} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Acquisition Risks</span>
+                  </div>
+                  <ul className="space-y-3">
+                    <li className="flex gap-3 text-xs text-gray-400">
+                      <div className="w-1.5 h-1.5 rounded-full bg-neo-gold mt-1.5 shadow-gold-glow shrink-0" />
+                      <span>{result.zoningAnalysis || "Mixed-use zoning profile"} suggests potential conversion delays. Price in the regulatory friction.</span>
+                    </li>
+                    <li className="flex gap-3 text-xs text-gray-400">
+                      <div className="w-1.5 h-1.5 rounded-full bg-neo-pink mt-1.5 shadow-pink-glow shrink-0" />
+                      <span>Immediately abandon deal if per-sqft cost exceeds {formatPrice(walkawayCap / (landValNum/parsePrice(result.perSqmValue)))} due to ROI dilution.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
             <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d border-l-4 border-l-orange-500">
               <h3 className="text-sm font-black text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
                 <Zap size={18} className="text-orange-500" /> Grounded Justification
@@ -169,16 +226,6 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
               <p className="text-gray-400 leading-relaxed italic text-sm">
                 "{result.valuationJustification}"
               </p>
-              <div className="mt-6 pt-6 border-t border-white/5 flex flex-wrap gap-10">
-                <div>
-                  <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest block">Zoning Potential</span>
-                  <span className="text-xs font-black text-white uppercase mt-1 block">{result.zoningAnalysis}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest block">Strategy</span>
-                  <span className="text-xs font-black text-white uppercase mt-1 block">{result.negotiationStrategy}</span>
-                </div>
-              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
