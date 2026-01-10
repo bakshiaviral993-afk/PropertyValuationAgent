@@ -3,21 +3,28 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
   "dependencies": {
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "lucide-react": "^0.468.0",
     "framer-motion": "^11.11.17",
-    "recharts": "^2.15.0",
+    "recharts": "2.15.0",
     "@google/genai": "^1.30.0",
     "canvas-confetti": "^1.9.3",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1"
   },
   "devDependencies": {
+    "vite": "^6.0.7",
+    "@vitejs/plugin-react": "^4.3.4",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.7.2"
   },
   "overrides": {
     "recharts": {
