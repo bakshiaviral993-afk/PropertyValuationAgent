@@ -138,7 +138,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
       text: currentStep.type === 'price-range' ? formatPrice(Number(normalizedVal)) : String(normalizedVal) 
     }]);
 
-    // Handle City to Area Transition
+    // Transition: City -> Area
     if (currentStep.field === 'city') {
       setIsResolving(true);
       const cityKey = Object.keys(CITY_LOCALITY_MAP).find(k => k.toLowerCase() === String(normalizedVal).toLowerCase());
@@ -156,7 +156,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
       return;
     }
 
-    // Handle Area to PIN Transition (PIN Auto-detect Fix)
+    // Transition: Area -> (Manual PIN or Skip to Configuration)
     if (currentStep.field === 'area') {
       const cityKey = Object.keys(CITY_LOCALITY_MAP).find(k => k.toLowerCase() === nextFormData.city.toLowerCase());
       const cityData = cityKey ? CITY_LOCALITY_MAP[cityKey] : null;
@@ -187,7 +187,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
 
         if (mode === 'essentials') { onComplete(updatedWithAuto); return; }
 
-        // Skip index 2 (Pincode) and go to index 3 (Property Config)
+        // EXPLICIT JUMP: Go straight to Property Config (Index 3), skipping manual PIN (Index 2)
         const nextIdx = 3; 
         if (nextIdx < steps.length) {
           setCurrentStepIndex(nextIdx);
@@ -205,7 +205,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
       }
     }
 
-    // Default Sequential flow
+    // Default sequential behavior
     setFormData(nextFormData);
     let nextIdx = currentStepIndex + 1;
     setInputValue('');

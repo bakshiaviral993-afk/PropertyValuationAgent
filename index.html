@@ -2,7 +2,6 @@
 <html lang="en">
   <head>
     <script>
-      // Define process.env globally to satisfy library requirements and our code
       window.process = { 
         env: { 
           NODE_ENV: 'production',
@@ -10,30 +9,15 @@
           DATABASE_URL: ''
         } 
       };
-      // Make process accessible directly if window.process exists
-      if (typeof process === 'undefined') {
-        window.process = window.process || { env: {} };
-      }
     </script>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="QuantCasa">
     <meta name="theme-color" content="#0a0a0f">
-    
-    <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M25 75 A 32 32 0 1 1 72 45' stroke='%2300F6FF' stroke-width='6' stroke-linecap='round' fill='none'/><path d='M25 75 L52 45 L79 75' stroke='%2300F6FF' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/><circle cx='72' cy='45' r='4.5' fill='%23585FD8'/><line x1='79' y1='36' x2='88' y2='28' stroke='%2300F6FF' stroke-width='4.5' stroke-linecap='round'/><line x1='83' y1='45' x2='93' y2='45' stroke='%2300F6FF' stroke-width='4.5' stroke-linecap='round'/><line x1='79' y1='54' x2='88' y2='62' stroke='%2300F6FF' stroke-width='4.5' stroke-linecap='round'/><rect x='42' y='65' width='5.5' height='10' rx='1.5' fill='%23585FD8'/><rect x='50' y='55' width='5.5' height='20' rx='1.5' fill='%23585FD8'/><rect x='58' y='68' width='5.5' height='7' rx='1.5' fill='%23585FD8'/></svg>">
-    
-    <title>QuantCasa | Neo-Quantum Property Valuation</title>
-    
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M25 75 L52 45 L79 75' stroke='%2300F6FF' stroke-width='8' fill='none'/></svg>">
+    <title>QuantCasa | Professional Property Valuation</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&family=Lora:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=Lora:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
         darkMode: 'class',
@@ -41,7 +25,6 @@
           extend: {
             fontFamily: {
               sans: ['Plus Jakarta Sans', 'sans-serif'],
-              mono: ['JetBrains Mono', 'monospace'],
               serif: ['Lora', 'serif'],
             },
             colors: {
@@ -53,61 +36,28 @@
               'report-blue': '#004c97',
               'report-text': '#222222',
               'report-bg': '#f7f7f7',
-              brand: {
-                primary: '#585FD8',
-                secondary: '#FF6B9D',
-                background: '#0a0a0f',
-                surface: '#1a1a2e',
-              },
             },
             boxShadow: {
               'neo-glow': '0 0 30px rgba(88, 95, 216, 0.4)',
-              'pink-glow': '0 0 25px rgba(255, 107, 157, 0.4)',
-              'gold-glow': '0 0 20px rgba(252, 211, 77, 0.3)',
-              'glass-3d': '0 8px 32px rgba(0, 0, 0, 0.37), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+              'glass-3d': '0 8px 32px rgba(0, 0, 0, 0.37)',
             }
           }
         }
       }
     </script>
     <style>
-      :root {
-        --bg-primary: #0a0a0f;
-        --neon-primary: #585FD8;
-        --glow-accent: #FF6B9D;
-      }
-      body {
-        background-color: var(--bg-primary);
-        color: #f8fafc;
-        font-family: 'Plus Jakarta Sans', sans-serif;
-        overflow-x: hidden;
-      }
-      .glass-3d {
-        background: rgba(26, 26, 46, 0.6);
-        backdrop-filter: blur(16px);
-        border: 1px solid rgba(88, 95, 216, 0.2);
-        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-      }
-      .neon-text-glow {
-        text-shadow: 0 0 15px rgba(88, 95, 216, 0.6);
-      }
-      .pink-text-glow {
-        text-shadow: 0 0 15px rgba(255, 107, 157, 0.6);
-      }
+      body { background-color: #0a0a0f; color: #f8fafc; overflow-x: hidden; }
       ::-webkit-scrollbar { width: 6px; }
-      ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb { background: #585FD8; border-radius: 10px; }
-      .leaflet-container { border-radius: 2rem; background: #0a0a0f !important; }
       
-      /* Professional Report Print Styles */
+      /* Professional Report Styles */
+      .report-justification table tr:nth-child(even) { background-color: #fafafa; }
+      .report-justification thead { background-color: #004c97; color: white; }
+      
       @media print {
         .no-print { display: none !important; }
-        body { background: white !important; color: black !important; }
-        .report-page { margin: 0; padding: 0; box-shadow: none; border: none; }
-      }
-      
-      .report-justification table tr:nth-child(even) {
-        background-color: #fafafa;
+        body { background: white !important; }
+        .report-container { box-shadow: none !important; border: none !important; width: 100% !important; margin: 0 !important; }
       }
     </style>
     <script type="importmap">
@@ -119,21 +69,21 @@
     "react/jsx-runtime": "https://esm.sh/react@19.2.3/jsx-runtime",
     "lucide-react": "https://esm.sh/lucide-react@0.468.0?deps=react@19.2.3",
     "framer-motion": "https://esm.sh/framer-motion@11.11.17?deps=react@19.2.3,react-dom@19.2.3",
-    "recharts": "https://esm.sh/recharts@2.13.3?deps=react@19.2.3,react-dom@19.2.3",
+    "recharts": "https://esm.sh/recharts@2.15.0?deps=react@19.2.3,react-dom@19.2.3",
     "@google/genai": "https://esm.sh/@google/genai@1.30.0",
     "canvas-confetti": "https://esm.sh/canvas-confetti@1.9.3",
     "html2canvas": "https://esm.sh/html2canvas@1.4.1",
     "jspdf": "https://esm.sh/jspdf@2.5.1",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "prisma/": "https://esm.sh/prisma@^7.2.0/",
     "convex/": "https://esm.sh/convex@^1.31.3/",
+    "prisma/": "https://esm.sh/prisma@^7.2.0/",
     "@prisma/extension-accelerate": "https://esm.sh/@prisma/extension-accelerate@^3.0.1"
   }
 }
 </script>
   </head>
-  <body class="dark">
+  <body>
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
   </body>
