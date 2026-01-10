@@ -29,7 +29,7 @@
     <title>QuantCasa | Neo-Quantum Property Valuation</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&family=Lora:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -42,6 +42,7 @@
             fontFamily: {
               sans: ['Plus Jakarta Sans', 'sans-serif'],
               mono: ['JetBrains Mono', 'monospace'],
+              serif: ['Lora', 'serif'],
             },
             colors: {
               'neo-bg': '#0a0a0f',
@@ -49,6 +50,9 @@
               'neo-neon': '#585FD8',
               'neo-pink': '#FF6B9D',
               'neo-gold': '#FCD34D',
+              'report-blue': '#004c97',
+              'report-text': '#222222',
+              'report-bg': '#f7f7f7',
               brand: {
                 primary: '#585FD8',
                 secondary: '#FF6B9D',
@@ -94,27 +98,37 @@
       ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb { background: #585FD8; border-radius: 10px; }
       .leaflet-container { border-radius: 2rem; background: #0a0a0f !important; }
+      
+      /* Professional Report Print Styles */
+      @media print {
+        .no-print { display: none !important; }
+        body { background: white !important; color: black !important; }
+        .report-page { margin: 0; padding: 0; box-shadow: none; border: none; }
+      }
+      
+      .report-justification table tr:nth-child(even) {
+        background-color: #fafafa;
+      }
     </style>
     <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@18.3.1",
-    "react-dom": "https://esm.sh/react-dom@18.3.1",
-    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
-    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
-    "lucide-react": "https://esm.sh/lucide-react@0.468.0?deps=react@18.3.1",
-    "framer-motion": "https://esm.sh/framer-motion@11.11.17?deps=react@18.3.1,react-dom@18.3.1",
-    "recharts": "https://esm.sh/recharts@2.13.3?deps=react@18.3.1,react-dom@18.3.1",
+    "react": "https://esm.sh/react@19.2.3",
+    "react-dom": "https://esm.sh/react-dom@19.2.3",
+    "react-dom/client": "https://esm.sh/react-dom@19.2.3/client",
+    "react/jsx-runtime": "https://esm.sh/react@19.2.3/jsx-runtime",
+    "lucide-react": "https://esm.sh/lucide-react@0.468.0?deps=react@19.2.3",
+    "framer-motion": "https://esm.sh/framer-motion@11.11.17?deps=react@19.2.3,react-dom@19.2.3",
+    "recharts": "https://esm.sh/recharts@2.13.3?deps=react@19.2.3,react-dom@19.2.3",
     "@google/genai": "https://esm.sh/@google/genai@1.30.0",
     "canvas-confetti": "https://esm.sh/canvas-confetti@1.9.3",
     "html2canvas": "https://esm.sh/html2canvas@1.4.1",
     "jspdf": "https://esm.sh/jspdf@2.5.1",
-    "@prisma/client": "https://esm.sh/@prisma/client@latest",
-    "@prisma/extension-accelerate": "https://esm.sh/@prisma/extension-accelerate@latest",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
+    "prisma/": "https://esm.sh/prisma@^7.2.0/",
     "convex/": "https://esm.sh/convex@^1.31.3/",
-    "prisma/": "https://esm.sh/prisma@^7.2.0/"
+    "@prisma/extension-accelerate": "https://esm.sh/@prisma/extension-accelerate@^3.0.1"
   }
 }
 </script>

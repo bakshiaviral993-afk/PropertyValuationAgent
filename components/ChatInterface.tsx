@@ -156,7 +156,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
       return;
     }
 
-    // Handle Area to PIN Transition (The FIX)
+    // Handle Area to PIN Transition (PIN Auto-detect Fix)
     if (currentStep.field === 'area') {
       const cityKey = Object.keys(CITY_LOCALITY_MAP).find(k => k.toLowerCase() === nextFormData.city.toLowerCase());
       const cityData = cityKey ? CITY_LOCALITY_MAP[cityKey] : null;
@@ -182,11 +182,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
         setMessages(prev => [...prev, { 
           id: `b-auto-${Date.now()}`, 
           sender: 'bot', 
-          text: lang === 'HI' ? `पिन कोड पाया गया: ${autoPincode}` : `Auto-filled PIN: ${autoPincode}` 
+          text: lang === 'HI' ? `पिन कोड मिला: ${autoPincode}` : `PIN Node Linked: ${autoPincode}` 
         }]);
 
         if (mode === 'essentials') { onComplete(updatedWithAuto); return; }
 
+        // Skip index 2 (Pincode) and go to index 3 (Property Config)
         const nextIdx = 3; 
         if (nextIdx < steps.length) {
           setCurrentStepIndex(nextIdx);
