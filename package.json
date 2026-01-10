@@ -13,8 +13,9 @@
     "react-dom": "^19.2.3",
     "lucide-react": "^0.468.0",
     "framer-motion": "^11.11.17",
-    "recharts": "^2.15.0",
+    "recharts": "2.15.0",
     "@google/genai": "^1.30.0",
+    "@vercel/kv": "^1.0.1",
     "canvas-confetti": "^1.9.3",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1"
