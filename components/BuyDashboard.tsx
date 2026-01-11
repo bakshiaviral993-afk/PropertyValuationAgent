@@ -5,7 +5,7 @@ import {
   FileText, CheckCircle2, Home, Building2,
   Zap, Save, Sparkles, BarChart3, LayoutGrid, Compass, Paintbrush, Wind, Sparkle, Video, X,
   Target, ShieldAlert, Gavel, MessageSquare, GraduationCap, Download, Loader2, RefreshCw, ImageIcon,
-  Landmark, AlertCircle, CheckCircle
+  Landmark, AlertCircle, CheckCircle, BrainCircuit
 } from 'lucide-react';
 // @ts-ignore
 import confetti from 'canvas-confetti';
@@ -26,6 +26,7 @@ interface BuyDashboardProps {
   result: BuyResult;
   lang?: AppLang;
   onAnalyzeFinance?: (value: number) => void;
+  userBudget?: number;
 }
 
 const safeRender = (value: any): string => {
@@ -94,7 +95,7 @@ const AIListingImage = ({ listing, onShowVideo }: { listing: SaleListing, onShow
   );
 };
 
-const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnalyzeFinance }) => {
+const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnalyzeFinance, userBudget }) => {
   const reportRef = useRef<HTMLDivElement>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [viewMode, setViewMode] = useState<'dashboard' | 'stats' | 'harmony' | 'pro-report'>('pro-report');
@@ -102,14 +103,16 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
   const [isSearchingPincode, setIsSearchingPincode] = useState(false);
 
   useEffect(() => {
-    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+    if (!result.isBudgetAlignmentFailure) {
+      confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+    }
     const priceValue = parsePrice(result.fairValue);
     const priceText = formatPrice(priceValue);
-    const speechText = lang === 'HI' 
-      ? `संपत्ति का सही मूल्य ${priceText} है। विस्तृत रिपोर्ट तैयार है।`
-      : `The asset's fair market value is ${priceText}. Your detailed analyst report is ready.`;
+    const speechText = result.isBudgetAlignmentFailure 
+      ? (lang === 'HI' ? `चेतावनी: आपकी बजट सीमा बाजार मूल्य से कम है। इस क्षेत्र में कम से कम ${formatPrice(result.suggestedMinimum || 0)} की आवश्यकता होगी।` : `Warning: Your budget is below the current market entry barrier. You will need at least ${formatPrice(result.suggestedMinimum || 0)} for this locality.`)
+      : (lang === 'HI' ? `संपत्ति का सही मूल्य ${priceText} है।` : `The asset's fair market value is ${priceText}.`);
     speak(speechText, lang === 'HI' ? 'hi-IN' : 'en-IN');
-  }, [result.fairValue, lang]);
+  }, [result.fairValue, lang, result.isBudgetAlignmentFailure, result.suggestedMinimum]);
 
   const handleDownloadPDF = async () => {
     if (!reportRef.current) return;
@@ -181,36 +184,49 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
       </div>
 
       <div ref={reportRef} className={`${viewMode === 'pro-report' ? 'bg-white' : ''} transition-colors duration-500 rounded-[40px] overflow-hidden shadow-2xl`}>
-        {viewMode === 'pro-report' && <ProfessionalReport result={result} />}
+        {viewMode === 'pro-report' && <ProfessionalReport result={result} userBudget={userBudget} />}
         {viewMode === 'dashboard' && (
           <div className="p-4 space-y-10 no-print">
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-              <div className="xl:col-span-2 bg-white/5 rounded-[48px] p-10 border border-white/10 relative overflow-hidden shadow-glass-3d group">
+              <div className={`xl:col-span-2 rounded-[48px] p-10 border relative overflow-hidden shadow-glass-3d group transition-all ${result.isBudgetAlignmentFailure ? 'bg-neo-pink/5 border-neo-pink/20' : 'bg-white/5 border-white/10'}`}>
                 <div className="absolute top-0 right-0 p-20 opacity-5 rotate-12 transition-transform group-hover:scale-110 duration-1000">
-                  <Landmark size={240} className="text-neo-neon" />
-                </div>
-                <span className="text-[10px] font-black text-neo-neon uppercase tracking-[0.4em] mb-4 block relative z-10">Precise Fair Value</span>
-                <div className="text-6xl font-black text-white tracking-tighter mb-8 leading-tight relative z-10">
-                  {formatPrice(fairValNum)}
+                  <Landmark size={240} className={result.isBudgetAlignmentFailure ? 'text-neo-pink' : 'text-neo-neon'} />
                 </div>
                 
-                {result.valuationJustification && (
-                  <div className="mb-6 p-4 bg-white/5 border border-white/10 rounded-2xl flex items-start gap-3 relative z-10 animate-in slide-in-from-left duration-500">
-                    <AlertCircle className="text-neo-neon shrink-0 mt-0.5" size={18} />
-                    <p className="text-[11px] font-bold text-gray-200 leading-relaxed italic">{result.valuationJustification}</p>
+                {result.isBudgetAlignmentFailure ? (
+                  <div className="relative z-10">
+                    <span className="text-[10px] font-black text-neo-pink uppercase tracking-[0.4em] mb-4 block">Market Entry Barrier</span>
+                    <div className="text-6xl font-black text-white tracking-tighter mb-4 leading-tight">
+                      {formatPrice(result.suggestedMinimum || 0)}
+                    </div>
+                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-8">Minimum Required Capital</p>
+                  </div>
+                ) : (
+                  <div className="relative z-10">
+                    <span className="text-[10px] font-black text-neo-neon uppercase tracking-[0.4em] mb-4 block">Precise Fair Value</span>
+                    <div className="text-6xl font-black text-white tracking-tighter mb-8 leading-tight">
+                      {formatPrice(fairValNum)}
+                    </div>
+                  </div>
+                )}
+                
+                {result.notes && (
+                  <div className={`mb-6 p-4 border rounded-2xl flex items-start gap-3 relative z-10 animate-in slide-in-from-left duration-500 ${result.isBudgetAlignmentFailure ? 'bg-neo-pink/10 border-neo-pink/20' : 'bg-white/5 border-white/10'}`}>
+                    {result.isBudgetAlignmentFailure ? <ShieldAlert className="text-neo-pink shrink-0 mt-0.5" size={18} /> : <AlertCircle className="text-neo-neon shrink-0 mt-0.5" size={18} />}
+                    <p className="text-[11px] font-bold text-gray-200 leading-relaxed italic">{result.notes}</p>
                   </div>
                 )}
 
                 <div className="flex gap-4 relative z-10">
-                  <div className={`px-8 py-3 rounded-full text-xs font-black border uppercase tracking-widest flex items-center gap-2 ${result.recommendation === 'Fair Price' || result.recommendation === 'Good Buy' ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30' : 'bg-neo-pink/20 text-neo-pink border-neo-pink/30'}`}>
-                    {result.recommendation === 'Fair Price' || result.recommendation === 'Good Buy' ? <CheckCircle size={14}/> : <AlertCircle size={14}/>}
-                    {safeRender(result.recommendation)}
+                  <div className={`px-8 py-3 rounded-full text-xs font-black border uppercase tracking-widest flex items-center gap-2 ${result.isBudgetAlignmentFailure ? 'bg-neo-pink/20 text-neo-pink border-neo-pink/30' : result.recommendation === 'Fair Price' || result.recommendation === 'Good Buy' ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30' : 'bg-neo-pink/20 text-neo-pink border-neo-pink/30'}`}>
+                    {result.isBudgetAlignmentFailure ? <AlertCircle size={14}/> : result.recommendation === 'Fair Price' || result.recommendation === 'Good Buy' ? <CheckCircle size={14}/> : <AlertCircle size={14}/>}
+                    {result.isBudgetAlignmentFailure ? 'Recalibration Needed' : safeRender(result.recommendation)}
                   </div>
-                  {onAnalyzeFinance && (
-                    <button onClick={() => onAnalyzeFinance(fairValNum)} className="px-8 py-3 rounded-full bg-white/5 text-white text-xs font-black border border-white/10 uppercase hover:bg-neo-neon transition-all">
-                      Fiscal Simulator
-                    </button>
-                  )}
+                  {result.learningSignals ? (
+                    <div className="px-6 py-3 rounded-full bg-neo-neon/10 text-neo-neon text-[9px] font-black border border-neo-neon/30 uppercase tracking-widest flex items-center gap-2 animate-pulse">
+                      <BrainCircuit size={12}/> Neural Calibration Active
+                    </div>
+                  ) : null}
                 </div>
               </div>
               <div className="bg-white/5 rounded-[40px] p-10 border border-white/10 flex flex-col items-center justify-center text-center shadow-glass-3d">
@@ -241,8 +257,12 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
             {(!result.listings || result.listings.length === 0) && (
                 <div className="col-span-full text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10 animate-in fade-in duration-700">
                    <Building2 size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
-                   <p className="text-gray-500 font-black uppercase tracking-widest text-xs">No direct listing matches found within budget parameters.</p>
-                   <p className="text-[10px] text-gray-600 uppercase mt-2">Valuation derived via neighboring micro-market statistical nodes.</p>
+                   <p className="text-gray-500 font-black uppercase tracking-widest text-xs">
+                     {result.isBudgetAlignmentFailure ? 'No properties found within your selected budget.' : 'No direct listing matches found.'}
+                   </p>
+                   <p className="text-[10px] text-gray-600 uppercase mt-2">
+                     {result.isBudgetAlignmentFailure ? `Grounded entry barrier identified at ~${formatPrice(result.suggestedMinimum || 0)}.` : 'Valuation derived via neural calibration nodes.'}
+                   </p>
                 </div>
             )}
           </div>

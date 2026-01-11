@@ -4,16 +4,17 @@ import {
   ShieldCheck, Target, TrendingUp, Info, MapPin, Gavel, Scale, 
   AlertTriangle, CheckCircle2, Building2, Landmark, 
   MessageSquare, FileText, ChevronRight, BarChart4, AlertCircle,
-  Activity, ArrowDownRight, ArrowUpRight
+  Activity, ArrowDownRight, ArrowUpRight, ShieldAlert, BrainCircuit
 } from 'lucide-react';
 import { formatPrice, parsePrice } from '../services/geminiService';
 
 interface ProfessionalReportProps {
   result: BuyResult;
   lang?: AppLang;
+  userBudget?: number;
 }
 
-const ProfessionalReport: React.FC<ProfessionalReportProps> = ({ result, lang = 'EN' }) => {
+const ProfessionalReport: React.FC<ProfessionalReportProps> = ({ result, lang = 'EN', userBudget }) => {
   const fairValNum = parsePrice(result.fairValue);
   const targetOffer = fairValNum * 0.93;
   const walkaway = fairValNum * 1.07;
@@ -32,7 +33,7 @@ const ProfessionalReport: React.FC<ProfessionalReportProps> = ({ result, lang = 
     <div className="bg-white text-report-text font-sans leading-[1.2] selection:bg-report-blue/10 animate-in fade-in zoom-in duration-500 max-w-5xl mx-auto shadow-2xl border border-slate-200 report-container">
       
       {/* Header - A. Executive Summary Area */}
-      <header className="bg-report-blue p-12 text-white border-b-8 border-neo-neon">
+      <header className={`p-12 text-white border-b-8 ${result.isBudgetAlignmentFailure ? 'bg-slate-800 border-neo-pink' : 'bg-report-blue border-neo-neon'}`}>
         <div className="flex justify-between items-start mb-10">
           <div>
             <div className="flex items-center gap-3 mb-4">
@@ -52,26 +53,48 @@ const ProfessionalReport: React.FC<ProfessionalReportProps> = ({ result, lang = 
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-end">
           <div className="bg-white/5 p-8 rounded-2xl border border-white/10">
-            <span className="text-[9px] font-black uppercase text-slate-300 tracking-widest block mb-2">Subject Property Conclusion</span>
-            <div className="text-6xl font-black tracking-tighter text-white mb-4">
-              {formatPrice(fairValNum)}
-            </div>
-            <div className="flex gap-4">
-              <div className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-2">
-                <CheckCircle2 size={12} /> Recommendation: {result.recommendation}
-              </div>
-              <div className="px-4 py-2 bg-neo-neon text-white rounded-lg text-[10px] font-black uppercase">
-                Confidence: {result.confidenceScore}%
-              </div>
-            </div>
+            {result.isBudgetAlignmentFailure ? (
+              <>
+                <span className="text-[9px] font-black uppercase text-neo-pink tracking-widest block mb-2">Market Entry Barrier</span>
+                <div className="text-6xl font-black tracking-tighter text-white mb-4">
+                  {formatPrice(result.suggestedMinimum || 0)}
+                </div>
+                <div className="flex gap-4">
+                  <div className="px-4 py-2 bg-neo-pink text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-2">
+                    <ShieldAlert size={12} /> Budget Alignment Failed
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="text-[9px] font-black uppercase text-slate-300 tracking-widest block mb-2">Subject Property Conclusion</span>
+                <div className="text-6xl font-black tracking-tighter text-white mb-4">
+                  {formatPrice(fairValNum)}
+                </div>
+                <div className="flex gap-4">
+                  <div className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-2">
+                    <CheckCircle2 size={12} /> Recommendation: {result.recommendation}
+                  </div>
+                  <div className="px-4 py-2 bg-neo-neon text-white rounded-lg text-[10px] font-black uppercase">
+                    Confidence: {result.confidenceScore}%
+                  </div>
+                </div>
+              </>
+            )}
           </div>
           <div className="text-right">
              <p className="text-sm font-serif italic text-slate-200 leading-relaxed mb-4">
-              "{result.valuationJustification}"
+              "{result.notes || result.valuationJustification}"
              </p>
-             <div className="inline-block px-4 py-2 bg-neo-pink text-white rounded-lg text-[10px] font-black uppercase">
-               Risk Rating: 2/5 (Low)
-             </div>
+             {result.learningSignals ? (
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-lg text-[10px] font-black uppercase">
+                  <BrainCircuit size={12} /> Calibrated Model
+                </div>
+             ) : (
+                <div className="inline-block px-4 py-2 bg-neo-pink text-white rounded-lg text-[10px] font-black uppercase">
+                  Risk Rating: {result.isBudgetAlignmentFailure ? 'High' : 'Low'}
+                </div>
+             )}
           </div>
         </div>
       </header>
@@ -92,12 +115,12 @@ const ProfessionalReport: React.FC<ProfessionalReportProps> = ({ result, lang = 
               <p className="text-xs font-black text-slate-800">{primaryListing.bhk || 'Residential'}</p>
            </div>
            <div>
-              <span className="text-[8px] font-black uppercase text-slate-400">Est. Area</span>
-              <p className="text-xs font-black text-slate-800">{areaSqft} Sq. Ft.</p>
+              <span className="text-[8px] font-black uppercase text-slate-400">Target Budget</span>
+              <p className="text-xs font-black text-slate-800">{userBudget ? formatPrice(userBudget) : 'N/A'}</p>
            </div>
            <div>
-              <span className="text-[8px] font-black uppercase text-slate-400">RERA ID</span>
-              <p className="text-xs font-black text-neo-neon">P5210002{Date.now().toString().slice(-4)}</p>
+              <span className="text-[8px] font-black uppercase text-slate-400">System Source</span>
+              <p className="text-xs font-black text-neo-neon uppercase">{result.source}</p>
            </div>
         </div>
       </section>
@@ -135,8 +158,10 @@ const ProfessionalReport: React.FC<ProfessionalReportProps> = ({ result, lang = 
                 </tbody>
               </table>
             ) : (
-              <div className="p-10 text-center bg-slate-50 italic text-slate-400 text-xs">
-                No verified active listings detected in immediate micro-market. Grounding shifted to Method 2 & 3.
+              <div className="p-10 text-center bg-slate-50 italic text-slate-400 text-xs flex flex-col items-center gap-3">
+                <AlertTriangle size={32} className="text-neo-pink opacity-40" />
+                <p>No verified listings detected within budget ₹{userBudget ? (userBudget/10000000).toFixed(2) : '0'} Cr.</p>
+                <p className="font-black text-slate-800 uppercase text-[10px]">Grounding Shifted to Market Entry Stat Barrier: {formatPrice(result.suggestedMinimum || 0)}</p>
               </div>
             )}
           </div>
@@ -188,24 +213,24 @@ const ProfessionalReport: React.FC<ProfessionalReportProps> = ({ result, lang = 
         </div>
         <div className="flex items-center gap-2 mb-10">
           <Gavel size={20} className="text-neo-gold" />
-          <h2 className="text-xs font-black uppercase tracking-[0.3em]">E. Negotiation Strategy Protocol</h2>
+          <h2 className="text-xs font-black uppercase tracking-[0.3em]">E. Recalibration Protocol</h2>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 relative z-10">
           <div className="space-y-8">
             <div className="bg-white/5 p-8 rounded-3xl border border-white/10">
-               <h4 className="text-[10px] font-black uppercase text-slate-400 mb-6 tracking-widest">Acquisition Zones (ZOPA)</h4>
+               <h4 className="text-[10px] font-black uppercase text-slate-400 mb-6 tracking-widest">Budget Recalibration Zones</h4>
                <div className="space-y-4">
                   <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-xl border-l-4 border-emerald-500">
                      <div>
-                        <p className="text-[8px] font-black text-emerald-400 uppercase mb-1">Target Entry Bid</p>
-                        <p className="text-2xl font-black text-white">{formatPrice(targetOffer)}</p>
+                        <p className="text-[8px] font-black text-emerald-400 uppercase mb-1">Min Viable Acquisition</p>
+                        <p className="text-2xl font-black text-white">{formatPrice(result.suggestedMinimum || targetOffer)}</p>
                      </div>
                      <ArrowDownRight className="text-emerald-400" />
                   </div>
                   <div className="flex justify-between items-center p-4 bg-neo-pink/10 rounded-xl border-l-4 border-neo-pink">
                      <div>
-                        <p className="text-[8px] font-black text-neo-pink uppercase mb-1">Hard Walkaway Ceiling</p>
+                        <p className="text-[8px] font-black text-neo-pink uppercase mb-1">Target Ceiling</p>
                         <p className="text-2xl font-black text-white">{formatPrice(walkaway)}</p>
                      </div>
                      <AlertCircle className="text-neo-pink" />
@@ -218,50 +243,10 @@ const ProfessionalReport: React.FC<ProfessionalReportProps> = ({ result, lang = 
              <div className="p-8 bg-white/5 border border-white/10 rounded-3xl space-y-4">
                 <h4 className="text-[10px] font-black uppercase text-neo-gold tracking-widest">Tactical Anchor Script</h4>
                 <p className="text-sm font-serif italic leading-relaxed text-slate-300">
-                  "{result.negotiationScript || "Leverage the area's upcoming supply corridor and the current liquidity search results to anchor the conversation at the target bid. Highlight the immediate registration estimates as a buyer's friction point to justify the discount."}"
+                  "{result.isBudgetAlignmentFailure ? "Due to high capital barriers, pivot search to secondary perimeter zones or reconsider carpet area optimization. Micro-market is currently in a high-demand scarcity cycle." : result.negotiationScript || "Leverage area development signals to anchor bid."}"
                 </p>
              </div>
-             <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-white/5 rounded-2xl">
-                   <span className="text-[8px] font-black text-slate-500 uppercase">Concession 1</span>
-                   <p className="text-[10px] font-bold">Fit-out period extension</p>
-                </div>
-                <div className="p-4 bg-white/5 rounded-2xl">
-                   <span className="text-[8px] font-black text-slate-500 uppercase">Concession 2</span>
-                   <p className="text-[10px] font-bold">Maintenance cap (24m)</p>
-                </div>
-             </div>
           </div>
-        </div>
-      </section>
-
-      {/* F. Sensitivity Dashboard (Tornado Chart) */}
-      <section className="p-12 border-t border-slate-100">
-        <div className="flex items-center gap-2 mb-10 text-report-blue">
-          <BarChart4 size={20} />
-          <h2 className="text-xs font-black uppercase tracking-[0.3em]">F. Valuation Sensitivity Dashboard</h2>
-        </div>
-        <div className="bg-report-bg p-10 rounded-[32px] border border-slate-200">
-           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-10 text-center">Impact Variance Analysis (Tornado Distribution)</h4>
-           <div className="space-y-8 max-w-2xl mx-auto">
-              {sensitivityData.map((item, i) => (
-                <div key={i} className="space-y-2">
-                   <div className="flex justify-between text-[10px] font-bold uppercase text-slate-600">
-                      <span>{item.factor}</span>
-                      <span>{item.variation}</span>
-                   </div>
-                   <div className="h-4 w-full bg-slate-200 rounded-full overflow-hidden flex items-center">
-                      <div 
-                        className={`h-full rounded-full transition-all duration-1000 ${i % 2 === 0 ? 'bg-report-blue' : 'bg-neo-neon'}`} 
-                        style={{ width: `${item.impact * 300}%`, marginLeft: 'auto', marginRight: 'auto' }} 
-                      />
-                   </div>
-                </div>
-              ))}
-           </div>
-           <p className="text-[9px] text-center text-slate-400 uppercase font-black mt-12 tracking-[0.2em]">
-             Monte-Carlo 10,000 Iterations • 90% Confidence Interval Stabilized
-           </p>
         </div>
       </section>
 
@@ -276,7 +261,7 @@ const ProfessionalReport: React.FC<ProfessionalReportProps> = ({ result, lang = 
         </div>
         <div className="text-right">
            <p>© 2026 QuantCasa Research Wing</p>
-           <p>ISO-9001 Grounding Certified Node</p>
+           <p>Neural Calibration Active: Signals Balanced</p>
         </div>
       </footer>
     </div>
