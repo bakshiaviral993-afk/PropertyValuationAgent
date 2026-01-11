@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LandResult, LandListing, AppLang } from '../types';
-import { Map, ExternalLink, Globe, LayoutDashboard, Map as MapIcon, Bookmark, ImageIcon, Loader2, Zap, Info, Calculator, BarChart3, HardHat, Gavel, Target, ShieldAlert, MessageSquare, RefreshCw } from 'lucide-react';
+import { Map, ExternalLink, Globe, LayoutDashboard, Map as MapIcon, Bookmark, ImageIcon, Loader2, Zap, Info, Calculator, BarChart3, HardHat, Gavel, Target, ShieldAlert, MessageSquare, RefreshCw, TrendingUp } from 'lucide-react';
 import { generatePropertyImage } from '../services/geminiService';
 import { speak } from '../services/voiceService';
 import { parsePrice } from '../services/geminiService';
@@ -73,7 +73,7 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
             <Calculator size={24} className="text-orange-500" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-white">Plot Valuation Node</h2>
+            <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Plot Valuation Node</h2>
             <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Strict Grounding Engine</p>
           </div>
         </div>
@@ -84,9 +84,16 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white/5 rounded-[32px] p-6 border border-white/10 border-t-2 border-t-orange-500">
-          <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Total Fair Value</span>
-          <div className="text-2xl font-black text-white">{formatPrice(result.landValue)}</div>
+        <div className="bg-white/5 rounded-[32px] p-6 border border-white/10 border-t-2 border-t-orange-500 flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Total Fair Value</span>
+            <div className="text-2xl font-black text-white">{formatPrice(result.landValue)}</div>
+          </div>
+          {onAnalyzeFinance && (
+            <button onClick={() => { setIsSearchingPincode(true); setTimeout(() => { onAnalyzeFinance(parsePrice(result.landValue)); setIsSearchingPincode(false); }, 800); }} className="mt-4 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[8px] font-black uppercase flex items-center gap-2 hover:bg-orange-500 hover:text-white transition-all">
+              <TrendingUp size={10}/> Simulator
+            </button>
+          )}
         </div>
         <div className="bg-white/5 rounded-[32px] p-6 border border-white/10">
           <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Rate Breakdown</span>

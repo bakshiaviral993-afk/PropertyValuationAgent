@@ -49,7 +49,7 @@ const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
 
   return (
     <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 relative pb-20">
-      {isSearchingPincode && (
+      {(isSearchingPincode || isUpdating) && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 bg-neo-neon text-white rounded-full font-black text-[10px] uppercase tracking-widest shadow-neo-glow flex items-center gap-3 animate-bounce">
           <RefreshCw size={14} className="animate-spin" /> Updating commercial micro-market nodes...
         </div>
@@ -73,9 +73,16 @@ const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 border-t-2 border-t-neo-neon shadow-glass-3d">
-          <span className="text-[10px] font-black text-neo-neon uppercase block mb-1">Market Valuation</span>
-          <div className="text-4xl font-black text-white tracking-tighter">{currentResult.fairValue}</div>
+        <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 border-t-2 border-t-neo-neon shadow-glass-3d flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-black text-neo-neon uppercase block mb-1">Market Valuation</span>
+            <div className="text-4xl font-black text-white tracking-tighter">{currentResult.fairValue}</div>
+          </div>
+          {onAnalyzeFinance && (
+            <button onClick={() => { setIsSearchingPincode(true); setTimeout(() => { onAnalyzeFinance(); setIsSearchingPincode(false); }, 800); }} className="mt-6 px-4 py-2 rounded-xl bg-neo-neon/10 border border-neo-neon/30 text-neo-neon text-[10px] font-black uppercase tracking-widest hover:bg-neo-neon hover:text-white transition-all w-full flex items-center justify-center gap-2">
+              <TrendingUp size={12}/> Fiscal Simulator
+            </button>
+          )}
         </div>
         <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 border-t-2 border-t-emerald-500 shadow-glass-3d">
           <span className="text-[10px] font-black text-emerald-500 uppercase block mb-1">Yield Potential</span>

@@ -124,13 +124,16 @@ export async function getLandValuationAnalysis(req: LandRequest): Promise<LandRe
   };
 }
 
-/**
- * Real-time vision analysis for property harmony
- */
 export async function analyzeImageForHarmony(base64Data: string, type: string): Promise<string> {
-  const prompt = `Analyze this property image for 2026 trendy ${type} compliance. Detect spatial zones, energy flow, and architectural defects. Suggest trendy Biophilic improvements (e.g. specific plant placement, natural material fusion). Output: Score (0-100), key defects, and a "Trendy Remedy".`;
+  const prompt = `Analyze this property image for 2026 trendy ${type} compliance. Detect spatial zones, energy flow, and architectural defects. Suggest trendy Biophilic improvements. Output must follow DeepSeek expert structure:
+- Tip: [Short summary]
+- Details:
+  - Step 1: [Observation]
+  - Step 2: [Remedy]
+- Suggestions:
+  - [Follow-up 1]
+  - [Follow-up 2]`;
   
-  // callLLMWithFallback handles multipart internally when image config is passed
   const { text } = await callLLMWithFallback(prompt, { 
     image: { data: base64Data.split(',')[1], mimeType: 'image/jpeg' },
     model: 'gemini-3-flash-preview'
@@ -144,7 +147,17 @@ export const askPropertyQuestion = async (
   lang: 'EN' | 'HI' = 'EN',
   intent: 'general' | 'vastu' | 'interior' | 'feng-shui' = 'general'
 ): Promise<string> => {
-  const sysPrompt = `QuantCasa Expert. Intent: ${intent.toUpperCase()}. 2026 Trends: Biophilic design, sustainable fusion. Context: ${JSON.stringify(contextResult || {})}. Rules: Highlight mode: TIP:: [One line] DETAIL:: [Explanation].`;
+  const sysPrompt = `You are the QuantCasa Expert AI. Intent: ${intent.toUpperCase()}. Respond in a structured, DeepSeek-style logical breakdown. DO NOT use paragraphs. Always use:
+- Tip: [One-line expert advice]
+- Details:
+  - Step 1: [Technical analysis]
+  - Step 2: [Logical reasoning or remedy]
+- Suggestions:
+  - [Interactive follow-up question A]
+  - [Interactive follow-up question B]
+
+Context: ${JSON.stringify(contextResult || {})}. 2026 Trends: Biophilic sustainability, ancient spatial wisdom fusion.`;
+  
   const { text } = await callLLMWithFallback(messages[messages.length - 1].text, { systemInstruction: sysPrompt, temperature: 0.7 });
   return text;
 };
@@ -154,7 +167,7 @@ export const generatePropertyImage = async (prompt: string): Promise<string | nu
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
-      contents: { parts: [{ text: `High-res architectural 2026 render: ${prompt}. Biophilic style, sustainable materials, natural lighting, Vastu-optimized energy flow. Cinematic realistic photography.` }] },
+      contents: { parts: [{ text: `High-res architectural 2026 render: ${prompt}. Biophilic style, sustainable materials, natural lighting, energy flow. Cinematic realism.` }] },
       config: { imageConfig: { aspectRatio: "16:9" } }
     });
     for (const part of response.candidates[0].content.parts) {

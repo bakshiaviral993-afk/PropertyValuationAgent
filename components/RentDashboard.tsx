@@ -75,7 +75,6 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
 
   const listingPrices = result.listings?.map(l => parsePrice(l.rent)) || [];
   const listingStats = calculateListingStats(listingPrices);
-  const rentValueNum = parsePrice(result.rentalValue);
 
   return (
     <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 pb-20">
@@ -122,7 +121,7 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
                 </div>
               </div>
               {onAnalyzeFinance && (
-                <button onClick={onAnalyzeFinance} className="mt-6 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all w-full flex items-center justify-center gap-2">
+                <button onClick={() => { setIsSearchingPincode(true); setTimeout(() => { onAnalyzeFinance(); setIsSearchingPincode(false); }, 800); }} className="mt-6 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all w-full flex items-center justify-center gap-2">
                   <TrendingUp size={12}/> Fiscal Simulator
                 </button>
               )}
