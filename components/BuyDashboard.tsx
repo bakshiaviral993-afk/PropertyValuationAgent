@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { BuyResult, SaleListing, AppLang } from '../types';
 import { 
   TrendingUp, MapPin, Star, Share2, 
-  FileText, CheckCircle2, Home, 
+  FileText, CheckCircle2, Home, Building2,
   Zap, Save, Sparkles, BarChart3, LayoutGrid, Compass, Paintbrush, Wind, Sparkle, Video, X,
   Target, ShieldAlert, Gavel, MessageSquare, GraduationCap, Download, Loader2, RefreshCw, ImageIcon,
   Landmark, AlertCircle, CheckCircle
@@ -194,9 +194,9 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
                   {formatPrice(fairValNum)}
                 </div>
                 
-                {result.valuationJustification.includes("Note:") && (
-                  <div className="mb-6 p-4 bg-neo-pink/10 border border-neo-pink/20 rounded-2xl flex items-start gap-3 relative z-10 animate-in slide-in-from-left duration-500">
-                    <AlertCircle className="text-neo-pink shrink-0 mt-0.5" size={18} />
+                {result.valuationJustification && (
+                  <div className="mb-6 p-4 bg-white/5 border border-white/10 rounded-2xl flex items-start gap-3 relative z-10 animate-in slide-in-from-left duration-500">
+                    <AlertCircle className="text-neo-neon shrink-0 mt-0.5" size={18} />
                     <p className="text-[11px] font-bold text-gray-200 leading-relaxed italic">{result.valuationJustification}</p>
                   </div>
                 )}
@@ -237,6 +237,14 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
                 </div>
               ))}
             </div>
+
+            {(!result.listings || result.listings.length === 0) && (
+                <div className="col-span-full text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10 animate-in fade-in duration-700">
+                   <Building2 size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
+                   <p className="text-gray-500 font-black uppercase tracking-widest text-xs">No direct listing matches found within budget parameters.</p>
+                   <p className="text-[10px] text-gray-600 uppercase mt-2">Valuation derived via neighboring micro-market statistical nodes.</p>
+                </div>
+            )}
           </div>
         )}
         {viewMode === 'stats' && listingStats && <MarketStats stats={listingStats} prices={listingPrices} />}

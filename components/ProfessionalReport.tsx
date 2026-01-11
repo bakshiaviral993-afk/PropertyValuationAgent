@@ -17,7 +17,7 @@ const ProfessionalReport: React.FC<ProfessionalReportProps> = ({ result, lang = 
   const fairValNum = parsePrice(result.fairValue);
   const targetOffer = fairValNum * 0.93;
   const walkaway = fairValNum * 1.07;
-  const primaryListing = result.listings[0] || {} as SaleListing;
+  const primaryListing = result.listings && result.listings.length > 0 ? result.listings[0] : {} as SaleListing;
   const areaSqft = primaryListing.priceValue ? Math.round(fairValNum / (primaryListing.priceValue / 1000)) : 1200;
 
   // Sensitivity Data for Tornado Chart Visualization
@@ -85,11 +85,11 @@ const ProfessionalReport: React.FC<ProfessionalReportProps> = ({ result, lang = 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
            <div>
               <span className="text-[8px] font-black uppercase text-slate-400">Locality</span>
-              <p className="text-xs font-black text-slate-800 truncate">{primaryListing.address}</p>
+              <p className="text-xs font-black text-slate-800 truncate">{primaryListing.address || 'Scanned Locality'}</p>
            </div>
            <div>
               <span className="text-[8px] font-black uppercase text-slate-400">Configuration</span>
-              <p className="text-xs font-black text-slate-800">{primaryListing.bhk || 'N/A'}</p>
+              <p className="text-xs font-black text-slate-800">{primaryListing.bhk || 'Residential'}</p>
            </div>
            <div>
               <span className="text-[8px] font-black uppercase text-slate-400">Est. Area</span>
@@ -113,26 +113,32 @@ const ProfessionalReport: React.FC<ProfessionalReportProps> = ({ result, lang = 
         <article className="report-justification">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Method 1 — Comparable Sales Analysis (Primary)</h3>
           <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="text-[9px] font-black uppercase tracking-widest">
-                  <th className="p-4">Comparable Transaction</th>
-                  <th className="p-4">Distance</th>
-                  <th className="p-4">Unit Rate (₹/ft²)</th>
-                  <th className="p-4 text-right">Adjusted Price</th>
-                </tr>
-              </thead>
-              <tbody className="text-xs">
-                {result.listings.slice(0, 5).map((l, i) => (
-                  <tr key={i} className="border-b border-slate-100">
-                    <td className="p-4 font-bold text-slate-700" data-provenance={`Listing_ID_${i}_${Date.now()}`}>{l.title}</td>
-                    <td className="p-4 text-slate-500 italic">~{(0.4 + i * 0.2).toFixed(1)} km</td>
-                    <td className="p-4 font-black">₹{Math.round(parsePrice(l.price) / areaSqft).toLocaleString()}</td>
-                    <td className="p-4 text-right font-black text-report-blue">{formatPrice(parsePrice(l.price))}</td>
+            {result.listings && result.listings.length > 0 ? (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="text-[9px] font-black uppercase tracking-widest">
+                    <th className="p-4">Comparable Transaction</th>
+                    <th className="p-4">Distance</th>
+                    <th className="p-4">Unit Rate (₹/ft²)</th>
+                    <th className="p-4 text-right">Adjusted Price</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="text-xs">
+                  {result.listings.slice(0, 5).map((l, i) => (
+                    <tr key={i} className="border-b border-slate-100">
+                      <td className="p-4 font-bold text-slate-700">{l.title}</td>
+                      <td className="p-4 text-slate-500 italic">~{(0.4 + i * 0.2).toFixed(1)} km</td>
+                      <td className="p-4 font-black">₹{Math.round(parsePrice(l.price) / areaSqft).toLocaleString()}</td>
+                      <td className="p-4 text-right font-black text-report-blue">{formatPrice(parsePrice(l.price))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-10 text-center bg-slate-50 italic text-slate-400 text-xs">
+                No verified active listings detected in immediate micro-market. Grounding shifted to Method 2 & 3.
+              </div>
+            )}
           </div>
         </article>
 

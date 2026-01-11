@@ -135,7 +135,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
       let discoveredLocalities = cityKey ? CITY_LOCALITY_MAP[cityKey].localities : [];
       
       if (discoveredLocalities.length === 0) {
-        discoveredLocalities = await resolveLocalityData('major localities', String(normalizedVal));
+        try {
+          discoveredLocalities = await resolveLocalityData('major localities', String(normalizedVal));
+        } catch (e) { console.error("Locality search failed", e); }
       }
       setIsResolving(false);
       setSuggestions(discoveredLocalities);
@@ -153,34 +155,32 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
       const cityData = cityKey ? CITY_LOCALITY_MAP[cityKey] : null;
       let autoPincode = null;
 
-      // 1. Check hardcoded mapping
       if (cityData?.pincodes) {
         const areaKey = Object.keys(cityData.pincodes).find(k => k.toLowerCase() === String(normalizedVal).toLowerCase());
         if (areaKey) autoPincode = cityData.pincodes[areaKey][0];
       }
 
-      // 2. Fallback to AI grounding for PIN
       if (!autoPincode) {
         try {
           const aiResult = await resolveLocalityData(String(normalizedVal), nextFormData.city, 'pincode');
-          autoPincode = aiResult.find(s => /^\d{6}$/.test(s));
+          autoPincode = aiResult.find(s => /^\d{6}$/.test(String(s)));
         } catch (e) { console.warn("AI PIN resolution failed", e); }
       }
 
       setIsResolving(false);
 
       if (autoPincode) {
-        const updatedWithAuto = { ...nextFormData, pincode: autoPincode };
+        const updatedWithAuto = { ...nextFormData, pincode: String(autoPincode) };
         setFormData(updatedWithAuto);
         setMessages(prev => [...prev, { 
           id: `b-auto-${Date.now()}`, 
           sender: 'bot', 
-          text: lang === 'HI' ? `पिन कोड मिला: ${autoPincode} (स्वचालित रूप से चयनित)` : `Verified PIN node: ${autoPincode} (Auto-Selected)` 
+          text: lang === 'HI' ? `पिन कोड मिला: ${autoPincode} (स्वचालित रूप से चयनित)` : `Verified PIN Node: ${autoPincode} (Auto-Detected)` 
         }]);
 
         if (mode === 'essentials') { onComplete(updatedWithAuto); return; }
 
-        // JUMP LOGIC: Skip PIN step (index 2) and go to Property Config (index 3)
+        // JUMP LOGIC: Index 3 is the start of Property specific fields
         const nextIdx = 3; 
         if (nextIdx < steps.length) {
           setCurrentStepIndex(nextIdx);
@@ -194,7 +194,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
           return;
         }
       }
-      // If no auto-pincode found, move to manual PIN entry step
     }
 
     // DEFAULT SEQUENTIAL FLOW
@@ -270,7 +269,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
           <div className="flex justify-start animate-pulse">
             <div className="bg-white/5 border border-white/10 rounded-2xl px-6 py-4 flex items-center gap-3">
               <Loader2 size={16} className="text-neo-neon animate-spin" />
-              <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Resolving Spatial Node...</span>
+              <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Grounding Spatial Node...</span>
             </div>
           </div>
         )}

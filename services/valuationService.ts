@@ -76,7 +76,7 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
   
   const budgetText = userBudget > 0 ? `Targeting a purchase budget of ₹${(userBudget / 10000000).toFixed(2)} Cr.` : "";
   const prompt = `Search for real active sale listings of ${req.bhk || '2-3 BHK'} apartments in ${req.area}, ${req.city}. 
-  ${budgetText} Focus on listings within 20% of this budget.
+  ${budgetText} Provide active verified listings. If no direct budget match, provide the most relevant available market comparables.
   OUTPUT FORMAT: {"listings": [{"project": string, "price": number, "size_sqft": number, "psf": number}]}`;
   
   const { text, groundingSources } = await callLLMWithFallback(prompt, { temperature: 0.1 });
@@ -88,6 +88,7 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
     if (jsonMatch) try { listings = JSON.parse(jsonMatch[0]).listings || []; } catch {}
   }
 
+  // Precision Filtering: Remove invalid or empty signals
   listings = listings.filter((l: any) => l.price > 100000 && l.psf > 2000);
 
   let finalValue: number;
@@ -97,13 +98,14 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
     const sortedPsfs = listings.map((l: any) => l.psf).sort((a: any, b: any) => a - b);
     const medianPsf = sortedPsfs[Math.floor(sortedPsfs.length / 2)];
     const derivedValue = medianPsf * (req.size || 1100);
+    
     if (userBudget > 0 && derivedValue > userBudget * 1.1) {
       notes = `Note: Current area listings suggest a fair value slightly above your target budget. Secondary location pivot or area downsizing recommended.`;
     }
     finalValue = derivedValue;
   } else {
     finalValue = stats.medianPsf * (req.size || 1100);
-    notes = "Valuation grounded via regional market indices.";
+    notes = "Valuation grounded via regional market indices due to limited active live listings.";
   }
 
   return {
