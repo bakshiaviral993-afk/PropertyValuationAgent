@@ -18,16 +18,36 @@ export default async function handler(req: any, res: any) {
         ? { parts: [{ text: prompt }, { inlineData: { data: image.data, mimeType: image.mimeType } }] }
         : prompt;
 
+      // Detect if search grounding is likely needed (e.g. for listings or pincodes)
+      const needsSearch = prompt.toLowerCase().includes('listing') || 
+                         prompt.toLowerCase().includes('pincode') || 
+                         prompt.toLowerCase().includes('pin code') ||
+                         prompt.toLowerCase().includes('price') ||
+                         prompt.toLowerCase().includes('for sale');
+
+      const tools = needsSearch ? [{ googleSearch: {} }] : undefined;
+
       const result = await ai.models.generateContent({
         model: modelName,
         contents: contents,
         config: {
           ...config,
-          // Optimization for expert bot: reduce tokens if it's just a diagnostic
           maxOutputTokens: config.maxOutputTokens || 1200,
+          tools: tools,
         }
       });
-      return res.status(200).json({ text: result.text, source: 'gemini' });
+
+      // Extract grounding sources if available
+      const groundingSources = result.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((chunk: any) => ({
+        uri: chunk.web?.uri,
+        title: chunk.web?.title
+      })).filter((s: any) => s.uri) || [];
+
+      return res.status(200).json({ 
+        text: result.text, 
+        source: 'gemini',
+        groundingSources: groundingSources 
+      });
     } catch (err: any) {
       if (err.status === 429) continue;
       console.error(`LLM Error with ${modelName}:`, err);
