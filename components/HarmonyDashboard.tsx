@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Compass, Wind, Sparkles, Send, Loader2, Zap, MessageSquareText, Upload, Image as ImageIcon, Paintbrush, X } from 'lucide-react';
+import { Compass, Wind, Sparkles, Send, Loader2, Zap, MessageSquareText, Upload, Image as ImageIcon, Paintbrush, X, List } from 'lucide-react';
 import { AppLang, ChatMessage } from '../types';
 import { askPropertyQuestion, generatePropertyImage, analyzeImageForHarmony } from '../services/geminiService';
 import PanchangWidget from './PanchangWidget';
@@ -11,7 +11,7 @@ interface HarmonyDashboardProps {
 
 const HarmonyDashboard: React.FC<HarmonyDashboardProps> = ({ contextResult, lang }) => {
   const [harmonyType, setHarmonyType] = useState<'vastu' | 'feng-shui' | 'interior' | 'general'>('vastu');
-  const [harmonyResult, setHarmonyResult] = useState<{ tip: string, detail: string, renderUrl?: string } | null>(null);
+  const [harmonyResult, setHarmonyResult] = useState<{ tip: string, detail: string[], renderUrl?: string } | null>(null);
   const [followUpMsgs, setFollowUpMsgs] = useState<ChatMessage[]>([]);
   const [followInput, setFollowInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -35,29 +35,30 @@ const HarmonyDashboard: React.FC<HarmonyDashboardProps> = ({ contextResult, lang
       }
     }
 
+    const userDesc = followInput.trim() ? `User Description: ${followInput}.` : "";
     const prompt = `System: Home-harmony expert. 2026 Biophilic Trend fusion.
-    User: Analyze ${harmonyType.toUpperCase()} for Pincode: ${pincode}. ${visionAnalysis ? 'Vision Context: ' + visionAnalysis : ''}
+    User: Analyze ${harmonyType.toUpperCase()} for Pincode: ${pincode}. ${userDesc} ${visionAnalysis ? 'Vision Context: ' + visionAnalysis : ''}
     Output Format:
-    TIP:: [Highlighted one-line trendy advice]
-    DETAIL:: [2-sentence explanation involving biophilic elements]`;
+    TIP:: [One line summary]
+    DETAIL:: [Bullet points of advice separated by new lines]`;
 
     try {
       const response = await askPropertyQuestion([{ id: 'h', sender: 'user', text: prompt }], contextResult, lang, harmonyType as any);
       
       const tipLine = response.split('\n').find(l => l.toUpperCase().startsWith('TIP::'))?.replace(/TIP::/i, '').trim();
-      const detailLine = response.split('\n').find(l => l.toUpperCase().startsWith('DETAIL::'))?.replace(/DETAIL::/i, '').trim();
+      const detailSection = response.split(/DETAIL::/i)[1] || response;
+      const bulletPoints = detailSection.split('\n').map(s => s.replace(/^[•\-\*]\s*/, '').trim()).filter(Boolean);
       
-      // Generate trendy visual render
       const renderPrompt = `${harmonyType} optimized living space: ${tipLine || 'sustainable modern fusion'}. Include biophilic greenery and natural lighting.`;
       const renderUrl = await generatePropertyImage(renderPrompt);
 
       setHarmonyResult({
-        tip: tipLine || response.split('\n')[0],
-        detail: detailLine || response.split('\n').slice(1).join(' '),
+        tip: tipLine || "Spatial Optimization Active",
+        detail: bulletPoints,
         renderUrl: renderUrl || undefined
       });
     } catch (e) {
-      setHarmonyResult({ tip: "Neural link slow.", detail: "Please re-initialize tips." });
+      setHarmonyResult({ tip: "Neural link slow.", detail: ["Please re-initialize tips."], renderUrl: undefined });
     } finally {
       setIsLoading(false);
     }
@@ -73,30 +74,6 @@ const HarmonyDashboard: React.FC<HarmonyDashboardProps> = ({ contextResult, lang
         getHarmonyTips(base64);
       };
       reader.readAsDataURL(file);
-    }
-  };
-
-  const handleFollowUp = async () => {
-    if (!followInput.trim() || isLoading) return;
-    const userMsg: ChatMessage = { id: `u-${Date.now()}`, sender: 'user', text: followInput };
-    setFollowUpMsgs(prev => [...prev, userMsg]);
-    const currentInput = followInput;
-    setFollowInput('');
-    setIsLoading(true);
-
-    try {
-      const historyText = followUpMsgs.concat(userMsg).map(m => `${m.sender}: ${m.text}`).join('\n');
-      const answer = await askPropertyQuestion(
-        [{ id: 'f', sender: 'user', text: `Previous conversation: ${historyText}\nUser follow-up: ${currentInput}\nProvide biophilic remedy.` }],
-        { ...contextResult, harmonyBase: harmonyResult },
-        lang,
-        harmonyType as any
-      );
-      setFollowUpMsgs(prev => [...prev, { id: `b-${Date.now()}`, sender: 'bot', text: answer }]);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -117,35 +94,37 @@ const HarmonyDashboard: React.FC<HarmonyDashboardProps> = ({ contextResult, lang
             onClick={() => fileInputRef.current?.click()}
             className="px-5 py-3 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-neo-neon hover:bg-white/10 transition-all flex items-center gap-2"
           >
-            <Upload size={14} /> Upload Plan
+            <Upload size={14} /> Upload Plan/Photo
           </button>
           <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" hidden />
         </div>
 
-        <div className="flex flex-wrap items-center gap-6 bg-white/5 p-6 rounded-[32px] border border-white/5">
-          <div className="flex flex-wrap gap-6">
-            {(['vastu', 'feng-shui', 'interior', 'general'] as const).map((type) => (
-              <label key={type} className="flex items-center gap-3 cursor-pointer group">
-                <input 
-                  type="radio" name="harmony" checked={harmonyType === type}
-                  onChange={() => setHarmonyType(type)} className="sr-only"
-                />
-                <div className={`w-5 h-5 rounded-full border-2 transition-all flex items-center justify-center ${harmonyType === type ? 'border-neo-neon bg-neo-neon shadow-neo-glow' : 'border-gray-600'}`}>
-                  {harmonyType === type && <div className="w-2 h-2 bg-white rounded-full" />}
-                </div>
-                <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${harmonyType === type ? 'text-white' : 'text-gray-500'}`}>
-                  {type}
-                </span>
-              </label>
-            ))}
+        <div className="space-y-4">
+          <textarea 
+            value={followInput}
+            onChange={(e) => setFollowInput(e.target.value)}
+            placeholder="Describe your property (e.g., 'Kitchen in southeast, main door north, living room colors blue')"
+            className="w-full bg-black/40 border border-white/10 rounded-[32px] p-6 text-sm font-medium text-white outline-none focus:border-neo-neon min-h-[100px] transition-all"
+          />
+          <div className="flex flex-wrap items-center gap-6 bg-white/5 p-4 rounded-[32px] border border-white/5">
+            <div className="flex flex-wrap gap-4">
+              {(['vastu', 'feng-shui', 'interior', 'general'] as const).map((type) => (
+                <label key={type} className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" checked={harmonyType === type} onChange={() => setHarmonyType(type)} className="sr-only" />
+                  <div className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${harmonyType === type ? 'bg-neo-neon text-white shadow-neo-glow' : 'bg-white/5 text-gray-500 hover:text-white'}`}>
+                    {type}
+                  </div>
+                </label>
+              ))}
+            </div>
+            <button 
+              onClick={() => getHarmonyTips(uploadedImage || undefined)}
+              disabled={isLoading}
+              className="ml-auto px-8 py-4 bg-neo-neon text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-neo-glow hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-3"
+            >
+              {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />} Establish Sync
+            </button>
           </div>
-          <button 
-            onClick={() => getHarmonyTips(uploadedImage || undefined)}
-            disabled={isLoading}
-            className="ml-auto px-8 py-4 bg-neo-neon text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-neo-glow hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-3"
-          >
-            {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />} Establish Sync
-          </button>
         </div>
 
         {uploadedImage && (
@@ -171,33 +150,14 @@ const HarmonyDashboard: React.FC<HarmonyDashboardProps> = ({ contextResult, lang
                   <div className="text-2xl font-black text-emerald-400 uppercase tracking-tight leading-tight neon-text-glow">
                     {harmonyResult?.tip}
                   </div>
-                  <p className="text-sm text-gray-300 leading-relaxed font-medium italic">
-                    "{harmonyResult?.detail}"
-                  </p>
-                  
-                  {followUpMsgs.length > 0 && (
-                    <div className="space-y-4 pt-6 border-t border-white/5 max-h-[200px] overflow-y-auto scrollbar-hide">
-                      {followUpMsgs.map((m) => (
-                        <div key={m.id} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-[90%] px-4 py-3 rounded-2xl text-xs ${m.sender === 'user' ? 'bg-neo-neon/20 text-white' : 'bg-white/5 text-gray-400'}`}>
-                            {m.text}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="relative mt-8 flex gap-3">
-                    <input 
-                      type="text" placeholder="Ask biophilic remedy…" value={followInput}
-                      onChange={(e) => setFollowInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleFollowUp()}
-                      className="flex-1 h-12 bg-black/40 border border-white/10 rounded-2xl pl-5 text-xs font-bold text-white outline-none focus:border-neo-neon"
-                    />
-                    <button onClick={handleFollowUp} className="w-12 h-12 bg-neo-neon text-white rounded-2xl flex items-center justify-center shadow-neo-glow active:scale-95 transition-all">
-                      <Send size={16} />
-                    </button>
-                  </div>
+                  <ul className="space-y-4">
+                    {harmonyResult?.detail.map((item, i) => (
+                      <li key={i} className="flex gap-3 text-sm text-gray-300 leading-relaxed font-medium italic">
+                        <div className="w-1.5 h-1.5 rounded-full bg-neo-neon mt-2 shrink-0 shadow-neo-glow" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
                 </>
               )}
             </div>

@@ -4,7 +4,7 @@ import {
   TrendingUp, MapPin, Star, Share2, 
   FileText, CheckCircle2, Home, 
   Zap, Save, Sparkles, BarChart3, LayoutGrid, Compass, Paintbrush, Wind, Sparkle, Video, X,
-  Target, ShieldAlert, Gavel, MessageSquare, GraduationCap, Download
+  Target, ShieldAlert, Gavel, MessageSquare, GraduationCap, Download, Loader2, RefreshCw
 } from 'lucide-react';
 // @ts-ignore
 import confetti from 'canvas-confetti';
@@ -64,8 +64,8 @@ const AIListingImage = ({ listing, onShowVideo }: { listing: SaleListing, onShow
           <Video size={14} /> Video Walkthrough
         </button>
       </div>
-      <div className="absolute bottom-2 right-2 px-2 py-1 rounded bg-black/60 text-[10px] font-black text-white uppercase">
-        Live
+      <div className="absolute bottom-2 right-2 px-2 py-1 rounded bg-black/60 text-[8px] font-black text-white uppercase">
+        Live_Node
       </div>
     </div>
   );
@@ -76,6 +76,7 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
   const [isSaved, setIsSaved] = useState(false);
   const [viewMode, setViewMode] = useState<'dashboard' | 'stats' | 'harmony' | 'pro-report'>('pro-report');
   const [selectedVideo, setSelectedVideo] = useState<{prompt: string, title: string} | null>(null);
+  const [isSearchingPincode, setIsSearchingPincode] = useState(false);
 
   useEffect(() => {
     confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
@@ -97,27 +98,8 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const canvasRatio = canvas.height / canvas.width;
-    const imgWidth = pageWidth;
-    const imgHeight = pageWidth * canvasRatio;
-    
-    // Simple pagination if report is long
-    let heightLeft = imgHeight;
-    let position = 0;
-    
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-    
-    while (heightLeft >= 0) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-    }
-    
-    const timestamp = new Date().toISOString().split('T')[0];
-    pdf.save(`QuantCasa_Valuation_${timestamp}_v2.pdf`);
+    pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, (canvas.height * pageWidth) / canvas.width);
+    pdf.save(`QuantCasa_Report_${Date.now()}.pdf`);
   };
 
   const listingPrices = result.listings?.map(l => parsePrice(l.price)) || [];
@@ -126,6 +108,12 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
 
   return (
     <div className="h-full space-y-10 overflow-y-auto pb-24 scrollbar-hide px-2">
+      {isSearchingPincode && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 bg-neo-neon text-white rounded-full font-black text-[10px] uppercase tracking-widest shadow-neo-glow flex items-center gap-3 animate-bounce">
+          <RefreshCw size={14} className="animate-spin" /> Searching for regional pincodes & market data...
+        </div>
+      )}
+
       {selectedVideo && (
         <div className="fixed inset-0 z-[500] bg-neo-bg/80 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
           <VideoGenerator 
@@ -136,7 +124,6 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
         </div>
       )}
 
-      {/* Control Widget */}
       <div className="bg-neo-glass border border-white/10 p-8 rounded-[48px] flex flex-wrap gap-6 items-center justify-between shadow-neo-glow no-print">
         <div className="flex items-center gap-6">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-report-blue to-neo-neon flex items-center justify-center text-white shadow-neo-glow">
@@ -170,7 +157,6 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
         </div>
       </div>
 
-      {/* Main Content Area */}
       <div ref={reportRef} className={`${viewMode === 'pro-report' ? 'bg-white' : ''} transition-colors duration-500`}>
         {viewMode === 'pro-report' && <ProfessionalReport result={result} />}
         {viewMode === 'dashboard' && (
