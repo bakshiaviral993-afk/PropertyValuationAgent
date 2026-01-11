@@ -62,7 +62,7 @@ const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
           </div>
           <div>
             <h2 className="text-2xl font-black text-white uppercase tracking-tighter">{initialType} Assets</h2>
-            <p className="text-[10px] text-gray-500 uppercase font-black opacity-60">{area}, {city}</p>
+            <p className="text-[10px] text-gray-500 uppercase font-black opacity-60 tracking-widest">{area}, {city}</p>
           </div>
         </div>
         <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10">
@@ -94,28 +94,39 @@ const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto scrollbar-hide">
         <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 border-l-4 border-l-neo-neon mb-8">
           <h3 className="text-xs font-black text-white mb-4 flex items-center gap-2 uppercase tracking-widest"><Info size={18}/> Business Intelligence</h3>
           <p className="text-gray-300 leading-relaxed italic text-sm">"{currentResult.businessInsights}"</p>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
           {currentResult.listings.map((item, idx) => (
-            <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 shadow-glass-3d group">
+            <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-8 shadow-glass-3d group hover:border-neo-neon/40 transition-all">
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <h4 className="font-black text-white text-lg truncate uppercase">{item.title}</h4>
-                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">{item.address}</p>
+                  <h4 className="font-black text-white text-lg truncate uppercase leading-tight">{item.title}</h4>
+                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mt-1">{item.address}</p>
                 </div>
                 <div className="text-right">
-                  <div className="text-xl font-black text-white">{item.price}</div>
-                  <div className="text-[8px] text-neo-neon font-black uppercase mt-1">{item.intent} Option</div>
+                  <div className="text-xl font-black text-white">{typeof item.price === 'string' ? item.price : formatPrice(item.price as any)}</div>
+                  <div className="text-[8px] text-neo-neon font-black uppercase mt-1 px-2 py-0.5 bg-neo-neon/10 rounded border border-neo-neon/20">{item.intent} Option</div>
                 </div>
               </div>
-              <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-4 rounded-2xl bg-neo-neon text-white text-[10px] font-black uppercase flex items-center justify-center gap-2">Verify Listing <ExternalLink size={14} /></a>
+              <div className="mb-6 grid grid-cols-2 gap-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                 <div className="bg-white/5 p-3 rounded-xl border border-white/5">Area: {item.sqft} SQFT</div>
+                 <div className="bg-white/5 p-3 rounded-xl border border-white/5">Type: {item.type}</div>
+              </div>
+              <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-4 rounded-2xl bg-neo-neon text-white text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-neo-glow transition-all active:scale-95">Verify Listing <ExternalLink size={14} /></a>
             </div>
           ))}
+
+          {currentResult.listings.length === 0 && (
+            <div className="col-span-full text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10">
+               <Briefcase size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
+               <p className="text-gray-500 font-black uppercase tracking-widest text-xs">No hyper-local commercial listings found.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

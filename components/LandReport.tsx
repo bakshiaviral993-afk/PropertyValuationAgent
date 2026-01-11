@@ -54,8 +54,8 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
   const listings = result.listings || [];
 
   useEffect(() => {
-    const landText = formatPrice(result.landValue);
-    const speechText = lang === 'HI' ? `प्लॉट का मूल्य ${landText} है।` : `The plot's market value is ${landText}.`;
+    const landValueStr = typeof result.landValue === 'string' ? result.landValue : formatPrice(result.landValue);
+    const speechText = lang === 'HI' ? `प्लॉट का मूल्य ${landValueStr} है।` : `The plot's market value is ${landValueStr}.`;
     speak(speechText, lang === 'HI' ? 'hi-IN' : 'en-IN');
   }, [result.landValue, lang]);
 
@@ -87,7 +87,7 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
         <div className="bg-white/5 rounded-[32px] p-6 border border-white/10 border-t-2 border-t-orange-500 flex flex-col justify-between">
           <div>
             <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Total Fair Value</span>
-            <div className="text-2xl font-black text-white">{formatPrice(result.landValue)}</div>
+            <div className="text-2xl font-black text-white">{typeof result.landValue === 'string' ? result.landValue : formatPrice(result.landValue)}</div>
           </div>
           {onAnalyzeFinance && (
             <button onClick={() => { setIsSearchingPincode(true); setTimeout(() => { onAnalyzeFinance(parsePrice(result.landValue)); setIsSearchingPincode(false); }, 800); }} className="mt-4 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[8px] font-black uppercase flex items-center gap-2 hover:bg-orange-500 hover:text-white transition-all">
@@ -109,7 +109,7 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-10">
+      <div className="flex-1 overflow-y-auto pb-10 scrollbar-hide">
         <div className="space-y-8">
           <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 border-l-4 border-l-orange-500">
             <h3 className="text-sm font-black text-white mb-4 flex items-center gap-2 uppercase">
@@ -120,20 +120,27 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {listings.map((item, idx) => (
-              <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 group">
+              <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 group shadow-glass-3d animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
                 <AIPropertyImage title={item.title} address={item.address} type="Plot" />
                 <div className="mb-4">
-                  <h4 className="font-black text-white truncate">{item.title}</h4>
-                  <p className="text-[10px] text-gray-500 truncate">{item.address}</p>
-                  <div className="mt-4 flex justify-between items-center">
-                    <span className="text-xl font-black text-orange-500">{formatPrice(item.price)}</span>
-                    <span className="text-[10px] font-black text-gray-400">{item.size}</span>
+                  <h4 className="font-black text-white truncate uppercase">{item.title}</h4>
+                  <p className="text-[10px] text-gray-500 truncate font-bold tracking-widest mt-1 uppercase">{item.address}</p>
+                  <div className="mt-4 flex justify-between items-center pt-4 border-t border-white/5">
+                    <span className="text-xl font-black text-orange-500">{typeof item.price === 'string' ? item.price : formatPrice(item.price)}</span>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{item.size}</span>
                   </div>
                 </div>
-                <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-4 rounded-2xl bg-white/5 text-white text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:bg-orange-500 transition-all">Verify Listing <ExternalLink size={14} /></a>
+                <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-4 rounded-2xl bg-white/5 text-white text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:bg-orange-500 transition-all border border-white/10">Verify Listing <ExternalLink size={14} /></a>
               </div>
             ))}
           </div>
+
+          {listings.length === 0 && (
+            <div className="text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10">
+               <MapIcon size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
+               <p className="text-gray-500 font-black uppercase tracking-widest text-xs">No active land listings detected in this micro-market.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

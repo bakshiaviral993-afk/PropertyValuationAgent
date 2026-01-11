@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { RentResult, RentalListing, AppLang } from '../types';
 import { 
   MapPin, ExternalLink, Globe, Info, Layers, Building2, ImageIcon, Loader2, BarChart3, LayoutGrid,
-  Receipt, Wallet, TrendingUp, Gavel, Target, ShieldAlert, MessageSquare, RefreshCw, Sparkles
+  Receipt, Wallet, TrendingUp, Gavel, Target, ShieldAlert, MessageSquare, RefreshCw, Sparkles, CheckCircle, AlertCircle
 } from 'lucide-react';
 import { generatePropertyImage } from '../services/geminiService';
 import { speak } from '../services/voiceService';
@@ -13,6 +13,7 @@ interface RentDashboardProps {
   result: RentResult;
   lang?: AppLang;
   onAnalyzeFinance?: () => void;
+  userBudget?: number;
 }
 
 const formatPriceDisplay = (val: any): string => {
@@ -60,10 +61,13 @@ const AIPropertyImage = ({ title, address, type }: { title: string, address: str
   );
 };
 
-const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAnalyzeFinance }) => {
+const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAnalyzeFinance, userBudget }) => {
   const [viewMode, setViewMode] = useState<'dashboard' | 'stats'>('dashboard');
   const [isSearchingPincode, setIsSearchingPincode] = useState(false);
   const listings = result.listings || [];
+
+  const fairValueNum = parsePrice(result.rentalValue);
+  const isAboveBudget = userBudget && fairValueNum > userBudget * 1.1;
 
   useEffect(() => {
     const rentText = formatPriceDisplay(result.rentalValue);
@@ -90,7 +94,7 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
             <Building2 size={24} />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Rental Analysis</h2>
+            <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Lease Analysis</h2>
             <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black opacity-60">Verified Valuation Node</p>
           </div>
         </div>
@@ -110,60 +114,93 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d border-t-2 border-t-emerald-500 flex flex-col justify-between">
+            <div className={`bg-white/5 rounded-[32px] p-8 border shadow-glass-3d border-t-4 flex flex-col justify-between transition-all ${isAboveBudget ? 'border-t-neo-pink border-neo-pink/20' : 'border-t-emerald-500 border-white/10'}`}>
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <Receipt size={14} className="text-emerald-500" />
-                  <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest block">Monthly Rent</span>
+                  <Receipt size={14} className={isAboveBudget ? 'text-neo-pink' : 'text-emerald-500'} />
+                  <span className={`text-[10px] font-black uppercase tracking-widest block ${isAboveBudget ? 'text-neo-pink' : 'text-emerald-500'}`}>Est. Monthly Rent</span>
                 </div>
                 <div className="text-4xl font-black text-white tracking-tighter">
                   {formatPriceDisplay(result.rentalValue)}
                 </div>
+                <div className="mt-2 flex items-center gap-2">
+                   {isAboveBudget ? (
+                     <span className="px-3 py-1 bg-neo-pink/10 text-neo-pink text-[8px] font-black uppercase rounded-lg flex items-center gap-1.5 border border-neo-pink/20">
+                       <AlertCircle size={10} /> Above Target
+                     </span>
+                   ) : (
+                     <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 text-[8px] font-black uppercase rounded-lg flex items-center gap-1.5 border border-emerald-500/20">
+                       <CheckCircle size={10} /> Within Budget
+                     </span>
+                   )}
+                </div>
               </div>
               {onAnalyzeFinance && (
-                <button onClick={() => { setIsSearchingPincode(true); setTimeout(() => { onAnalyzeFinance(); setIsSearchingPincode(false); }, 800); }} className="mt-6 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all w-full flex items-center justify-center gap-2">
+                <button onClick={() => { setIsSearchingPincode(true); setTimeout(() => { onAnalyzeFinance(); setIsSearchingPincode(false); }, 800); }} className="mt-6 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-400 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all w-full flex items-center justify-center gap-2">
                   <TrendingUp size={12}/> Fiscal Simulator
                 </button>
               )}
             </div>
-            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d border-t-2 border-t-blue-500">
+            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d border-t-4 border-t-blue-500">
               <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest block mb-2">Projected Yield</span>
               <div className="text-4xl font-black text-white tracking-tighter">{result.yieldPercentage || "3.5%"}</div>
+              <p className="text-[9px] text-gray-500 mt-2 font-bold uppercase">Asset Efficiency Signal</p>
             </div>
-            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d border-t-2 border-t-orange-500">
-              <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest block mb-2">Confidence</span>
+            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d border-t-4 border-t-orange-500">
+              <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest block mb-2">Confidence Score</span>
               <div className="text-4xl font-black text-white tracking-tighter">{result.confidenceScore}%</div>
+              <p className="text-[9px] text-gray-500 mt-2 font-bold uppercase">Grounding Probability</p>
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto pr-2 pb-10 scrollbar-hide">
             <div className="space-y-8">
-              <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d border-l-4 border-l-emerald-500">
-                <h3 className="text-xs font-black text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
-                  <Info size={18} className="text-emerald-500" /> Market Reasoning
-                </h3>
-                <p className="text-gray-300 leading-relaxed italic text-sm">"{result.valuationJustification}"</p>
-              </div>
+              {(result.valuationJustification || result.notes) && (
+                <div className={`bg-white/5 rounded-[32px] p-8 border border-white/10 border-l-4 shadow-glass-3d ${isAboveBudget ? 'border-l-neo-pink' : 'border-l-emerald-500'}`}>
+                  <h3 className="text-xs font-black text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
+                    <Info size={18} className={isAboveBudget ? 'text-neo-pink' : 'text-emerald-500'} /> Market Context
+                  </h3>
+                  <p className="text-gray-300 leading-relaxed italic text-sm">"{result.valuationJustification} {result.notes}"</p>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {listings.map((item, idx) => (
-                  <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 shadow-glass-3d hover:border-emerald-500/30 transition-all group">
-                    <AIPropertyImage title={item.title} address={item.address} type={item.bhk} />
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex-1 min-w-0 pr-4">
-                        <h4 className="font-black text-white truncate uppercase">{item.title}</h4>
-                        <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-1 font-bold uppercase tracking-widest truncate"><MapPin size={12}/> {item.address}</p>
+                {listings.map((item, idx) => {
+                  const itemRent = parsePrice(item.rent);
+                  const isMatch = userBudget && itemRent <= userBudget * 1.05;
+                  
+                  return (
+                    <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 shadow-glass-3d hover:border-emerald-500/30 transition-all group relative overflow-hidden">
+                      {isMatch && (
+                        <div className="absolute top-6 right-6 z-10 px-3 py-1 bg-emerald-500 text-white text-[8px] font-black uppercase rounded-full shadow-neo-glow animate-in zoom-in">
+                          Budget Match
+                        </div>
+                      )}
+                      <AIPropertyImage title={item.title} address={item.address} type={item.bhk} />
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex-1 min-w-0 pr-4">
+                          <h4 className="font-black text-white truncate uppercase">{item.title}</h4>
+                          <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-1 font-bold uppercase tracking-widest truncate"><MapPin size={12}/> {item.address}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-xl font-black text-emerald-500">{formatPriceDisplay(item.rent)}</div>
+                        </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-xl font-black text-emerald-500">{formatPriceDisplay(item.rent)}</div>
-                      </div>
+                      <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-500 hover:border-emerald-500 transition-all">
+                        Verify Source <ExternalLink size={14} />
+                      </a>
                     </div>
-                    <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-500 hover:border-emerald-500 transition-all">
-                      Verify Source <ExternalLink size={14} />
-                    </a>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+
+              {listings.length === 0 && !isSearchingPincode && (
+                <div className="text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10">
+                   <Building2 size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
+                   <p className="text-gray-500 font-black uppercase tracking-widest text-xs">No hyper-local listings found for this budget node.</p>
+                   <p className="text-[10px] text-gray-600 uppercase mt-2">Try expanding search radius or adjusting budget parameters.</p>
+                </div>
+              )}
             </div>
           </div>
         </>

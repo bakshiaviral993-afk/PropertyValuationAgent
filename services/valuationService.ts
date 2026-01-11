@@ -74,11 +74,9 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
   const stats = await getDynamicMarketStats(req.city, req.area, req.pincode, "residential");
   const userBudget = req.budget || 0;
   
-  // BUDGET AWARE PROMPT: Specifically request properties around the user's budget
-  const budgetText = userBudget > 0 ? `Targeting a budget of ₹${(userBudget / 10000000).toFixed(2)} Cr.` : "";
-  const prompt = `Perform a web search for real, active property listings of ${req.bhk || '2-3 BHK'} apartments for sale in ${req.area}, ${req.city}. 
-  ${budgetText} 
-  Provide a JSON list of 6-12 verified projects. Filter out listings that are 50% above the target budget unless necessary for market context.
+  const budgetText = userBudget > 0 ? `Targeting a purchase budget of ₹${(userBudget / 10000000).toFixed(2)} Cr.` : "";
+  const prompt = `Search for real active sale listings of ${req.bhk || '2-3 BHK'} apartments in ${req.area}, ${req.city}. 
+  ${budgetText} Focus on listings within 20% of this budget.
   OUTPUT FORMAT: {"listings": [{"project": string, "price": number, "size_sqft": number, "psf": number}]}`;
   
   const { text, groundingSources } = await callLLMWithFallback(prompt, { temperature: 0.1 });
@@ -87,44 +85,34 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
     listings = JSON.parse(text.replace(/```json|```/g, '').trim()).listings || []; 
   } catch (e) {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try { listings = JSON.parse(jsonMatch[0]).listings || []; } catch {}
-    }
+    if (jsonMatch) try { listings = JSON.parse(jsonMatch[0]).listings || []; } catch {}
   }
 
-  // Precision Filtering: Remove outliers and zero-values
-  listings = listings.filter((l: any) => l.price > 100000 && l.size_sqft > 100 && l.psf > 2000);
+  listings = listings.filter((l: any) => l.price > 100000 && l.psf > 2000);
 
   let finalValue: number;
   let notes = "";
 
   if (listings.length >= 2) {
-    // Calculate median PSF from found listings
     const sortedPsfs = listings.map((l: any) => l.psf).sort((a: any, b: any) => a - b);
     const medianPsf = sortedPsfs[Math.floor(sortedPsfs.length / 2)];
-    
-    // Weight the valuation: Give some weight to the medianPsf from web, but bound it by market stats
     const derivedValue = medianPsf * (req.size || 1100);
-    
-    // If the search results are wildly higher than user budget, flag it
-    if (userBudget > 0 && derivedValue > userBudget * 1.15) {
-      notes = `Note: Current micro-market listings for ${req.area} suggest a fair value slightly above your selected budget. Total area optimization or secondary location pivot recommended.`;
+    if (userBudget > 0 && derivedValue > userBudget * 1.1) {
+      notes = `Note: Current area listings suggest a fair value slightly above your target budget. Secondary location pivot or area downsizing recommended.`;
     }
-    
     finalValue = derivedValue;
   } else {
-    // Fallback to statistical median
     finalValue = stats.medianPsf * (req.size || 1100);
-    notes = "Limited live listings found. Valuation grounded via regional statistical indices.";
+    notes = "Valuation grounded via regional market indices.";
   }
 
   return {
     estimatedValue: Math.round(finalValue),
-    rangeLow: Math.round(finalValue * 0.94), // Tighter range for better precision
+    rangeLow: Math.round(finalValue * 0.94),
     rangeHigh: Math.round(finalValue * 1.06),
     pricePerUnit: Math.round(finalValue / (req.size || 1100)),
-    confidence: listings.length >= 4 ? 'high' : 'medium',
-    source: listings.length >= 3 ? 'live_scrape' : 'cached_stats',
+    confidence: listings.length >= 3 ? 'high' : 'medium',
+    source: listings.length >= 2 ? 'live_scrape' : 'cached_stats',
     notes,
     comparables: listings.slice(0, 8),
     groundingSources
@@ -133,29 +121,42 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
 
 export async function getRentValuationInternal(req: ValuationRequestBase): Promise<ValuationResultBase> {
   const stats = await getDynamicMarketStats(req.city, req.area, req.pincode, "rental");
+  const userBudget = req.budget || 0;
   
-  const prompt = `Search for active rental listings for ${req.propertyType} in ${req.area}, ${req.city}. 
-  Provide a JSON list of verified rental properties.
+  const budgetText = userBudget > 0 ? `Targeting a monthly rent of ₹${userBudget.toLocaleString()}.` : "";
+  const prompt = `Search for active verified rental listings for ${req.propertyType} in ${req.area}, ${req.city}. 
+  ${budgetText} Output real results near this price point.
   OUTPUT FORMAT: {"listings": [{"project": string, "monthlyRent": number, "size_sqft": number}]}`;
   
   const { text, groundingSources } = await callLLMWithFallback(prompt);
   let listings = [];
-  try { listings = JSON.parse(text.replace(/```json|```/g, '').trim()).listings || []; } catch {}
+  try { 
+    listings = JSON.parse(text.replace(/```json|```/g, '').trim()).listings || []; 
+  } catch (e) {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) try { listings = JSON.parse(jsonMatch[0]).listings || []; } catch {}
+  }
+
+  listings = listings.filter((l: any) => l.monthlyRent > 1000);
 
   const rentPsf = (listings.length > 0) 
-    ? listings.reduce((acc: number, curr: any) => acc + (curr.monthlyRent / curr.size_sqft), 0) / listings.length
+    ? listings.reduce((acc: number, curr: any) => acc + (curr.monthlyRent / (curr.size_sqft || req.size || 1000)), 0) / listings.length
     : stats.medianPsf * 0.0025; 
 
-  const size = req.size || 1100;
+  const finalValue = rentPsf * (req.size || 1100);
+  let notes = "";
+  if (userBudget > 0 && finalValue > userBudget * 1.15) {
+    notes = `Note: Current rental demand in ${req.area} is resulting in higher asks. Recommended to check immediate outskirts.`;
+  }
 
   return {
-    estimatedValue: Math.round(rentPsf * size),
-    rangeLow: Math.round(rentPsf * size * 0.9),
-    rangeHigh: Math.round(rentPsf * size * 1.1),
+    estimatedValue: Math.round(finalValue),
+    rangeLow: Math.round(finalValue * 0.9),
+    rangeHigh: Math.round(finalValue * 1.1),
     pricePerUnit: Math.round(rentPsf),
-    confidence: listings.length >= 3 ? 'high' : 'medium',
-    source: listings.length >= 3 ? 'live_scrape' : 'cached_stats',
-    notes: '',
+    confidence: listings.length >= 2 ? 'high' : 'medium',
+    source: listings.length >= 2 ? 'live_scrape' : 'cached_stats',
+    notes,
     comparables: listings.slice(0, 8),
     groundingSources
   };
@@ -163,24 +164,32 @@ export async function getRentValuationInternal(req: ValuationRequestBase): Promi
 
 export async function getLandValuationInternal(req: ValuationRequestBase): Promise<ValuationResultBase> {
   const stats = await getDynamicMarketStats(req.city, req.area, req.pincode, "land");
-  
-  const prompt = `Search for recent land/plot sales or active listings in ${req.area}, ${req.city}. 
-  Provide a JSON list of results.
+  const userBudget = req.budget || 0;
+
+  const budgetText = userBudget > 0 ? `Targeting a plot cost of ₹${(userBudget/10000000).toFixed(2)} Cr.` : "";
+  const prompt = `Search for real land/plot listings for sale in ${req.area}, ${req.city}. 
+  ${budgetText} Priority for listings within ±15% of budget.
   OUTPUT FORMAT: {"listings": [{"project": string, "totalPrice": number, "size_sqyd": number}]}`;
   
   const { text, groundingSources } = await callLLMWithFallback(prompt);
   let listings = [];
-  try { listings = JSON.parse(text.replace(/```json|```/g, '').trim()).listings || []; } catch {}
+  try { 
+    listings = JSON.parse(text.replace(/```json|```/g, '').trim()).listings || []; 
+  } catch (e) {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) try { listings = JSON.parse(jsonMatch[0]).listings || []; } catch {}
+  }
 
-  const size = req.size || 1000;
   const psy = (listings.length > 0)
-    ? listings.reduce((acc: number, curr: any) => acc + (curr.totalPrice / curr.size_sqyd), 0) / listings.length
+    ? listings.reduce((acc: number, curr: any) => acc + (curr.totalPrice / (curr.size_sqyd || req.size || 1000)), 0) / listings.length
     : stats.medianPsf * 9 * 0.4; 
 
+  const finalValue = psy * (req.size || 1000);
+
   return {
-    estimatedValue: Math.round(psy * size),
-    rangeLow: Math.round(psy * size * 0.85),
-    rangeHigh: Math.round(psy * size * 1.15),
+    estimatedValue: Math.round(finalValue),
+    rangeLow: Math.round(finalValue * 0.85),
+    rangeHigh: Math.round(finalValue * 1.15),
     pricePerUnit: Math.round(psy),
     confidence: listings.length > 0 ? 'medium' : 'low',
     source: listings.length > 0 ? 'live_scrape' : 'cached_stats',
@@ -192,25 +201,32 @@ export async function getLandValuationInternal(req: ValuationRequestBase): Promi
 
 export async function getCommercialValuationInternal(req: ValuationRequestBase): Promise<ValuationResultBase> {
   const stats = await getDynamicMarketStats(req.city, req.area, req.pincode, "commercial");
-  
-  const prompt = `Search for commercial ${req.propertyType} listings for sale or lease in ${req.area}, ${req.city}. 
-  Provide JSON results.
+  const userBudget = req.budget || 0;
+
+  const budgetText = userBudget > 0 ? `Budget: ₹${(userBudget/10000000).toFixed(2)} Cr.` : "";
+  const prompt = `Search for commercial ${req.propertyType} listings in ${req.area}, ${req.city}. 
+  ${budgetText} Include only real verified assets.
   OUTPUT FORMAT: {"listings": [{"project": string, "price": number, "psf": number, "size_sqft": number}]}`;
   
   const { text, groundingSources } = await callLLMWithFallback(prompt);
   let listings = [];
-  try { listings = JSON.parse(text.replace(/```json|```/g, '').trim()).listings || []; } catch {}
+  try { 
+    listings = JSON.parse(text.replace(/```json|```/g, '').trim()).listings || []; 
+  } catch (e) {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) try { listings = JSON.parse(jsonMatch[0]).listings || []; } catch {}
+  }
 
   const psf = (listings.length > 0)
-    ? listings.reduce((acc: number, curr: any) => acc + curr.psf, 0) / listings.length
+    ? listings.reduce((acc: number, curr: any) => acc + (curr.price / (curr.size_sqft || req.size || 500)), 0) / listings.length
     : stats.medianPsf * 1.5; 
 
-  const size = req.size || 500;
+  const finalValue = psf * (req.size || 500);
 
   return {
-    estimatedValue: Math.round(psf * size),
-    rangeLow: Math.round(psf * size * 0.9),
-    rangeHigh: Math.round(psf * size * 1.1),
+    estimatedValue: Math.round(finalValue),
+    rangeLow: Math.round(finalValue * 0.9),
+    rangeHigh: Math.round(finalValue * 1.1),
     pricePerUnit: Math.round(psf),
     confidence: listings.length > 0 ? 'medium' : 'low',
     source: listings.length > 0 ? 'live_scrape' : 'cached_stats',
