@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChatMessage, AppMode, WizardStep, AppLang } from '../types';
-import { Send, ChevronLeft, Mic, MicOff, Edit2, History, Loader2, Sparkles, Edit3, IndianRupee } from 'lucide-react';
+import { Send, ChevronLeft, Mic, MicOff, Edit2, History, Loader2, Sparkles, Edit3, IndianRupee, MapPin, Search, CheckCircle2 } from 'lucide-react';
 import LoadingInsights from './LoadingInsights';
 import { SpeechInput } from '../services/voiceService';
 import { resolveLocalityData, formatPrice } from '../services/geminiService';
@@ -25,12 +25,14 @@ const CITY_LOCALITY_MAP: Record<string, { localities: string[], pincodes: Record
     }
   },
   'Pune': {
-    localities: ['Kharadi', 'Baner', 'Wagholi', 'Hinjewadi'],
+    localities: ['Kharadi', 'Baner', 'Wagholi', 'Hinjewadi', 'Kalyani Nagar', 'Magarpatta'],
     pincodes: { 
       'Kharadi': ['411014'], 
       'Baner': ['411045'], 
       'Wagholi': ['412207'],
-      'Hinjewadi': ['411057']
+      'Hinjewadi': ['411057'],
+      'Kalyani Nagar': ['411006'],
+      'Magarpatta': ['411013']
     }
   },
   'Delhi': {
@@ -112,19 +114,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const handleEditMessage = (index: number) => {
-    if (messages[index].sender !== 'user') return;
-    const stepIdx = Math.floor(index / 2);
-    const field = steps[stepIdx].field;
-    const oldValue = formData[field];
-    setHistory(prev => [...prev, { field, oldValue, timestamp: Date.now() }]);
-    setCurrentStepIndex(stepIdx);
-    setInputValue(String(oldValue));
-    setIsManualEntry(true);
-    setMessages(prev => prev.slice(0, index)); 
-  };
+  }, [messages, isResolving]);
 
   const handleNext = async (val: any) => {
     if (val === undefined || val === null || (typeof val === 'string' && val.trim() === '')) return;
@@ -138,7 +128,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
       text: currentStep.type === 'price-range' ? formatPrice(Number(normalizedVal)) : String(normalizedVal) 
     }]);
 
-    // Transition: City -> Area
+    // TRANSITION: City -> Locality Suggestions
     if (currentStep.field === 'city') {
       setIsResolving(true);
       const cityKey = Object.keys(CITY_LOCALITY_MAP).find(k => k.toLowerCase() === String(normalizedVal).toLowerCase());
@@ -156,25 +146,28 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
       return;
     }
 
-    // Transition: Area -> (Manual PIN or Skip to Configuration)
+    // TRANSITION: Locality -> Automatic PIN Search
     if (currentStep.field === 'area') {
+      setIsResolving(true);
       const cityKey = Object.keys(CITY_LOCALITY_MAP).find(k => k.toLowerCase() === nextFormData.city.toLowerCase());
       const cityData = cityKey ? CITY_LOCALITY_MAP[cityKey] : null;
       let autoPincode = null;
 
+      // 1. Check hardcoded mapping
       if (cityData?.pincodes) {
         const areaKey = Object.keys(cityData.pincodes).find(k => k.toLowerCase() === String(normalizedVal).toLowerCase());
         if (areaKey) autoPincode = cityData.pincodes[areaKey][0];
       }
 
-      if (!autoPincode && !isManualEntry) {
-        setIsResolving(true);
+      // 2. Fallback to AI grounding for PIN
+      if (!autoPincode) {
         try {
           const aiResult = await resolveLocalityData(String(normalizedVal), nextFormData.city, 'pincode');
           autoPincode = aiResult.find(s => /^\d{6}$/.test(s));
         } catch (e) { console.warn("AI PIN resolution failed", e); }
-        setIsResolving(false);
       }
+
+      setIsResolving(false);
 
       if (autoPincode) {
         const updatedWithAuto = { ...nextFormData, pincode: autoPincode };
@@ -182,18 +175,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
         setMessages(prev => [...prev, { 
           id: `b-auto-${Date.now()}`, 
           sender: 'bot', 
-          text: lang === 'HI' ? `पिन कोड मिला: ${autoPincode}` : `PIN Node Linked: ${autoPincode}` 
+          text: lang === 'HI' ? `पिन कोड मिला: ${autoPincode} (स्वचालित रूप से चयनित)` : `Verified PIN node: ${autoPincode} (Auto-Selected)` 
         }]);
 
         if (mode === 'essentials') { onComplete(updatedWithAuto); return; }
 
-        // EXPLICIT JUMP: Go straight to Property Config (Index 3), skipping manual PIN (Index 2)
+        // JUMP LOGIC: Skip PIN step (index 2) and go to Property Config (index 3)
         const nextIdx = 3; 
         if (nextIdx < steps.length) {
           setCurrentStepIndex(nextIdx);
-          setTimeout(() => {
-            setMessages(prev => [...prev, { id: `b-next-${Date.now()}`, sender: 'bot', text: steps[nextIdx].question }]);
-          }, 300);
+          setMessages(prev => [...prev, { id: `b-next-${Date.now()}`, sender: 'bot', text: steps[nextIdx].question }]);
           setInputValue('');
           setSuggestions([]);
           setIsManualEntry(false);
@@ -203,9 +194,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
           return;
         }
       }
+      // If no auto-pincode found, move to manual PIN entry step
     }
 
-    // Default sequential behavior
+    // DEFAULT SEQUENTIAL FLOW
     setFormData(nextFormData);
     let nextIdx = currentStepIndex + 1;
     setInputValue('');
@@ -274,12 +266,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
             </div>
           </div>
         ))}
-        {history.length > 0 && (
-          <div className="flex items-center gap-2 text-[8px] font-black text-gray-600 uppercase tracking-widest px-4">
-            <History size={10} /> {history.length} Revisions Logged
+        {isResolving && (
+          <div className="flex justify-start animate-pulse">
+            <div className="bg-white/5 border border-white/10 rounded-2xl px-6 py-4 flex items-center gap-3">
+              <Loader2 size={16} className="text-neo-neon animate-spin" />
+              <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Resolving Spatial Node...</span>
+            </div>
           </div>
         )}
-        {(isLoading || isResolving) && <LoadingInsights />}
+        {(isLoading) && <LoadingInsights />}
         <div ref={scrollRef} />
       </div>
 
@@ -289,16 +284,18 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
             {suggestions.length > 0 && currentStep.field === 'area' && (
               <div className="flex flex-wrap gap-2 mb-4">
                  {suggestions.map(s => (
-                   <button key={s} onClick={() => handleNext(s)} className="h-10 px-5 rounded-xl bg-neo-neon/20 border border-neo-neon/40 text-xs font-black text-white hover:bg-neo-neon">{s}</button>
+                   <button key={s} onClick={() => handleNext(s)} className="h-10 px-5 rounded-xl bg-neo-neon/20 border border-neo-neon/40 text-xs font-black text-white hover:bg-neo-neon transition-all flex items-center gap-2">
+                     <MapPin size={12}/> {s}
+                   </button>
                  ))}
-                 <button onClick={() => setIsManualEntry(true)} className="h-10 px-5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-gray-400">Manual Entry</button>
+                 <button onClick={() => { setIsManualEntry(true); setSuggestions([]); }} className="h-10 px-5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-gray-400">Custom Entry</button>
               </div>
             )}
             
             {currentStep.type === 'city-picker' && !isManualEntry && (
               <div className="flex flex-wrap gap-2">
                 {COMMON_CITIES.map(c => (
-                  <button key={c} onClick={() => handleNext(c)} className="h-10 px-5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-gray-200 hover:border-neo-neon">{c}</button>
+                  <button key={c} onClick={() => handleNext(c)} className="h-10 px-5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-gray-200 hover:border-neo-neon transition-all">{c}</button>
                 ))}
               </div>
             )}
@@ -331,23 +328,28 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
 
             {(isManualEntry || (currentStep.type !== 'city-picker' && currentStep.type !== 'select' && currentStep.type !== 'price-range' && suggestions.length === 0)) && (
                <div className="relative flex gap-3 animate-in fade-in duration-300">
+                <div className="absolute left-6 inset-y-0 flex items-center pointer-events-none text-gray-500">
+                  <Edit3 size={18}/>
+                </div>
                 <input 
                   autoFocus 
                   type={currentStep.type === 'number' ? 'number' : 'text'}
                   placeholder={currentStep.placeholder || `Enter ${currentStep.field}...`}
-                  className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-bold text-white focus:border-neo-neon outline-none" 
+                  className="flex-1 bg-white/5 border border-white/10 rounded-2xl pl-16 pr-6 py-4 text-sm font-bold text-white focus:border-neo-neon outline-none" 
                   value={inputValue} 
                   onChange={(e) => setInputValue(e.target.value)} 
                   onKeyDown={(e) => e.key === 'Enter' && handleNext(inputValue)} 
                 />
-                <button onClick={() => handleNext(inputValue)} className="w-14 h-14 bg-neo-neon rounded-2xl flex items-center justify-center text-white shadow-neo-glow"><Send size={20} /></button>
+                <button onClick={() => handleNext(inputValue)} className="w-14 h-14 bg-neo-neon rounded-2xl flex items-center justify-center text-white shadow-neo-glow hover:scale-105 active:scale-95 transition-all">
+                  <Send size={20} />
+                </button>
               </div>
             )}
 
             {currentStep.type === 'select' && (
               <div className="flex flex-wrap gap-3">
                 {currentStep.options?.map(o => (
-                  <button key={o} onClick={() => handleNext(o)} className="flex-1 min-w-[100px] h-12 rounded-xl bg-white/5 border border-white/5 text-xs font-bold text-gray-200 hover:border-neo-neon transition-all">{o}</button>
+                  <button key={o} onClick={() => handleNext(o)} className="flex-1 min-w-[100px] h-12 rounded-xl bg-white/5 border border-white/5 text-xs font-bold text-gray-200 hover:border-neo-neon transition-all uppercase tracking-widest">{o}</button>
                 ))}
               </div>
             )}
@@ -356,6 +358,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
       </div>
     </div>
   );
+
+  function handleEditMessage(index: number) {
+    if (messages[index].sender !== 'user') return;
+    const stepIdx = Math.floor(index / 2);
+    const field = steps[stepIdx]?.field;
+    if (!field) return;
+    
+    const oldValue = formData[field];
+    setHistory(prev => [...prev, { field, oldValue, timestamp: Date.now() }]);
+    setCurrentStepIndex(stepIdx);
+    setInputValue(String(oldValue));
+    setIsManualEntry(true);
+    setMessages(prev => prev.slice(0, index)); 
+  }
 };
 
 export default ChatInterface;

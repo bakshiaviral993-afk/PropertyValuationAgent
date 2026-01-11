@@ -21,7 +21,11 @@ export default async function handler(req: any, res: any) {
       const result = await ai.models.generateContent({
         model: modelName,
         contents: contents,
-        config: config
+        config: {
+          ...config,
+          // Optimization for expert bot: reduce tokens if it's just a diagnostic
+          maxOutputTokens: config.maxOutputTokens || 1200,
+        }
       });
       return res.status(200).json({ text: result.text, source: 'gemini' });
     } catch (err: any) {

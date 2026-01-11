@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import HeroGate from './components/HeroGate';
 import Onboarding from './components/Onboarding';
@@ -15,10 +14,12 @@ import HarmonyDashboard from './components/HarmonyDashboard';
 import EssentialsDashboard from './components/EssentialsDashboard';
 import DPDPModal from './components/DPDPModal';
 import PrivacyPolicy from './components/PrivacyPolicy';
+import FeedbackModal from './components/FeedbackModal';
+import AboutModal from './components/AboutModal';
 import Logo from './components/Logo';
 import { AppMode, AppLang, BuyResult, RentResult, LandResult, CommercialResult, BuyRequest, RentRequest, LandRequest, CommercialRequest } from './types';
 import { getBuyAnalysis, getRentAnalysis, getLandValuationAnalysis, getCommercialAnalysis, parsePrice } from './services/geminiService';
-import { ArrowLeft, Zap, ShieldCheck, Sparkles, Binary, X, BarChart3, Navigation, MessageSquareText, Bell, Shield, Calculator, ShieldCheck as ShieldIcon, ShoppingBag, Briefcase } from 'lucide-react';
+import { ArrowLeft, Zap, ShieldCheck, Sparkles, Binary, X, BarChart3, Navigation, MessageSquareText, Bell, Shield, Calculator, ShieldCheck as ShieldIcon, ShoppingBag, Briefcase, MessageSquare, Info } from 'lucide-react';
 
 const App: React.FC = () => {
   const [stage, setStage] = useState<'gate' | 'onboarding' | 'chat' | 'results' | 'privacy'>('gate');
@@ -30,6 +31,8 @@ const App: React.FC = () => {
   const [showQuickCalc, setShowQuickCalc] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
   const [showConsentModal, setShowConsentModal] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   
   const [buyData, setBuyData] = useState<BuyResult | null>(null);
   const [rentData, setRentData] = useState<RentResult | null>(null);
@@ -136,7 +139,21 @@ const App: React.FC = () => {
             <span className="text-[8px] font-black text-neo-neon uppercase tracking-[0.4em] opacity-80">INTELLIGENCE_LAYER_V5.3</span>
           </div>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-3 md:gap-4">
+          <button 
+            onClick={() => setShowAbout(true)}
+            className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-gray-400 hover:text-white transition-all border border-white/10"
+            title="About QuantCasa"
+          >
+            <Info size={20} />
+          </button>
+          <button 
+            onClick={() => setShowFeedback(true)}
+            className="hidden md:flex h-10 px-5 rounded-2xl bg-neo-pink/10 text-neo-pink text-[10px] font-black hover:bg-neo-pink hover:text-white transition-all items-center gap-2 border border-neo-pink/20 uppercase tracking-widest shadow-pink-glow active:scale-95"
+            title="Tester Feedback"
+          >
+            <MessageSquare size={14} /> Feedback
+          </button>
           <button 
             onClick={() => { setMode('essentials'); setStage('chat'); }}
             className={`w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center transition-all border border-white/10 ${mode === 'essentials' ? 'text-neo-pink border-neo-pink/50 shadow-pink-glow' : 'text-gray-400'}`}
@@ -158,50 +175,54 @@ const App: React.FC = () => {
             <Bell size={20} />
             <span className="absolute top-2 right-2 w-2 h-2 bg-neo-pink rounded-full animate-pulse shadow-pink-glow" />
           </button>
-          {stage === 'results' && !['essentials', 'expert'].includes(mode) && (
-             <button 
-              onClick={() => { setMode('expert'); setStage('chat'); }} 
-              className="h-10 px-6 rounded-2xl bg-neo-neon/10 text-neo-neon text-[10px] font-black hover:bg-neo-neon hover:text-white transition-all flex items-center gap-2 border border-neo-neon/20 uppercase tracking-widest shadow-neo-glow active:scale-95"
-             >
-                <MessageSquareText size={14} /> Expert Chat
-             </button>
-          )}
           <button onClick={() => setStage('onboarding')} className="h-10 px-6 rounded-2xl bg-white/5 text-[10px] font-black hover:bg-white/10 transition-all flex items-center gap-2 border border-white/5 uppercase tracking-widest shadow-glass-3d active:scale-95">
             <ArrowLeft size={14} /> Reset
           </button>
         </div>
       </header>
 
-      {/* Harmony Alerts Portal */}
-      {showAlerts && (
-        <div className="fixed top-24 right-6 md:right-10 z-[200] w-full max-w-sm animate-in slide-in-from-top-10 duration-500">
-          <div className="bg-neo-glass backdrop-blur-3xl border border-neo-gold/30 rounded-[32px] p-6 shadow-neo-glow">
-            <div className="flex justify-between items-center mb-6">
-              <h4 className="text-xs font-black text-neo-gold uppercase tracking-widest">Auspicious Alerts</h4>
-              <button onClick={() => setShowAlerts(false)} className="text-gray-500 hover:text-white"><X size={16}/></button>
-            </div>
-            <div className="space-y-4">
-              <div className="p-4 bg-neo-neon/10 border border-neo-neon/20 rounded-2xl">
-                <p className="text-[10px] text-neo-neon font-black uppercase mb-1">Today's Pulse</p>
-                <p className="text-xs text-gray-300">Swati Nakshatra detected. Ideal for property site visits before 2 PM.</p>
-              </div>
-              <div className="p-4 bg-neo-gold/10 border border-neo-gold/20 rounded-2xl">
-                <p className="text-[10px] text-neo-gold font-black uppercase mb-1">Market Alert</p>
-                <p className="text-xs text-gray-300">Mumbai commercial index projected to rise 4.2% this quarter.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Floating Mobile Feedback Button */}
+      <button 
+        onClick={() => setShowFeedback(true)}
+        className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-neo-pink text-white rounded-full shadow-pink-glow z-[150] flex items-center justify-center active:scale-90 transition-all"
+      >
+        <MessageSquare size={24} />
+      </button>
 
-      {/* Quick Calculator Modal */}
-      {showQuickCalc && (
-        <div className="fixed inset-0 z-[300] bg-neo-bg/80 backdrop-blur-xl flex items-center justify-center p-6 animate-in zoom-in duration-300">
-          <div className="w-full max-w-2xl relative">
-            <ValuationCalculator onClose={() => setShowQuickCalc(false)} />
+      {/* Modals Container */}
+      <div className="relative z-[500]">
+        {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
+        {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
+        
+        {showAlerts && (
+          <div className="fixed top-24 right-6 md:right-10 z-[200] w-full max-w-sm animate-in slide-in-from-top-10 duration-500">
+            <div className="bg-neo-glass backdrop-blur-3xl border border-neo-gold/30 rounded-[32px] p-6 shadow-neo-glow">
+              <div className="flex justify-between items-center mb-6">
+                <h4 className="text-xs font-black text-neo-gold uppercase tracking-widest">Auspicious Alerts</h4>
+                <button onClick={() => setShowAlerts(false)} className="text-gray-500 hover:text-white"><X size={16}/></button>
+              </div>
+              <div className="space-y-4">
+                <div className="p-4 bg-neo-neon/10 border border-neo-neon/20 rounded-2xl">
+                  <p className="text-[10px] text-neo-neon font-black uppercase mb-1">Today's Pulse</p>
+                  <p className="text-xs text-gray-300">Swati Nakshatra detected. Ideal for property site visits before 2 PM.</p>
+                </div>
+                <div className="p-4 bg-neo-gold/10 border border-neo-gold/20 rounded-2xl">
+                  <p className="text-[10px] text-neo-gold font-black uppercase mb-1">Market Alert</p>
+                  <p className="text-xs text-gray-300">Mumbai residential index projected to rise 4.2% this quarter.</p>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {showQuickCalc && (
+          <div className="fixed inset-0 z-[300] bg-neo-bg/80 backdrop-blur-xl flex items-center justify-center p-6 animate-in zoom-in duration-300">
+            <div className="w-full max-w-2xl relative">
+              <ValuationCalculator onClose={() => setShowQuickCalc(false)} />
+            </div>
+          </div>
+        )}
+      </div>
 
       <main className="flex-1 max-w-7xl mx-auto w-full p-6 md:p-10 flex flex-col lg:flex-row gap-10">
         <div className={`transition-all duration-1000 w-full lg:w-[440px] shrink-0 ${stage === 'results' ? 'hidden lg:block opacity-20 pointer-events-none grayscale' : 'mx-auto'}`}>
