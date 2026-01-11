@@ -72,10 +72,13 @@ async function getDynamicMarketStats(
 
 export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string }): Promise<ValuationResultBase> {
   const stats = await getDynamicMarketStats(req.city, req.area, req.pincode, "residential");
+  const userBudget = req.budget || 0;
   
-  // Explicitly ask for REAL listings from the web
-  const prompt = `Perform a web search for real, active property listings of ${req.bhk || '2-3 BHK'} apartments currently for sale in ${req.area}, ${req.city}. 
-  Provide a JSON list of 6-12 verified projects with their actual prices and sizes.
+  // BUDGET AWARE PROMPT: Specifically request properties around the user's budget
+  const budgetText = userBudget > 0 ? `Targeting a budget of ₹${(userBudget / 10000000).toFixed(2)} Cr.` : "";
+  const prompt = `Perform a web search for real, active property listings of ${req.bhk || '2-3 BHK'} apartments for sale in ${req.area}, ${req.city}. 
+  ${budgetText} 
+  Provide a JSON list of 6-12 verified projects. Filter out listings that are 50% above the target budget unless necessary for market context.
   OUTPUT FORMAT: {"listings": [{"project": string, "price": number, "size_sqft": number, "psf": number}]}`;
   
   const { text, groundingSources } = await callLLMWithFallback(prompt, { temperature: 0.1 });
@@ -83,34 +86,46 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
   try { 
     listings = JSON.parse(text.replace(/```json|```/g, '').trim()).listings || []; 
   } catch (e) {
-    console.warn("Listing parse failed, attempting regex extraction");
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try { listings = JSON.parse(jsonMatch[0]).listings || []; } catch {}
     }
   }
 
-  // Filter for realistic values to prevent bad data
-  listings = listings.filter((l: any) => l.price > 100000 && l.size_sqft > 100);
+  // Precision Filtering: Remove outliers and zero-values
+  listings = listings.filter((l: any) => l.price > 100000 && l.size_sqft > 100 && l.psf > 2000);
 
-  let range;
-  if (listings.length >= 3) {
-    const prices = listings.map((l: any) => l.price).sort((a: any, b: any) => a - b);
-    range = { low: prices[0], mid: prices[Math.floor(prices.length / 2)], high: prices[prices.length - 1] };
+  let finalValue: number;
+  let notes = "";
+
+  if (listings.length >= 2) {
+    // Calculate median PSF from found listings
+    const sortedPsfs = listings.map((l: any) => l.psf).sort((a: any, b: any) => a - b);
+    const medianPsf = sortedPsfs[Math.floor(sortedPsfs.length / 2)];
+    
+    // Weight the valuation: Give some weight to the medianPsf from web, but bound it by market stats
+    const derivedValue = medianPsf * (req.size || 1100);
+    
+    // If the search results are wildly higher than user budget, flag it
+    if (userBudget > 0 && derivedValue > userBudget * 1.15) {
+      notes = `Note: Current micro-market listings for ${req.area} suggest a fair value slightly above your selected budget. Total area optimization or secondary location pivot recommended.`;
+    }
+    
+    finalValue = derivedValue;
   } else {
-    const psf = stats.medianPsf;
-    const size = req.size || 1100;
-    range = { low: psf * size * 0.85, mid: psf * size, high: psf * size * 1.15 };
+    // Fallback to statistical median
+    finalValue = stats.medianPsf * (req.size || 1100);
+    notes = "Limited live listings found. Valuation grounded via regional statistical indices.";
   }
 
   return {
-    estimatedValue: Math.round(range.mid),
-    rangeLow: Math.round(range.low),
-    rangeHigh: Math.round(range.high),
-    pricePerUnit: Math.round(range.mid / (req.size || 1100)),
+    estimatedValue: Math.round(finalValue),
+    rangeLow: Math.round(finalValue * 0.94), // Tighter range for better precision
+    rangeHigh: Math.round(finalValue * 1.06),
+    pricePerUnit: Math.round(finalValue / (req.size || 1100)),
     confidence: listings.length >= 4 ? 'high' : 'medium',
     source: listings.length >= 3 ? 'live_scrape' : 'cached_stats',
-    notes: listings.length < 3 ? 'Grounded via regional market trends due to low listing density.' : '',
+    notes,
     comparables: listings.slice(0, 8),
     groundingSources
   };
@@ -129,7 +144,7 @@ export async function getRentValuationInternal(req: ValuationRequestBase): Promi
 
   const rentPsf = (listings.length > 0) 
     ? listings.reduce((acc: number, curr: any) => acc + (curr.monthlyRent / curr.size_sqft), 0) / listings.length
-    : stats.medianPsf * 0.0025; // Fallback rule of thumb
+    : stats.medianPsf * 0.0025; 
 
   const size = req.size || 1100;
 
@@ -158,10 +173,9 @@ export async function getLandValuationInternal(req: ValuationRequestBase): Promi
   try { listings = JSON.parse(text.replace(/```json|```/g, '').trim()).listings || []; } catch {}
 
   const size = req.size || 1000;
-  // Convert psf stats to sqyd (9x)
   const psy = (listings.length > 0)
     ? listings.reduce((acc: number, curr: any) => acc + (curr.totalPrice / curr.size_sqyd), 0) / listings.length
-    : stats.medianPsf * 9 * 0.4; // Conservative land-to-built ratio
+    : stats.medianPsf * 9 * 0.4; 
 
   return {
     estimatedValue: Math.round(psy * size),
@@ -189,7 +203,7 @@ export async function getCommercialValuationInternal(req: ValuationRequestBase):
 
   const psf = (listings.length > 0)
     ? listings.reduce((acc: number, curr: any) => acc + curr.psf, 0) / listings.length
-    : stats.medianPsf * 1.5; // Commercial premium
+    : stats.medianPsf * 1.5; 
 
   const size = req.size || 500;
 

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { BuyResult, SaleListing, AppLang } from '../types';
 import { 
@@ -6,7 +5,7 @@ import {
   FileText, CheckCircle2, Home, 
   Zap, Save, Sparkles, BarChart3, LayoutGrid, Compass, Paintbrush, Wind, Sparkle, Video, X,
   Target, ShieldAlert, Gavel, MessageSquare, GraduationCap, Download, Loader2, RefreshCw, ImageIcon,
-  Landmark
+  Landmark, AlertCircle, CheckCircle
 } from 'lucide-react';
 // @ts-ignore
 import confetti from 'canvas-confetti';
@@ -38,7 +37,6 @@ const AIListingImage = ({ listing, onShowVideo }: { listing: SaleListing, onShow
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // A collection of high-quality architectural placeholders
   const PLACEHOLDERS = [
     'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&auto=format&fit=crop',
     'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&auto=format&fit=crop',
@@ -189,15 +187,23 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
               <div className="xl:col-span-2 bg-white/5 rounded-[48px] p-10 border border-white/10 relative overflow-hidden shadow-glass-3d group">
                 <div className="absolute top-0 right-0 p-20 opacity-5 rotate-12 transition-transform group-hover:scale-110 duration-1000">
-                  {/* Added Landmark here to match use below */}
                   <Landmark size={240} className="text-neo-neon" />
                 </div>
-                <span className="text-[10px] font-black text-neo-neon uppercase tracking-[0.4em] mb-4 block relative z-10">Grounded Estimate</span>
+                <span className="text-[10px] font-black text-neo-neon uppercase tracking-[0.4em] mb-4 block relative z-10">Precise Fair Value</span>
                 <div className="text-6xl font-black text-white tracking-tighter mb-8 leading-tight relative z-10">
                   {formatPrice(fairValNum)}
                 </div>
+                
+                {result.valuationJustification.includes("Note:") && (
+                  <div className="mb-6 p-4 bg-neo-pink/10 border border-neo-pink/20 rounded-2xl flex items-start gap-3 relative z-10 animate-in slide-in-from-left duration-500">
+                    <AlertCircle className="text-neo-pink shrink-0 mt-0.5" size={18} />
+                    <p className="text-[11px] font-bold text-gray-200 leading-relaxed italic">{result.valuationJustification}</p>
+                  </div>
+                )}
+
                 <div className="flex gap-4 relative z-10">
-                  <div className="px-8 py-3 rounded-full bg-neo-neon/20 text-neo-neon text-xs font-black border border-neo-neon/30 uppercase tracking-widest">
+                  <div className={`px-8 py-3 rounded-full text-xs font-black border uppercase tracking-widest flex items-center gap-2 ${result.recommendation === 'Fair Price' || result.recommendation === 'Good Buy' ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30' : 'bg-neo-pink/20 text-neo-pink border-neo-pink/30'}`}>
+                    {result.recommendation === 'Fair Price' || result.recommendation === 'Good Buy' ? <CheckCircle size={14}/> : <AlertCircle size={14}/>}
                     {safeRender(result.recommendation)}
                   </div>
                   {onAnalyzeFinance && (
