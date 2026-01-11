@@ -125,7 +125,9 @@ export async function getLandValuationAnalysis(req: LandRequest): Promise<LandRe
 }
 
 export async function analyzeImageForHarmony(base64Data: string, type: string): Promise<string> {
-  const prompt = `Analyze this property image for 2026 trendy ${type} compliance. Detect spatial zones, energy flow, and architectural defects. Suggest trendy Biophilic improvements. Output must follow DeepSeek expert structure:
+  const prompt = `Analyze this property image for 2026 trendy ${type} compliance. Detect spatial zones, energy flow, and architectural defects. Suggest trendy Biophilic improvements. 
+
+MANDATORY OUTPUT FORMAT:
 - Tip: [Short summary]
 - Details:
   - Step 1: [Observation]
@@ -147,16 +149,23 @@ export const askPropertyQuestion = async (
   lang: 'EN' | 'HI' = 'EN',
   intent: 'general' | 'vastu' | 'interior' | 'feng-shui' = 'general'
 ): Promise<string> => {
-  const sysPrompt = `You are the QuantCasa Expert AI. Intent: ${intent.toUpperCase()}. Respond in a structured, DeepSeek-style logical breakdown. DO NOT use paragraphs. Always use:
-- Tip: [One-line expert advice]
-- Details:
-  - Step 1: [Technical analysis]
-  - Step 2: [Logical reasoning or remedy]
-- Suggestions:
-  - [Interactive follow-up question A]
-  - [Interactive follow-up question B]
+  const sysPrompt = `You are the QuantCasa Expert AI. Intent: ${intent.toUpperCase()}. Respond in a structured, DeepSeek-style logical breakdown. 
 
-Context: ${JSON.stringify(contextResult || {})}. 2026 Trends: Biophilic sustainability, ancient spatial wisdom fusion.`;
+CRITICAL RULES:
+1. Always start sections with exactly these headers: "- Tip:", "- Details:", and "- Suggestions:".
+2. Use bullet points for details.
+3. No long paragraphs.
+
+EXAMPLE OUTPUT:
+- Tip: Optimize North-East entry for maximum natural light.
+- Details:
+  - Step 1: Current plan shows heavy blockage in the Ishanya corner.
+  - Step 2: Relocate heavy storage to the South-West to balance energy.
+- Suggestions:
+  - Should we analyze the kitchen placement?
+  - Do you want a biophilic material palette recommendation?
+
+Context: ${JSON.stringify(contextResult || {})}. 2026 Trends: Biophilic sustainability.`;
   
   const { text } = await callLLMWithFallback(messages[messages.length - 1].text, { systemInstruction: sysPrompt, temperature: 0.7 });
   return text;

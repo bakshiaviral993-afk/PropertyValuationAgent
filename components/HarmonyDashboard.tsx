@@ -28,14 +28,23 @@ const HarmonyDashboard: React.FC<HarmonyDashboardProps> = ({ contextResult, lang
 
   const parseDeepSeekStyle = (text: string): Omit<StructuredResult, 'renderUrl'> => {
     const lines = text.split('\n');
-    const tip = lines.find(l => l.toLowerCase().includes('- tip:'))?.split(':').slice(1).join(':').trim() || "Optimization Link Active";
+    const tipLine = lines.find(l => l.toLowerCase().includes('- tip:'));
+    const tip = tipLine ? tipLine.split(':').slice(1).join(':').trim() : "Spatial Protocol Synced";
     
     const detailIdx = lines.findIndex(l => l.toLowerCase().includes('- details:'));
     const suggestionIdx = lines.findIndex(l => l.toLowerCase().includes('- suggestions:'));
     
-    const details = lines.slice(detailIdx + 1, suggestionIdx !== -1 ? suggestionIdx : undefined)
-      .map(l => l.replace(/^[•\-\*\s]+/, '').trim())
-      .filter(l => l.length > 3);
+    let details: string[] = [];
+    if (detailIdx !== -1) {
+      details = lines.slice(detailIdx + 1, suggestionIdx !== -1 ? suggestionIdx : undefined)
+        .map(l => l.replace(/^[•\-\*\d\.\s]+/, '').trim())
+        .filter(l => l.length > 3);
+    } else {
+      // Fallback: Use non-header lines as details
+      details = lines.filter(l => l.trim() && !l.toLowerCase().includes('- tip:') && !l.toLowerCase().includes('- suggestions:'))
+        .map(l => l.replace(/^[•\-\*\d\.\s]+/, '').trim())
+        .slice(0, 5);
+    }
       
     const suggestions = suggestionIdx !== -1 
       ? lines.slice(suggestionIdx + 1)
@@ -68,7 +77,7 @@ const HarmonyDashboard: React.FC<HarmonyDashboardProps> = ({ contextResult, lang
     const finalPrompt = `Analyze ${harmonyType.toUpperCase()} for ${pincode}. 
     User Context: ${userInput}. 
     ${visionAnalysis ? 'Vision Intelligence: ' + visionAnalysis : ''}
-    Respond in DeepSeek logical structure.`;
+    Respond in DeepSeek logical structure with explicit headers.`;
 
     try {
       const response = await askPropertyQuestion([{ id: 'h', sender: 'user', text: finalPrompt }], contextResult, lang, harmonyType as any);
@@ -107,6 +116,30 @@ const HarmonyDashboard: React.FC<HarmonyDashboardProps> = ({ contextResult, lang
         getHarmonyTips(base64);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleFollowUp = async () => {
+    if (!followInput.trim() || isLoading) return;
+    const userMsg: ChatMessage = { id: `u-${Date.now()}`, sender: 'user', text: followInput };
+    setFollowUpMsgs(prev => [...prev, userMsg]);
+    const currentInput = followInput;
+    setFollowInput('');
+    setIsLoading(true);
+
+    try {
+      const historyText = followUpMsgs.concat(userMsg).map(m => `${m.sender}: ${m.text}`).join('\n');
+      const answer = await askPropertyQuestion(
+        [{ id: 'f', sender: 'user', text: `Previous conversation: ${historyText}\nUser follow-up: ${currentInput}\nProvide biophilic remedy.` }],
+        { ...contextResult, harmonyBase: harmonyResult },
+        lang,
+        harmonyType as any
+      );
+      setFollowUpMsgs(prev => [...prev, { id: `b-${Date.now()}`, sender: 'bot', text: answer }]);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -152,7 +185,7 @@ const HarmonyDashboard: React.FC<HarmonyDashboardProps> = ({ contextResult, lang
             </div>
             <button 
               onClick={() => getHarmonyTips(uploadedImage || undefined)}
-              disabled={isLoading || !followInput.trim() && !uploadedImage}
+              disabled={isLoading || (!followInput.trim() && !uploadedImage)}
               className="ml-auto px-8 py-4 bg-neo-neon text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-neo-glow hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-3"
             >
               {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />} Run Diagnostic
@@ -188,10 +221,10 @@ const HarmonyDashboard: React.FC<HarmonyDashboardProps> = ({ contextResult, lang
                   </div>
 
                   <div className="space-y-4 flex-1">
-                    <span className="text-[8px] font-black text-gray-500 uppercase tracking-[0.4em]">Step-by-Step Details</span>
+                    <span className="text-[8px] font-black text-gray-500 uppercase tracking-[0.4em]">Analysis Details</span>
                     <ul className="space-y-4">
                       {harmonyResult?.details.map((item, i) => (
-                        <li key={i} className="flex gap-4 text-sm text-gray-300 leading-relaxed font-medium italic animate-in slide-in-from-left duration-300" style={{ delay: `${i * 100}ms` }}>
+                        <li key={i} className="flex gap-4 text-sm text-gray-300 leading-relaxed font-medium italic animate-in slide-in-from-left duration-300">
                           <div className="w-5 h-5 rounded-full bg-neo-neon/10 border border-neo-neon/30 text-neo-neon text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">{i+1}</div>
                           {item}
                         </li>
@@ -252,10 +285,10 @@ const HarmonyDashboard: React.FC<HarmonyDashboardProps> = ({ contextResult, lang
         <div className="bg-neo-neon/5 border border-neo-neon/10 rounded-[48px] p-10 flex flex-col justify-center">
             <div className="flex items-center gap-3 mb-6">
                 <MessageSquareText size={24} className="text-neo-neon" />
-                <h3 className="text-xl font-black text-white uppercase tracking-tighter leading-none">DeepSeek Engine</h3>
+                <h3 className="text-xl font-black text-white uppercase tracking-tighter leading-none">Expert Engine</h3>
             </div>
             <p className="text-xs text-gray-400 leading-relaxed">
-                QuantCasa's Expert mode uses <span className="text-white font-bold">Structured Reasoning</span> to deliver step-by-step guidance. Unlike generic bots, we break down advice into technical observations, remedies, and actionable follow-ups.
+                QuantCasa's Expert mode uses <span className="text-white font-bold">Structured Reasoning</span> to deliver step-by-step guidance. Our system now features robust content rendering to ensure you never miss a critical expert signal.
             </p>
         </div>
       </div>

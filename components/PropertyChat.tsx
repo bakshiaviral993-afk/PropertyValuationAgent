@@ -1,6 +1,4 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-// Added missing ChevronRight import
 import { Send, Bot, User, Sparkles, Mic, MicOff, Trash2, Volume2, VolumeX, Compass, Paintbrush, Wind, Headphones, Image as ImageIcon, Loader2, Info, AlertCircle, Zap, Hash, ChevronRight } from 'lucide-react';
 import { ChatMessage, AppLang } from '../types';
 import { askPropertyQuestion, generatePropertyImage } from '../services/geminiService';
@@ -106,6 +104,24 @@ const PropertyChat: React.FC<PropertyChatProps> = ({ contextResult, lang, initia
     const detailsIdx = lines.findIndex(l => l.toLowerCase().includes('- details:'));
     const sugIdx = lines.findIndex(l => l.toLowerCase().includes('- suggestions:'));
 
+    // Robust Fallback: If no headers found, render raw text as paragraphs or bullets
+    if (!tipLine && detailsIdx === -1 && sugIdx === -1) {
+      return (
+        <div className="space-y-3">
+          {lines.filter(l => l.trim()).map((line, i) => (
+            <p key={i} className="text-sm font-medium leading-relaxed">
+              {line.startsWith('-') || line.startsWith('*') || line.startsWith('•') ? (
+                <span className="flex gap-2">
+                  <ChevronRight size={14} className="text-neo-neon shrink-0 mt-1" />
+                  {line.replace(/^[-*•]\s*/, '')}
+                </span>
+              ) : line}
+            </p>
+          ))}
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-4">
         {tipLine && (
@@ -120,10 +136,10 @@ const PropertyChat: React.FC<PropertyChatProps> = ({ contextResult, lang, initia
             <span className="text-[8px] font-black uppercase text-gray-500 block">Analysis Breakdown</span>
             <ul className="space-y-2">
               {lines.slice(detailsIdx+1, sugIdx !== -1 ? sugIdx : undefined)
-                .map(l => l.replace(/^[•\-\*\s]+/, '').trim())
+                .map(l => l.replace(/^[•\-\*\d\.\s]+/, '').trim())
                 .filter(l => l.length > 2)
                 .map((d, i) => (
-                  <li key={i} className="text-xs text-gray-300 flex gap-2">
+                  <li key={i} className="text-xs text-gray-300 flex gap-2 leading-relaxed">
                     <ChevronRight size={14} className="text-neo-neon shrink-0 mt-0.5" />
                     {d}
                   </li>
