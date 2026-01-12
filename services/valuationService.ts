@@ -49,7 +49,6 @@ async function getLocalityLearningFactor(city: string, area: string): Promise<nu
   const signals = await safeKv.get(key);
   if (!signals || !Array.isArray(signals)) return 1.0;
   
-  // If we have at least 3 signals of "market friction", apply a 5-10% inflation offset
   if (signals.length >= 3) return 1.10;
   if (signals.length >= 1) return 1.05;
   return 1.0;
@@ -100,14 +99,14 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
   const userBudget = req.budget || 0;
   const learningFactor = await getLocalityLearningFactor(req.city, req.area || '');
   
-  // Apply Self-Learning: If factor > 1, we are using neural calibration
   const calibratedMedianPsf = stats.medianPsf * learningFactor;
   const calibratedMinPsf = stats.minPsf * learningFactor;
 
   const budgetText = userBudget > 0 ? `Targeting a purchase budget of ₹${(userBudget / 10000000).toFixed(2)} Cr.` : "";
   const prompt = `Search for real active sale listings of ${req.bhk || '2-3 BHK'} apartments in ${req.area}, ${req.city}. 
   ${budgetText} Focus on verified active inventory.
-  OUTPUT FORMAT: {"listings": [{"project": string, "price": number, "size_sqft": number, "psf": number}]}`;
+  CRITICAL: You MUST include "latitude" and "longitude" for every listing.
+  OUTPUT FORMAT: {"listings": [{"project": string, "price": number, "size_sqft": number, "psf": number, "latitude": number, "longitude": number}]}`;
   
   const { text, groundingSources } = await callLLMWithFallback(prompt, { temperature: 0.1 });
   let listings = [];
@@ -136,7 +135,6 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
       await logMarketFriction(req.city, req.area || '', userBudget);
     }
   } else {
-    // FALLBACK TO STATISTICAL CALIBRATION
     finalValue = calibratedMedianPsf * (req.size || 1100);
     
     if (userBudget > 0 && userBudget < finalValue * 0.85) {
@@ -154,7 +152,7 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
     confidence: listings.length >= 3 ? 'high' : 'medium',
     source: learningFactor > 1.0 ? 'neural_calibration' : (listings.length >= 2 ? 'live_scrape' : 'cached_stats'),
     notes,
-    comparables: listings.slice(0, 8),
+    comparables: listings.slice(0, 12),
     groundingSources,
     isBudgetAlignmentFailure,
     suggestedMinimum: Math.round(suggestedMinimum),
@@ -168,8 +166,8 @@ export async function getRentValuationInternal(req: ValuationRequestBase): Promi
   
   const budgetText = userBudget > 0 ? `Targeting a monthly rent of ₹${userBudget.toLocaleString()}.` : "";
   const prompt = `Search for active verified rental listings for ${req.propertyType} in ${req.area}, ${req.city}. 
-  ${budgetText} Output real results near this price point.
-  OUTPUT FORMAT: {"listings": [{"project": string, "monthlyRent": number, "size_sqft": number}]}`;
+  ${budgetText} Output real results with "latitude" and "longitude".
+  OUTPUT FORMAT: {"listings": [{"project": string, "monthlyRent": number, "size_sqft": number, "latitude": number, "longitude": number}]}`;
   
   const { text, groundingSources } = await callLLMWithFallback(prompt);
   let listings = [];
@@ -203,7 +201,7 @@ export async function getRentValuationInternal(req: ValuationRequestBase): Promi
     confidence: listings.length >= 2 ? 'high' : 'medium',
     source: listings.length >= 2 ? 'live_scrape' : 'cached_stats',
     notes,
-    comparables: listings.slice(0, 8),
+    comparables: listings.slice(0, 12),
     groundingSources,
     isBudgetAlignmentFailure,
     suggestedMinimum: Math.round(finalValue * 0.9)
@@ -216,8 +214,8 @@ export async function getLandValuationInternal(req: ValuationRequestBase): Promi
 
   const budgetText = userBudget > 0 ? `Targeting a plot cost of ₹${(userBudget/10000000).toFixed(2)} Cr.` : "";
   const prompt = `Search for real land/plot listings for sale in ${req.area}, ${req.city}. 
-  ${budgetText} Priority for listings within ±15% of budget.
-  OUTPUT FORMAT: {"listings": [{"project": string, "totalPrice": number, "size_sqyd": number}]}`;
+  ${budgetText} Priority for listings with "latitude" and "longitude".
+  OUTPUT FORMAT: {"listings": [{"project": string, "totalPrice": number, "size_sqyd": number, "latitude": number, "longitude": number}]}`;
   
   const { text, groundingSources } = await callLLMWithFallback(prompt);
   let listings = [];
@@ -256,8 +254,8 @@ export async function getCommercialValuationInternal(req: ValuationRequestBase):
 
   const budgetText = userBudget > 0 ? `Budget: ₹${(userBudget/10000000).toFixed(2)} Cr.` : "";
   const prompt = `Search for commercial ${req.propertyType} listings in ${req.area}, ${req.city}. 
-  ${budgetText} Include only real verified assets.
-  OUTPUT FORMAT: {"listings": [{"project": string, "price": number, "psf": number, "size_sqft": number}]}`;
+  ${budgetText} Include only real verified assets with lat/lng coordinates.
+  OUTPUT FORMAT: {"listings": [{"project": string, "price": number, "psf": number, "size_sqft": number, "latitude": number, "longitude": number}]}`;
   
   const { text, groundingSources } = await callLLMWithFallback(prompt);
   let listings = [];
