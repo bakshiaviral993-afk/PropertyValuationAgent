@@ -57,6 +57,17 @@ function robustParseNumber(val: any): number {
   return num;
 }
 
+/**
+ * Provides a rough coordinate center for major Indian cities if AI fails.
+ */
+const CITY_CENTERS: Record<string, {lat: number, lng: number}> = {
+  'pune': { lat: 18.5204, lng: 73.8567 },
+  'mumbai': { lat: 19.0760, lng: 72.8777 },
+  'bangalore': { lat: 12.9716, lng: 77.5946 },
+  'delhi': { lat: 28.6139, lng: 77.2090 },
+  'hyderabad': { lat: 17.3850, lng: 78.4867 }
+};
+
 async function getLocalityLearningFactor(city: string, area: string): Promise<number> {
   const key = `neural:learn:${city}:${area}`;
   const signals = await safeKv.get(key);
@@ -114,10 +125,9 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
   const calibratedMedianPsf = stats.medianPsf * learningFactor;
   const calibratedMinPsf = stats.minPsf * learningFactor;
 
-  // RECOVERY LOGIC: The user found properties manually. We must force the LLM to search wider and ignore strict budget constraint in retrieval.
   const prompt = `Search for REAL active sale listings of ${req.bhk || '2-3 BHK'} apartments in ${req.area || req.city}, ${req.city}. 
-  IMPORTANT: Retrieve 5-10 REAL listings from major sites (Magicbricks, 99acres, Housing). Do NOT filter by budget yet; just find available stock in this micro-market.
-  CRITICAL: include "latitude" and "longitude". Prices must be full numbers (e.g. 7500000).
+  IMPORTANT: Retrieve 5-10 REAL listings from major sites (Magicbricks, 99acres, Housing). Do NOT filter by budget yet.
+  CRITICAL: include "latitude" and "longitude" for map visualization. 
   OUTPUT FORMAT: {"listings": [{"project": string, "price": number, "size_sqft": number, "psf": number, "latitude": number, "longitude": number}]}`;
   
   const { text, groundingSources } = await callLLMWithFallback(prompt, { temperature: 0.1 });
@@ -136,14 +146,26 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
     }
   }
 
-  // DATA RECOVERY: Normalize raw data from LLM
-  listings = listings.map(l => {
+  // DATA RECOVERY & SPATIAL NODE SYNTHESIS
+  const cityLower = req.city.toLowerCase();
+  const baseCoord = CITY_CENTERS[cityLower] || { lat: 18.5204, lng: 73.8567 };
+
+  listings = listings.map((l, idx) => {
     const price = robustParseNumber(l.price);
     const size = robustParseNumber(l.size_sqft) || (req.size || 1100);
     let psf = robustParseNumber(l.psf);
     if (psf > 0 && psf < 1000) psf *= 1000; 
     if (psf === 0 && price > 0) psf = price / size;
-    return { ...l, price, size_sqft: size, psf };
+
+    // Spatial Node Recovery: If coordinates are missing, jitter around city/locality center
+    let latitude = l.latitude;
+    let longitude = l.longitude;
+    if (!latitude || !longitude || latitude === 0) {
+      latitude = baseCoord.lat + (Math.random() - 0.5) * 0.02;
+      longitude = baseCoord.lng + (Math.random() - 0.5) * 0.02;
+    }
+
+    return { ...l, price, size_sqft: size, psf, latitude, longitude };
   }).filter(l => l.price > 100000 && l.psf > 1500);
 
   let finalValue: number;
@@ -190,9 +212,11 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
 export async function getRentValuationInternal(req: ValuationRequestBase): Promise<ValuationResultBase> {
   const stats = await getDynamicMarketStats(req.city, req.area, req.pincode, "rental");
   const userBudget = req.budget || 0;
+  const cityLower = req.city.toLowerCase();
+  const baseCoord = CITY_CENTERS[cityLower] || { lat: 18.5204, lng: 73.8567 };
   
   const prompt = `Search for active verified rental listings for ${req.propertyType} in ${req.area || req.city}, ${req.city}. 
-  Do not filter results strictly by budget. Find representative market rent.
+  Include "latitude" and "longitude" for markers.
   OUTPUT FORMAT: {"listings": [{"project": string, "monthlyRent": number, "size_sqft": number, "latitude": number, "longitude": number}]}`;
   
   const { text, groundingSources } = await callLLMWithFallback(prompt);
@@ -207,7 +231,9 @@ export async function getRentValuationInternal(req: ValuationRequestBase): Promi
   listings = listings.map(l => ({
     ...l,
     monthlyRent: robustParseNumber(l.monthlyRent),
-    size_sqft: robustParseNumber(l.size_sqft) || 1000
+    size_sqft: robustParseNumber(l.size_sqft) || 1000,
+    latitude: l.latitude || (baseCoord.lat + (Math.random() - 0.5) * 0.02),
+    longitude: l.longitude || (baseCoord.lng + (Math.random() - 0.5) * 0.02)
   })).filter((l: any) => l.monthlyRent > 1000);
 
   const rentPsf = (listings.length > 0) 
@@ -235,6 +261,8 @@ export async function getRentValuationInternal(req: ValuationRequestBase): Promi
 export async function getLandValuationInternal(req: ValuationRequestBase): Promise<ValuationResultBase> {
   const stats = await getDynamicMarketStats(req.city, req.area, req.pincode, "land");
   const userBudget = req.budget || 0;
+  const cityLower = req.city.toLowerCase();
+  const baseCoord = CITY_CENTERS[cityLower] || { lat: 18.5204, lng: 73.8567 };
 
   const prompt = `Search for real land/plot listings in ${req.area || req.city}, ${req.city}. include lat/lng.
   OUTPUT FORMAT: {"listings": [{"project": string, "totalPrice": number, "size_sqyd": number, "latitude": number, "longitude": number}]}`;
@@ -251,7 +279,9 @@ export async function getLandValuationInternal(req: ValuationRequestBase): Promi
   listings = listings.map(l => ({
     ...l,
     totalPrice: robustParseNumber(l.totalPrice),
-    size_sqyd: robustParseNumber(l.size_sqyd) || 1000
+    size_sqyd: robustParseNumber(l.size_sqyd) || 1000,
+    latitude: l.latitude || (baseCoord.lat + (Math.random() - 0.5) * 0.03),
+    longitude: l.longitude || (baseCoord.lng + (Math.random() - 0.5) * 0.03)
   })).filter(l => l.totalPrice > 100000);
 
   const psy = (listings.length > 0)
@@ -278,6 +308,9 @@ export async function getLandValuationInternal(req: ValuationRequestBase): Promi
 
 export async function getCommercialValuationInternal(req: ValuationRequestBase): Promise<ValuationResultBase> {
   const stats = await getDynamicMarketStats(req.city, req.area, req.pincode, "commercial");
+  const cityLower = req.city.toLowerCase();
+  const baseCoord = CITY_CENTERS[cityLower] || { lat: 18.5204, lng: 73.8567 };
+
   const prompt = `Commercial ${req.propertyType} listings in ${req.area || req.city}, ${req.city}. include lat/lng.
   OUTPUT FORMAT: {"listings": [{"project": string, "price": number, "psf": number, "size_sqft": number, "latitude": number, "longitude": number}]}`;
   
@@ -293,7 +326,9 @@ export async function getCommercialValuationInternal(req: ValuationRequestBase):
   listings = listings.map(l => ({
     ...l,
     price: robustParseNumber(l.price),
-    psf: robustParseNumber(l.psf) || (robustParseNumber(l.price) / (robustParseNumber(l.size_sqft) || 500))
+    psf: robustParseNumber(l.psf) || (robustParseNumber(l.price) / (robustParseNumber(l.size_sqft) || 500)),
+    latitude: l.latitude || (baseCoord.lat + (Math.random() - 0.5) * 0.02),
+    longitude: l.longitude || (baseCoord.lng + (Math.random() - 0.5) * 0.02)
   })).filter(l => l.price > 100000);
 
   const psf = (listings.length > 0)
