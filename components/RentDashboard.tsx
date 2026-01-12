@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { RentResult, RentalListing, AppLang } from '../types';
 import { 
-  MapPin, ExternalLink, Globe, Info, Layers, Building2, ImageIcon, Loader2, BarChart3, LayoutGrid,
-  Receipt, Wallet, TrendingUp, Gavel, Target, ShieldAlert, MessageSquare, RefreshCw, Sparkles, CheckCircle, AlertCircle
+  MapPin, ExternalLink, Building2, Loader2, BarChart3, LayoutGrid,
+  Receipt, TrendingUp, RefreshCw, Sparkles, CheckCircle, AlertCircle, Map as MapIcon, Info
 } from 'lucide-react';
 import { generatePropertyImage } from '../services/geminiService';
 import { speak } from '../services/voiceService';
 import MarketStats from './MarketStats';
 import { parsePrice, calculateListingStats } from '../utils/listingProcessor';
+import GoogleMapView from './GoogleMapView';
 
 interface RentDashboardProps {
   result: RentResult;
@@ -62,7 +64,7 @@ const AIPropertyImage = ({ title, address, type }: { title: string, address: str
 };
 
 const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAnalyzeFinance, userBudget }) => {
-  const [viewMode, setViewMode] = useState<'dashboard' | 'stats'>('dashboard');
+  const [viewMode, setViewMode] = useState<'dashboard' | 'stats' | 'map'>('dashboard');
   const [isSearchingPincode, setIsSearchingPincode] = useState(false);
   const listings = result.listings || [];
 
@@ -79,6 +81,17 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
 
   const listingPrices = result.listings?.map(l => parsePrice(l.rent)) || [];
   const listingStats = calculateListingStats(listingPrices);
+
+  const mapNodes = [
+    { title: "Grounded Node", price: result.rentalValue, address: result.listings[0]?.address || "Selected Area", lat: result.listings[0]?.latitude, lng: result.listings[0]?.longitude, isSubject: true },
+    ...(result.listings || []).slice(1).map(l => ({
+      title: l.title,
+      price: formatPriceDisplay(l.rent),
+      address: l.address,
+      lat: l.latitude,
+      lng: l.longitude
+    }))
+  ];
 
   return (
     <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 pb-20">
@@ -99,19 +112,22 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
           </div>
         </div>
         
-        <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10 no-pdf-export">
-          <button onClick={() => setViewMode('dashboard')} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'dashboard' ? 'bg-emerald-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
+        <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10 overflow-x-auto scrollbar-hide no-pdf-export">
+          <button onClick={() => setViewMode('dashboard')} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'dashboard' ? 'bg-emerald-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
             <LayoutGrid size={12} /> Live Deck
           </button>
-          <button onClick={() => setViewMode('stats')} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'stats' ? 'bg-emerald-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
+          <button onClick={() => setViewMode('map')} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'map' ? 'bg-emerald-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
+            <MapIcon size={12} /> Map View
+          </button>
+          <button onClick={() => setViewMode('stats')} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'stats' ? 'bg-emerald-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
             <BarChart3 size={12} /> Statistics
           </button>
         </div>
       </div>
 
-      {viewMode === 'stats' && listingStats ? (
-        <MarketStats stats={listingStats} prices={listingPrices} labelPrefix="Monthly Rent" />
-      ) : (
+      {viewMode === 'stats' && listingStats && <MarketStats stats={listingStats} prices={listingPrices} labelPrefix="Monthly Rent" />}
+      {viewMode === 'map' && <GoogleMapView nodes={mapNodes} />}
+      {viewMode === 'dashboard' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className={`bg-white/5 rounded-[32px] p-8 border shadow-glass-3d border-t-4 flex flex-col justify-between transition-all ${isAboveBudget ? 'border-t-neo-pink border-neo-pink/20' : 'border-t-emerald-500 border-white/10'}`}>

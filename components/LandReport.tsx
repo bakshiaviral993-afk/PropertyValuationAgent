@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LandResult, LandListing, AppLang } from '../types';
-import { Map, ExternalLink, Globe, LayoutDashboard, Map as MapIcon, Bookmark, ImageIcon, Loader2, Zap, Info, Calculator, BarChart3, HardHat, Gavel, Target, ShieldAlert, MessageSquare, RefreshCw, TrendingUp } from 'lucide-react';
+import { ExternalLink, Map as MapIcon, ImageIcon, Loader2, Zap, Info, Calculator, RefreshCw, TrendingUp } from 'lucide-react';
 import { generatePropertyImage } from '../services/geminiService';
 import { speak } from '../services/voiceService';
 import { parsePrice } from '../services/geminiService';
+import GoogleMapView from './GoogleMapView';
 
 interface LandReportProps {
   result: LandResult;
@@ -59,6 +60,17 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
     speak(speechText, lang === 'HI' ? 'hi-IN' : 'en-IN');
   }, [result.landValue, lang]);
 
+  const mapNodes = [
+    { title: "Plot Analysis", price: result.landValue, address: result.listings[0]?.address || "Target Area", lat: result.listings[0]?.latitude, lng: result.listings[0]?.longitude, isSubject: true },
+    ...result.listings.slice(1).map(l => ({
+      title: l.title,
+      price: l.price,
+      address: l.address,
+      lat: l.latitude,
+      lng: l.longitude
+    }))
+  ];
+
   return (
     <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-right-8 duration-1000 pb-20">
       {isSearchingPincode && (
@@ -78,71 +90,78 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
           </div>
         </div>
         
-        <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10 no-pdf-export">
-          <button onClick={() => setViewMode('dashboard')} className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all tracking-widest ${viewMode === 'dashboard' ? 'bg-orange-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>DASHBOARD</button>
+        <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10 no-pdf-export overflow-x-auto scrollbar-hide">
+          <button onClick={() => setViewMode('dashboard')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest shrink-0 ${viewMode === 'dashboard' ? 'bg-orange-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>DASHBOARD</button>
+          <button onClick={() => setViewMode('map')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest shrink-0 ${viewMode === 'map' ? 'bg-orange-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>MAP VIEW</button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white/5 rounded-[32px] p-6 border border-white/10 border-t-2 border-t-orange-500 flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Total Fair Value</span>
-            <div className="text-2xl font-black text-white">{typeof result.landValue === 'string' ? result.landValue : formatPrice(result.landValue)}</div>
-          </div>
-          {onAnalyzeFinance && (
-            <button onClick={() => { setIsSearchingPincode(true); setTimeout(() => { onAnalyzeFinance(parsePrice(result.landValue)); setIsSearchingPincode(false); }, 800); }} className="mt-4 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[8px] font-black uppercase flex items-center gap-2 hover:bg-orange-500 hover:text-white transition-all">
-              <TrendingUp size={10}/> Simulator
-            </button>
-          )}
-        </div>
-        <div className="bg-white/5 rounded-[32px] p-6 border border-white/10">
-          <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Rate Breakdown</span>
-          <div className="text-xl font-black text-white">{result.perSqmValue}</div>
-        </div>
-        <div className="bg-white/5 rounded-[32px] p-6 border border-white/10">
-          <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Yield (Proj)</span>
-          <div className="text-2xl font-black text-emerald-500">{result.devROI}</div>
-        </div>
-        <div className="bg-white/5 rounded-[32px] p-6 border border-white/10">
-          <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Confidence</span>
-          <div className="text-2xl font-black text-white">{result.confidenceScore}%</div>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto pb-10 scrollbar-hide">
-        <div className="space-y-8">
-          <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 border-l-4 border-l-orange-500">
-            <h3 className="text-sm font-black text-white mb-4 flex items-center gap-2 uppercase">
-              <Zap size={18} className="text-orange-500" /> Grounded Justification
-            </h3>
-            <p className="text-gray-400 leading-relaxed italic text-sm">"{result.valuationJustification}"</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {listings.map((item, idx) => (
-              <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 group shadow-glass-3d animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
-                <AIPropertyImage title={item.title} address={item.address} type="Plot" />
-                <div className="mb-4">
-                  <h4 className="font-black text-white truncate uppercase">{item.title}</h4>
-                  <p className="text-[10px] text-gray-500 truncate font-bold tracking-widest mt-1 uppercase">{item.address}</p>
-                  <div className="mt-4 flex justify-between items-center pt-4 border-t border-white/5">
-                    <span className="text-xl font-black text-orange-500">{typeof item.price === 'string' ? item.price : formatPrice(item.price)}</span>
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{item.size}</span>
-                  </div>
-                </div>
-                <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-4 rounded-2xl bg-white/5 text-white text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:bg-orange-500 transition-all border border-white/10">Verify Listing <ExternalLink size={14} /></a>
+      {viewMode === 'map' ? (
+        <GoogleMapView nodes={mapNodes} />
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-white/5 rounded-[32px] p-6 border border-white/10 border-t-2 border-t-orange-500 flex flex-col justify-between">
+              <div>
+                <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Total Fair Value</span>
+                <div className="text-2xl font-black text-white">{typeof result.landValue === 'string' ? result.landValue : formatPrice(result.landValue)}</div>
               </div>
-            ))}
+              {onAnalyzeFinance && (
+                <button onClick={() => { setIsSearchingPincode(true); setTimeout(() => { onAnalyzeFinance(parsePrice(result.landValue)); setIsSearchingPincode(false); }, 800); }} className="mt-4 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[8px] font-black uppercase flex items-center gap-2 hover:bg-orange-500 hover:text-white transition-all">
+                  <TrendingUp size={10}/> Simulator
+                </button>
+              )}
+            </div>
+            <div className="bg-white/5 rounded-[32px] p-6 border border-white/10">
+              <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Rate Breakdown</span>
+              <div className="text-xl font-black text-white">{result.perSqmValue}</div>
+            </div>
+            <div className="bg-white/5 rounded-[32px] p-6 border border-white/10">
+              <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Yield (Proj)</span>
+              <div className="text-2xl font-black text-emerald-500">{result.devROI}</div>
+            </div>
+            <div className="bg-white/5 rounded-[32px] p-6 border border-white/10">
+              <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Confidence</span>
+              <div className="text-2xl font-black text-white">{result.confidenceScore}%</div>
+            </div>
           </div>
 
-          {listings.length === 0 && (
-            <div className="text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10">
-               <MapIcon size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
-               <p className="text-gray-500 font-black uppercase tracking-widest text-xs">No active land listings detected in this micro-market.</p>
+          <div className="flex-1 overflow-y-auto pb-10 scrollbar-hide">
+            <div className="space-y-8">
+              <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 border-l-4 border-l-orange-500">
+                <h3 className="text-sm font-black text-white mb-4 flex items-center gap-2 uppercase">
+                  <Zap size={18} className="text-orange-500" /> Grounded Justification
+                </h3>
+                <p className="text-gray-400 leading-relaxed italic text-sm">"{result.valuationJustification}"</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {listings.map((item, idx) => (
+                  <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 group shadow-glass-3d animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                    <AIPropertyImage title={item.title} address={item.address} type="Plot" />
+                    <div className="mb-4">
+                      <h4 className="font-black text-white truncate uppercase">{item.title}</h4>
+                      <p className="text-[10px] text-gray-500 truncate font-bold tracking-widest mt-1 uppercase">{item.address}</p>
+                      <div className="mt-4 flex justify-between items-center pt-4 border-t border-white/5">
+                        <span className="text-xl font-black text-orange-500">{typeof item.price === 'string' ? item.price : formatPrice(item.price)}</span>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{item.size}</span>
+                      </div>
+                    </div>
+                    <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-4 rounded-2xl bg-white/5 text-white text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:bg-orange-500 transition-all border border-white/10">Verify Listing <ExternalLink size={14} /></a>
+                  </div>
+                ))}
+              </div>
+
+              {listings.length === 0 && (
+                <div className="text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10">
+                   <MapIcon size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
+                   <p className="text-gray-500 font-black uppercase tracking-widest text-xs">No active land listings detected in this micro-market.</p>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

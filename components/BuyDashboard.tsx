@@ -1,11 +1,11 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { BuyResult, SaleListing, AppLang } from '../types';
 import { 
-  TrendingUp, MapPin, Star, Share2, 
-  FileText, CheckCircle2, Home, Building2,
-  Zap, Save, Sparkles, BarChart3, LayoutGrid, Compass, Paintbrush, Wind, Sparkle, Video, X,
-  Target, ShieldAlert, Gavel, MessageSquare, GraduationCap, Download, Loader2, RefreshCw, ImageIcon,
-  Landmark, AlertCircle, CheckCircle, BrainCircuit
+  TrendingUp, MapPin, Share2, 
+  FileText, Home, Building2,
+  Save, Sparkles, BarChart3, LayoutGrid, Sparkle, Video, Download, RefreshCw, 
+  Landmark, AlertCircle, CheckCircle, BrainCircuit, Map as MapIcon, Loader2, ShieldAlert
 } from 'lucide-react';
 // @ts-ignore
 import confetti from 'canvas-confetti';
@@ -17,10 +17,10 @@ import { parsePrice, formatPrice, generatePropertyImage } from '../services/gemi
 import { speak } from '../services/voiceService';
 import MarketStats from './MarketStats';
 import { calculateListingStats } from '../utils/listingProcessor';
-import PropertyChat from './PropertyChat';
 import HarmonyDashboard from './HarmonyDashboard';
 import VideoGenerator from './VideoGenerator';
 import ProfessionalReport from './ProfessionalReport';
+import GoogleMapView from './GoogleMapView';
 
 interface BuyDashboardProps {
   result: BuyResult;
@@ -98,7 +98,7 @@ const AIListingImage = ({ listing, onShowVideo }: { listing: SaleListing, onShow
 const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnalyzeFinance, userBudget }) => {
   const reportRef = useRef<HTMLDivElement>(null);
   const [isSaved, setIsSaved] = useState(false);
-  const [viewMode, setViewMode] = useState<'dashboard' | 'stats' | 'harmony' | 'pro-report'>('pro-report');
+  const [viewMode, setViewMode] = useState<'dashboard' | 'stats' | 'harmony' | 'pro-report' | 'map'>('pro-report');
   const [selectedVideo, setSelectedVideo] = useState<{prompt: string, title: string} | null>(null);
   const [isSearchingPincode, setIsSearchingPincode] = useState(false);
 
@@ -132,6 +132,18 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
   const listingStats = calculateListingStats(listingPrices);
   const fairValNum = parsePrice(result.fairValue);
 
+  // Prepare nodes for Google Maps
+  const mapNodes = [
+    { title: "Target Asset", price: result.fairValue, address: result.listings[0]?.address || "Selected Area", lat: result.listings[0]?.latitude, lng: result.listings[0]?.longitude, isSubject: true },
+    ...(result.listings || []).slice(1).map(l => ({
+      title: l.title,
+      price: formatPrice(parsePrice(l.price)),
+      address: l.address,
+      lat: l.latitude,
+      lng: l.longitude
+    }))
+  ];
+
   return (
     <div className="h-full space-y-10 overflow-y-auto pb-24 scrollbar-hide px-2">
       {isSearchingPincode && (
@@ -153,28 +165,31 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
       <div className="bg-neo-glass border border-white/10 p-8 rounded-[48px] flex flex-wrap gap-6 items-center justify-between shadow-neo-glow no-print">
         <div className="flex items-center gap-6">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-report-blue to-neo-neon flex items-center justify-center text-white shadow-neo-glow">
-            <GraduationCap size={24} />
+            <Landmark size={24} />
           </div>
           <div>
             <h2 className="text-2xl font-black text-white tracking-tighter uppercase">Valuation Console</h2>
-            <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10 mt-2">
-              <button onClick={() => setViewMode('pro-report')} className={`px-4 py-1.5 rounded-xl text-[9px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'pro-report' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
+            <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10 mt-2 overflow-x-auto scrollbar-hide">
+              <button onClick={() => setViewMode('pro-report')} className={`px-4 py-1.5 rounded-xl text-[9px] font-black transition-all uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'pro-report' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
                 <FileText size={12} /> Analyst Report
               </button>
-              <button onClick={() => setViewMode('dashboard')} className={`px-4 py-1.5 rounded-xl text-[9px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'dashboard' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
+              <button onClick={() => setViewMode('dashboard')} className={`px-4 py-1.5 rounded-xl text-[9px] font-black transition-all uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'dashboard' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
                 <LayoutGrid size={12} /> Live Deck
               </button>
-              <button onClick={() => setViewMode('stats')} className={`px-4 py-1.5 rounded-xl text-[9px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'stats' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
+              <button onClick={() => setViewMode('map')} className={`px-4 py-1.5 rounded-xl text-[9px] font-black transition-all uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'map' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
+                <MapIcon size={12} /> Map View
+              </button>
+              <button onClick={() => setViewMode('stats')} className={`px-4 py-1.5 rounded-xl text-[9px] font-black transition-all uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'stats' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
                 <BarChart3 size={12} /> Statistics
               </button>
-              <button onClick={() => setViewMode('harmony')} className={`px-4 py-1.5 rounded-xl text-[9px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'harmony' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
+              <button onClick={() => setViewMode('harmony')} className={`px-4 py-1.5 rounded-xl text-[9px] font-black transition-all uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'harmony' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
                 <Sparkle size={12} /> Harmony
               </button>
             </div>
           </div>
         </div>
         <div className="flex gap-3">
-           <button onClick={handleDownloadPDF} className="px-6 py-4 bg-neo-neon text-white rounded-[20px] font-black uppercase text-[10px] tracking-widest flex items-center gap-3 shadow-neo-glow hover:scale-105 active:scale-95 transition-all">
+           <button onClick={handleDownloadPDF} className="px-6 py-4 bg-neo-neon text-white rounded-[20px] font-black uppercase text-[10px] tracking-widest flex items-center gap-3 shadow-neo-glow hover:scale-[1.02] active:scale-95 transition-all">
              <Download size={16}/> Export Report
            </button>
            <button onClick={() => setIsSaved(true)} className={`p-4 rounded-[20px] border transition-all ${isSaved ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white/5 border-white/10 text-neo-neon hover:bg-white/10'}`}>
@@ -185,6 +200,7 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
 
       <div ref={reportRef} className={`${viewMode === 'pro-report' ? 'bg-white' : ''} transition-colors duration-500 rounded-[40px] overflow-hidden shadow-2xl`}>
         {viewMode === 'pro-report' && <ProfessionalReport result={result} userBudget={userBudget} />}
+        {viewMode === 'map' && <GoogleMapView nodes={mapNodes} />}
         {viewMode === 'dashboard' && (
           <div className="p-4 space-y-10 no-print">
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">

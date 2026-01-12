@@ -1,4 +1,3 @@
-
 import { ReactNode } from 'react';
 
 export type AppMode = 'buy' | 'rent' | 'land' | 'expert' | 'harmony' | 'essentials' | 'commercial';
@@ -54,6 +53,8 @@ export interface CommercialListing {
   sourceUrl: string;
   sqft: number;
   image?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface CommercialResult {
@@ -81,6 +82,11 @@ export interface BuyResult {
   valuationJustification: string;
   insights: NeighborhoodInsight[];
   groundingSources: GroundingSource[];
+  isBudgetAlignmentFailure?: boolean;
+  suggestedMinimum?: number;
+  learningSignals?: number;
+  source?: string;
+  notes?: string;
 }
 
 export interface UserProfile {
@@ -135,8 +141,8 @@ export interface RentalListing {
   bhk: string;
   qualityScore: number;
   image?: string;
-  latitude: number;
-  longitude: number;
+  latitude?: number;
+  longitude?: number;
   facing: string;
 }
 
@@ -147,8 +153,8 @@ export interface LandListing {
   address: string;
   sourceUrl: string;
   image?: string;
-  latitude: number;
-  longitude: number;
+  latitude?: number;
+  longitude?: number;
   facing: string;
 }
 
@@ -171,6 +177,9 @@ export interface RentResult {
   propertiesFoundCount: number;
   insights: NeighborhoodInsight[];
   groundingSources: GroundingSource[];
+  isBudgetAlignmentFailure?: boolean;
+  suggestedMinimum?: number;
+  notes?: string;
 }
 
 export interface LandResult {
@@ -183,6 +192,8 @@ export interface LandResult {
   listings: LandListing[];
   valuationJustification: string;
   insights: NeighborhoodInsight[];
+  isBudgetAlignmentFailure?: boolean;
+  suggestedMinimum?: number;
 }
 
 export interface ChatMessage {
