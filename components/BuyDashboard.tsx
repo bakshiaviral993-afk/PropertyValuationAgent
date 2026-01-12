@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { BuyResult, SaleListing, AppLang } from '../types';
 import { 
@@ -128,6 +127,28 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
     pdf.save(`QuantCasa_Report_${Date.now()}.pdf`);
   };
 
+  const handleShare = async () => {
+    const price = result.isBudgetAlignmentFailure ? formatPrice(result.suggestedMinimum || 0) : result.fairValue;
+    const location = result.listings?.[0]?.address || "Selected Locality";
+    const shareText = `Just found the fair market value for a property in ${location} using QuantCasa: ${price}! Check out this AI-powered valuation report.`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'QuantCasa Valuation Report',
+          text: shareText,
+          url: window.location.href,
+        });
+      } catch (err) {
+        console.error("Error sharing:", err);
+      }
+    } else {
+      // Fallback: Copy to clipboard or mailto
+      const mailtoLink = `mailto:?subject=Property Valuation - QuantCasa&body=${encodeURIComponent(shareText + "\n\nView more at: " + window.location.href)}`;
+      window.location.href = mailtoLink;
+    }
+  };
+
   const listingPrices = result.listings?.map(l => parsePrice(l.price)) || [];
   const listingStats = calculateListingStats(listingPrices);
   const fairValNum = parsePrice(result.fairValue);
@@ -191,6 +212,13 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
         <div className="flex gap-3">
            <button onClick={handleDownloadPDF} className="px-6 py-4 bg-neo-neon text-white rounded-[20px] font-black uppercase text-[10px] tracking-widest flex items-center gap-3 shadow-neo-glow hover:scale-[1.02] active:scale-95 transition-all">
              <Download size={16}/> Export Report
+           </button>
+           <button 
+             onClick={handleShare}
+             className="p-4 rounded-[20px] bg-white/5 border border-white/10 text-neo-pink hover:bg-white/10 transition-all shadow-glass-3d"
+             title="Share Report"
+           >
+             <Share2 size={20}/>
            </button>
            <button onClick={() => setIsSaved(true)} className={`p-4 rounded-[20px] border transition-all ${isSaved ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white/5 border-white/10 text-neo-neon hover:bg-white/10'}`}>
              <Save size={20}/>
