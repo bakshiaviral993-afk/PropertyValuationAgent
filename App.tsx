@@ -39,6 +39,7 @@ const App: React.FC = () => {
   const [landData, setLandData] = useState<LandResult | null>(null);
   const [commercialData, setCommercialData] = useState<CommercialResult | null>(null);
   
+  const [userBudget, setUserBudget] = useState<number | undefined>(undefined);
   const [locationContext, setLocationContext] = useState({ city: '', area: '', pincode: '' });
   const [commercialMeta, setCommercialMeta] = useState({ type: 'Shop' as 'Shop' | 'Office' | 'Warehouse', sqft: 0 });
 
@@ -71,6 +72,7 @@ const App: React.FC = () => {
   const handleComplete = async (data: any) => {
     setIsLoading(true);
     if (data.city) setLocationContext({ city: data.city, area: data.area || '', pincode: data.pincode || '' });
+    if (data.budget) setUserBudget(Number(data.budget));
     
     if (mode === 'essentials') {
       setIsLoading(false);
@@ -130,7 +132,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-neo-bg text-white flex flex-col font-sans selection:bg-neo-neon/40 overflow-x-hidden">
       <header className="px-6 md:px-10 py-6 border-b border-white/5 bg-neo-glass/60 backdrop-blur-2xl sticky top-0 z-[100] flex items-center justify-between">
-        <div className="flex items-center gap-4 cursor-pointer group" onClick={() => { setStage('onboarding'); setBuyData(null); setRentData(null); setLandData(null); setCommercialData(null); setShowFinance(false); setShowQuickCalc(false); }}>
+        <div className="flex items-center gap-4 cursor-pointer group" onClick={() => { setStage('onboarding'); setBuyData(null); setRentData(null); setLandData(null); setCommercialData(null); setShowFinance(false); setShowQuickCalc(false); setUserBudget(undefined); }}>
           <div className="w-10 h-10 md:w-12 md:h-12 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-white shadow-neo-glow transition-all group-hover:rotate-12 group-hover:scale-110 group-hover:border-neo-neon/50">
             <Logo size={28} />
           </div>
@@ -237,8 +239,8 @@ const App: React.FC = () => {
           {stage === 'results' ? (
             <div className="h-full relative animate-in fade-in slide-in-from-right-10 duration-700">
               {mode === 'essentials' && <EssentialsDashboard city={locationContext.city} area={locationContext.area} />}
-              {buyData && mode === 'buy' && <BuyDashboard result={buyData} lang={lang} onAnalyzeFinance={() => { setFinanceTab('calc'); setShowFinance(true); }} />}
-              {rentData && mode === 'rent' && <RentDashboard result={rentData} lang={lang} onAnalyzeFinance={() => { setFinanceTab('calc'); setShowFinance(true); }} />}
+              {buyData && mode === 'buy' && <BuyDashboard result={buyData} lang={lang} userBudget={userBudget} onAnalyzeFinance={() => { setFinanceTab('calc'); setShowFinance(true); }} />}
+              {rentData && mode === 'rent' && <RentDashboard result={rentData} lang={lang} userBudget={userBudget} onAnalyzeFinance={() => { setFinanceTab('calc'); setShowFinance(true); }} />}
               {landData && mode === 'land' && <LandReport result={landData} lang={lang} onAnalyzeFinance={() => { setFinanceTab('calc'); setShowFinance(true); }} />}
               {commercialData && mode === 'commercial' && (
                 <CommercialDashboard 

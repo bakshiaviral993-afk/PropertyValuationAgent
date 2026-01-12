@@ -114,9 +114,9 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
   const calibratedMedianPsf = stats.medianPsf * learningFactor;
   const calibratedMinPsf = stats.minPsf * learningFactor;
 
-  const budgetText = userBudget > 0 ? `Targeting a purchase budget of ₹${(userBudget / 10000000).toFixed(2)} Cr.` : "";
+  // RECOVERY LOGIC: The user found properties manually. We must force the LLM to search wider and ignore strict budget constraint in retrieval.
   const prompt = `Search for REAL active sale listings of ${req.bhk || '2-3 BHK'} apartments in ${req.area || req.city}, ${req.city}. 
-  ${budgetText} Focus on verified inventory. 
+  IMPORTANT: Retrieve 5-10 REAL listings from major sites (Magicbricks, 99acres, Housing). Do NOT filter by budget yet; just find available stock in this micro-market.
   CRITICAL: include "latitude" and "longitude". Prices must be full numbers (e.g. 7500000).
   OUTPUT FORMAT: {"listings": [{"project": string, "price": number, "size_sqft": number, "psf": number, "latitude": number, "longitude": number}]}`;
   
@@ -141,11 +141,10 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
     const price = robustParseNumber(l.price);
     const size = robustParseNumber(l.size_sqft) || (req.size || 1100);
     let psf = robustParseNumber(l.psf);
-    // Auto-fix tiny PSF units (e.g. 7.5 meaning 7500)
     if (psf > 0 && psf < 1000) psf *= 1000; 
     if (psf === 0 && price > 0) psf = price / size;
     return { ...l, price, size_sqft: size, psf };
-  }).filter(l => l.price > 100000 && l.psf > 1500); // Relaxed PSF filter
+  }).filter(l => l.price > 100000 && l.psf > 1500);
 
   let finalValue: number;
   let notes = "";
@@ -163,7 +162,6 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
       await logMarketFriction(req.city, req.area || '', userBudget);
     }
   } else {
-    // If no listings found, use calibrated stats but keep trying to find data for the report
     finalValue = calibratedMedianPsf * (req.size || 1100);
     
     if (userBudget > 0 && userBudget < finalValue * 0.85) {
@@ -193,9 +191,8 @@ export async function getRentValuationInternal(req: ValuationRequestBase): Promi
   const stats = await getDynamicMarketStats(req.city, req.area, req.pincode, "rental");
   const userBudget = req.budget || 0;
   
-  const budgetText = userBudget > 0 ? `Targeting a monthly rent of ₹${userBudget.toLocaleString()}.` : "";
   const prompt = `Search for active verified rental listings for ${req.propertyType} in ${req.area || req.city}, ${req.city}. 
-  ${budgetText} Output real results with "latitude" and "longitude".
+  Do not filter results strictly by budget. Find representative market rent.
   OUTPUT FORMAT: {"listings": [{"project": string, "monthlyRent": number, "size_sqft": number, "latitude": number, "longitude": number}]}`;
   
   const { text, groundingSources } = await callLLMWithFallback(prompt);
