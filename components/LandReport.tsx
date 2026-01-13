@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { LandResult, LandListing, AppLang } from '../types';
-import { ExternalLink, Map as MapIcon, ImageIcon, Loader2, Zap, Info, Calculator, RefreshCw, TrendingUp } from 'lucide-react';
+import { ExternalLink, Map as MapIcon, ImageIcon, Loader2, Zap, Info, Calculator, RefreshCw, TrendingUp, Plus } from 'lucide-react';
 import { generatePropertyImage } from '../services/geminiService';
 import { speak } from '../services/voiceService';
 import { parsePrice } from '../services/geminiService';
 import GoogleMapView from './GoogleMapView';
+import { getMoreListings } from '../services/valuationService';
+// @ts-ignore
+import confetti from 'canvas-confetti';
 
 interface LandReportProps {
   result: LandResult;
@@ -52,7 +55,13 @@ const AIPropertyImage = ({ title, address, type }: { title: string, address: str
 const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeFinance }) => {
   const [viewMode, setViewMode] = useState<'dashboard' | 'map'>('dashboard');
   const [isSearchingPincode, setIsSearchingPincode] = useState(false);
-  const listings = result.listings || [];
+  
+  const [allListings, setAllListings] = useState<LandListing[]>(result.listings || []);
+  const [isDeepScanning, setIsDeepScanning] = useState(false);
+
+  useEffect(() => {
+    setAllListings(result.listings || []);
+  }, [result.listings]);
 
   useEffect(() => {
     const landValueStr = typeof result.landValue === 'string' ? result.landValue : formatPrice(result.landValue);
@@ -60,9 +69,49 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
     speak(speechText, lang === 'HI' ? 'hi-IN' : 'en-IN');
   }, [result.landValue, lang]);
 
+  const handleDeepScan = async () => {
+    if (isDeepScanning) return;
+    setIsDeepScanning(true);
+    setIsSearchingPincode(true);
+    
+    try {
+      const city = allListings[0]?.address?.split(',').pop()?.trim() || 'Unknown City';
+      const area = allListings[0]?.address?.split(',')[0]?.trim() || '';
+      
+      const more = await getMoreListings({
+        city,
+        area,
+        propertyType: 'Plot',
+        size: 1000,
+        mode: 'land'
+      });
+      
+      const formattedMore: LandListing[] = more.map(l => ({
+        title: l.project || "Land Parcel",
+        price: formatPrice(l.totalPrice || l.price),
+        size: `${l.size_sqyd || 1000} sqyd`,
+        address: `${l.project}, ${area}, ${city}`,
+        sourceUrl: 'https://www.99acres.com',
+        latitude: l.latitude,
+        longitude: l.longitude,
+        facing: 'East'
+      }));
+
+      const uniqueNew = formattedMore.filter(nm => !allListings.some(al => al.title === nm.title));
+      setAllListings(prev => [...prev, ...uniqueNew]);
+      
+      confetti({ particleCount: 100, spread: 50, origin: { y: 0.8 } });
+    } catch (e) {
+      console.error("Land Deep Scan Failed:", e);
+    } finally {
+      setIsDeepScanning(false);
+      setIsSearchingPincode(false);
+    }
+  };
+
   const mapNodes = [
-    { title: "Plot Analysis", price: result.landValue, address: result.listings[0]?.address || "Target Area", lat: result.listings[0]?.latitude, lng: result.listings[0]?.longitude, isSubject: true },
-    ...result.listings.slice(1).map(l => ({
+    { title: "Plot Analysis", price: result.landValue, address: allListings[0]?.address || "Target Area", lat: allListings[0]?.latitude, lng: allListings[0]?.longitude, isSubject: true },
+    ...allListings.slice(1).map(l => ({
       title: l.title,
       price: l.price,
       address: l.address,
@@ -136,7 +185,7 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {listings.map((item, idx) => (
+                {allListings.map((item, idx) => (
                   <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 group shadow-glass-3d animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
                     <AIPropertyImage title={item.title} address={item.address} type="Plot" />
                     <div className="mb-4">
@@ -152,7 +201,21 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
                 ))}
               </div>
 
-              {listings.length === 0 && (
+              {allListings.length > 0 && (
+                <div className="flex flex-col items-center gap-6 py-10">
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em]">Extended Land Registry Network</p>
+                  <button 
+                    onClick={handleDeepScan}
+                    disabled={isDeepScanning}
+                    className="px-12 py-5 bg-white/5 border border-white/10 rounded-full text-xs font-black uppercase tracking-widest text-white hover:bg-orange-500 hover:border-orange-500 transition-all flex items-center gap-3 shadow-neo-glow group active:scale-95 disabled:opacity-50"
+                  >
+                    {isDeepScanning ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} className="group-hover:rotate-90 transition-transform" />}
+                    {isDeepScanning ? 'Querying Regional Registries...' : 'See More Properties'}
+                  </button>
+                </div>
+              )}
+
+              {allListings.length === 0 && (
                 <div className="text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10">
                    <MapIcon size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
                    <p className="text-gray-500 font-black uppercase tracking-widest text-xs">No active land listings detected in this micro-market.</p>

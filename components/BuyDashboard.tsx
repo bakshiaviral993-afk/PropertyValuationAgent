@@ -4,7 +4,7 @@ import {
   TrendingUp, MapPin, Share2, 
   FileText, Home, Building2,
   Save, Sparkles, BarChart3, LayoutGrid, Sparkle, Video, Download, RefreshCw, 
-  Landmark, AlertCircle, CheckCircle, BrainCircuit, Map as MapIcon, Loader2, ShieldAlert
+  Landmark, AlertCircle, CheckCircle, BrainCircuit, Map as MapIcon, Loader2, ShieldAlert, Plus
 } from 'lucide-react';
 // @ts-ignore
 import confetti from 'canvas-confetti';
@@ -20,6 +20,7 @@ import HarmonyDashboard from './HarmonyDashboard';
 import VideoGenerator from './VideoGenerator';
 import ProfessionalReport from './ProfessionalReport';
 import GoogleMapView from './GoogleMapView';
+import { getMoreListings } from '../services/valuationService';
 
 interface BuyDashboardProps {
   result: BuyResult;
@@ -100,6 +101,13 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
   const [viewMode, setViewMode] = useState<'dashboard' | 'stats' | 'harmony' | 'pro-report' | 'map'>('pro-report');
   const [selectedVideo, setSelectedVideo] = useState<{prompt: string, title: string} | null>(null);
   const [isSearchingPincode, setIsSearchingPincode] = useState(false);
+  
+  const [allListings, setAllListings] = useState<SaleListing[]>(result.listings || []);
+  const [isDeepScanning, setIsDeepScanning] = useState(false);
+
+  useEffect(() => {
+    setAllListings(result.listings || []);
+  }, [result.listings]);
 
   useEffect(() => {
     if (!result.isBudgetAlignmentFailure) {
@@ -127,9 +135,51 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
     pdf.save(`QuantCasa_Report_${Date.now()}.pdf`);
   };
 
+  const handleDeepScan = async () => {
+    if (isDeepScanning) return;
+    setIsDeepScanning(true);
+    setIsSearchingPincode(true);
+    
+    try {
+      const city = result.listings[0]?.address?.split(',').pop()?.trim() || 'Unknown City';
+      const area = result.listings[0]?.address?.split(',')[0]?.trim() || '';
+      
+      const more = await getMoreListings({
+        city,
+        area,
+        propertyType: result.listings[0]?.bhk || 'Residential',
+        size: 1100,
+        mode: 'sale'
+      });
+      
+      const formattedMore: SaleListing[] = more.map(l => ({
+        title: l.project,
+        price: formatPrice(l.price),
+        priceValue: l.price,
+        address: `${l.project}, ${area}, ${city}`,
+        pincode: result.listings[0]?.pincode || '',
+        sourceUrl: 'https://www.99acres.com',
+        bhk: result.listings[0]?.bhk || 'Residential',
+        latitude: l.latitude,
+        longitude: l.longitude
+      }));
+
+      // Filter out duplicates based on title
+      const uniqueNew = formattedMore.filter(nm => !allListings.some(al => al.title === nm.title));
+      setAllListings(prev => [...prev, ...uniqueNew]);
+      
+      confetti({ particleCount: 100, spread: 50, origin: { y: 0.8 } });
+    } catch (e) {
+      console.error("Deep Scan Failed:", e);
+    } finally {
+      setIsDeepScanning(false);
+      setIsSearchingPincode(false);
+    }
+  };
+
   const handleShare = async () => {
     const price = result.isBudgetAlignmentFailure ? formatPrice(result.suggestedMinimum || 0) : result.fairValue;
-    const location = result.listings?.[0]?.address || "Selected Locality";
+    const location = allListings[0]?.address || "Selected Locality";
     const shareText = `Just found the fair market value for a property in ${location} using QuantCasa: ${price}! Check out this AI-powered valuation report.`;
     
     if (navigator.share) {
@@ -143,20 +193,18 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
         console.error("Error sharing:", err);
       }
     } else {
-      // Fallback: Copy to clipboard or mailto
       const mailtoLink = `mailto:?subject=Property Valuation - QuantCasa&body=${encodeURIComponent(shareText + "\n\nView more at: " + window.location.href)}`;
       window.location.href = mailtoLink;
     }
   };
 
-  const listingPrices = result.listings?.map(l => parsePrice(l.price)) || [];
+  const listingPrices = allListings.map(l => parsePrice(l.price));
   const listingStats = calculateListingStats(listingPrices);
   const fairValNum = parsePrice(result.fairValue);
 
-  // Prepare nodes for Google Maps
   const mapNodes = [
-    { title: "Target Asset", price: result.fairValue, address: result.listings[0]?.address || "Selected Area", lat: result.listings[0]?.latitude, lng: result.listings[0]?.longitude, isSubject: true },
-    ...(result.listings || []).slice(1).map(l => ({
+    { title: "Target Asset", price: result.fairValue, address: allListings[0]?.address || "Selected Area", lat: allListings[0]?.latitude, lng: allListings[0]?.longitude, isSubject: true },
+    ...allListings.slice(1).map(l => ({
       title: l.title,
       price: formatPrice(parsePrice(l.price)),
       address: l.address,
@@ -176,7 +224,7 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
       {selectedVideo && (
         <div className="fixed inset-0 z-[500] bg-neo-bg/80 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
           <VideoGenerator 
-            prompt={`${selectedVideo.prompt} in ${result.listings[0]?.address}`} 
+            prompt={`${selectedVideo.prompt} in ${allListings[0]?.address}`} 
             title={selectedVideo.title} 
             onClose={() => setSelectedVideo(null)} 
           />
@@ -281,8 +329,8 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {result.listings?.map((l, i) => (
-                <div key={i} className="bg-white/5 rounded-[32px] p-6 border border-white/10 hover:border-neo-neon/50 transition-all shadow-glass-3d flex flex-col group">
+              {allListings.map((l, i) => (
+                <div key={i} className="bg-white/5 rounded-[32px] p-6 border border-white/10 hover:border-neo-neon/50 transition-all shadow-glass-3d flex flex-col group animate-in slide-in-from-bottom duration-500" style={{ animationDelay: `${i % 6 * 100}ms` }}>
                   <AIListingImage listing={l} onShowVideo={() => setSelectedVideo({prompt: l.title, title: l.title})} />
                   <h4 className="font-black text-white text-lg leading-tight mb-2 truncate uppercase">{l.title}</h4>
                   <div className="flex items-center gap-1.5 text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-6">
@@ -298,7 +346,21 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnal
               ))}
             </div>
 
-            {(!result.listings || result.listings.length === 0) && (
+            {allListings.length > 0 && (
+              <div className="flex flex-col items-center gap-6 py-10">
+                <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em]">End of Current Grounded Signal</p>
+                <button 
+                  onClick={handleDeepScan}
+                  disabled={isDeepScanning}
+                  className="px-12 py-5 bg-white/5 border border-white/10 rounded-full text-xs font-black uppercase tracking-widest text-white hover:bg-neo-neon hover:border-neo-neon transition-all flex items-center gap-3 shadow-neo-glow group active:scale-95 disabled:opacity-50"
+                >
+                  {isDeepScanning ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} className="group-hover:rotate-90 transition-transform" />}
+                  {isDeepScanning ? 'Performing Deep Spatial Scan...' : 'See More Properties'}
+                </button>
+              </div>
+            )}
+
+            {allListings.length === 0 && (
                 <div className="col-span-full text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10 animate-in fade-in duration-700">
                    <Building2 size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
                    <p className="text-gray-500 font-black uppercase tracking-widest text-xs">

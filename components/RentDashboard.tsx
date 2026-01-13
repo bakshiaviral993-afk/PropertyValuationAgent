@@ -1,15 +1,17 @@
-
 import React, { useState, useEffect } from 'react';
 import { RentResult, RentalListing, AppLang } from '../types';
 import { 
   MapPin, ExternalLink, Building2, Loader2, BarChart3, LayoutGrid,
-  Receipt, TrendingUp, RefreshCw, Sparkles, CheckCircle, AlertCircle, Map as MapIcon, Info
+  Receipt, TrendingUp, RefreshCw, Sparkles, CheckCircle, AlertCircle, Map as MapIcon, Info, Plus
 } from 'lucide-react';
 import { generatePropertyImage } from '../services/geminiService';
 import { speak } from '../services/voiceService';
 import MarketStats from './MarketStats';
 import { parsePrice, calculateListingStats } from '../utils/listingProcessor';
 import GoogleMapView from './GoogleMapView';
+import { getMoreListings } from '../services/valuationService';
+// @ts-ignore
+import confetti from 'canvas-confetti';
 
 interface RentDashboardProps {
   result: RentResult;
@@ -66,7 +68,13 @@ const AIPropertyImage = ({ title, address, type }: { title: string, address: str
 const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAnalyzeFinance, userBudget }) => {
   const [viewMode, setViewMode] = useState<'dashboard' | 'stats' | 'map'>('dashboard');
   const [isSearchingPincode, setIsSearchingPincode] = useState(false);
-  const listings = result.listings || [];
+  
+  const [allListings, setAllListings] = useState<RentalListing[]>(result.listings || []);
+  const [isDeepScanning, setIsDeepScanning] = useState(false);
+
+  useEffect(() => {
+    setAllListings(result.listings || []);
+  }, [result.listings]);
 
   const fairValueNum = parsePrice(result.rentalValue);
   const isAboveBudget = userBudget && fairValueNum > userBudget * 1.1;
@@ -79,12 +87,53 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
     speak(speechText, lang === 'HI' ? 'hi-IN' : 'en-IN');
   }, [result.rentalValue, lang]);
 
-  const listingPrices = result.listings?.map(l => parsePrice(l.rent)) || [];
+  const handleDeepScan = async () => {
+    if (isDeepScanning) return;
+    setIsDeepScanning(true);
+    setIsSearchingPincode(true);
+    
+    try {
+      const city = allListings[0]?.address?.split(',').pop()?.trim() || 'Unknown City';
+      const area = allListings[0]?.address?.split(',')[0]?.trim() || '';
+      
+      const more = await getMoreListings({
+        city,
+        area,
+        propertyType: allListings[0]?.bhk || 'Residential',
+        size: 1100,
+        mode: 'rent'
+      });
+      
+      const formattedMore: RentalListing[] = more.map(l => ({
+        title: l.project,
+        rent: formatPriceDisplay(l.monthlyRent || l.price),
+        address: `${l.project}, ${area}, ${city}`,
+        sourceUrl: 'https://www.nobroker.in',
+        bhk: allListings[0]?.bhk || 'Residential',
+        qualityScore: 8,
+        latitude: l.latitude,
+        longitude: l.longitude,
+        facing: 'Any'
+      }));
+
+      const uniqueNew = formattedMore.filter(nm => !allListings.some(al => al.title === nm.title));
+      setAllListings(prev => [...prev, ...uniqueNew]);
+      
+      confetti({ particleCount: 100, spread: 50, origin: { y: 0.8 } });
+    } catch (e) {
+      console.error("Deep Scan Failed:", e);
+    } finally {
+      setIsDeepScanning(false);
+      setIsSearchingPincode(false);
+    }
+  };
+
+  const listingPrices = allListings.map(l => parsePrice(l.rent));
   const listingStats = calculateListingStats(listingPrices);
 
   const mapNodes = [
-    { title: "Grounded Node", price: result.rentalValue, address: result.listings[0]?.address || "Selected Area", lat: result.listings[0]?.latitude, lng: result.listings[0]?.longitude, isSubject: true },
-    ...(result.listings || []).slice(1).map(l => ({
+    { title: "Grounded Node", price: result.rentalValue, address: allListings[0]?.address || "Selected Area", lat: allListings[0]?.latitude, lng: allListings[0]?.longitude, isSubject: true },
+    ...allListings.slice(1).map(l => ({
       title: l.title,
       price: formatPriceDisplay(l.rent),
       address: l.address,
@@ -181,12 +230,12 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {listings.map((item, idx) => {
+                {allListings.map((item, idx) => {
                   const itemRent = parsePrice(item.rent);
                   const isMatch = userBudget && itemRent <= userBudget * 1.05;
                   
                   return (
-                    <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 shadow-glass-3d hover:border-emerald-500/30 transition-all group relative overflow-hidden">
+                    <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 shadow-glass-3d hover:border-emerald-500/30 transition-all group relative overflow-hidden animate-in zoom-in duration-500">
                       {isMatch && (
                         <div className="absolute top-6 right-6 z-10 px-3 py-1 bg-emerald-500 text-white text-[8px] font-black uppercase rounded-full shadow-neo-glow animate-in zoom-in">
                           Budget Match
@@ -210,7 +259,21 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
                 })}
               </div>
 
-              {listings.length === 0 && !isSearchingPincode && (
+              {allListings.length > 0 && (
+                <div className="flex flex-col items-center gap-6 py-10">
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em]">Extended Lease Network Detected</p>
+                  <button 
+                    onClick={handleDeepScan}
+                    disabled={isDeepScanning}
+                    className="px-12 py-5 bg-white/5 border border-white/10 rounded-full text-xs font-black uppercase tracking-widest text-white hover:bg-emerald-500 hover:border-emerald-500 transition-all flex items-center gap-3 shadow-neo-glow group active:scale-95 disabled:opacity-50"
+                  >
+                    {isDeepScanning ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} className="group-hover:rotate-90 transition-transform" />}
+                    {isDeepScanning ? 'Performing Deep Spatial Scan...' : 'See More Properties'}
+                  </button>
+                </div>
+              )}
+
+              {allListings.length === 0 && !isSearchingPincode && (
                 <div className="text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10">
                    <Building2 size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
                    <p className="text-gray-500 font-black uppercase tracking-widest text-xs">No hyper-local listings found for this budget node.</p>

@@ -40,9 +40,6 @@ const safeKv = {
   }
 };
 
-/**
- * Robustly parses price strings like "72.5 L" or "1.2 Cr" into absolute numbers.
- */
 function robustParseNumber(val: any): number {
   if (typeof val === 'number') return val;
   if (!val) return 0;
@@ -57,9 +54,6 @@ function robustParseNumber(val: any): number {
   return num;
 }
 
-/**
- * Provides a rough coordinate center for major Indian cities if AI fails.
- */
 const CITY_CENTERS: Record<string, {lat: number, lng: number}> = {
   'pune': { lat: 18.5204, lng: 73.8567 },
   'mumbai': { lat: 19.0760, lng: 72.8777 },
@@ -117,6 +111,49 @@ async function getDynamicMarketStats(
   }
 }
 
+export async function getMoreListings(req: ValuationRequestBase & { mode: 'sale' | 'rent' | 'land' | 'commercial' }): Promise<any[]> {
+  const cityLower = req.city.toLowerCase();
+  const baseCoord = CITY_CENTERS[cityLower] || { lat: 18.5204, lng: 73.8567 };
+  
+  let typeText = 'property';
+  if (req.mode === 'sale') typeText = 'apartments for sale';
+  else if (req.mode === 'rent') typeText = 'apartments for rent';
+  else if (req.mode === 'land') typeText = 'land/plots for sale';
+  else if (req.mode === 'commercial') typeText = 'commercial shops/offices';
+
+  const prompt = `Perform an EXHAUSTIVE deep scan for REAL active ${typeText} listings in ${req.area || req.city}, ${req.city}. 
+  IMPORTANT: Return as many REAL unique listings as possible (target 15-20). 
+  Ignore strict budget constraints. Include exact coordinates (latitude, longitude).
+  OUTPUT FORMAT: {"listings": [{"project": string, "price": number, "size_sqft": number, "psf": number, "latitude": number, "longitude": number, "monthlyRent": number, "totalPrice": number, "size_sqyd": number}]}`;
+
+  const { text } = await callLLMWithFallback(prompt, { temperature: 0.1, maxOutputTokens: 2000 });
+  let listings: any[] = [];
+  try {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      listings = JSON.parse(jsonMatch[0]).listings || [];
+    }
+  } catch (e) {
+    console.error("Deep Scan Parsing Error:", e);
+  }
+
+  return listings.map(l => {
+    const price = robustParseNumber(l.price || l.totalPrice || l.monthlyRent);
+    const size = robustParseNumber(l.size_sqft || l.size_sqyd) || (req.size || 1100);
+    let psf = robustParseNumber(l.psf);
+    if (psf === 0 && price > 0) psf = price / size;
+    
+    return {
+      ...l,
+      price,
+      size_sqft: size,
+      psf,
+      latitude: l.latitude || (baseCoord.lat + (Math.random() - 0.5) * 0.04),
+      longitude: l.longitude || (baseCoord.lng + (Math.random() - 0.5) * 0.04)
+    };
+  }).filter(l => l.price > 100);
+}
+
 export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string }): Promise<ValuationResultBase> {
   const stats = await getDynamicMarketStats(req.city, req.area, req.pincode, "residential");
   const userBudget = req.budget || 0;
@@ -126,7 +163,7 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
   const calibratedMinPsf = stats.minPsf * learningFactor;
 
   const prompt = `Search for REAL active sale listings of ${req.bhk || '2-3 BHK'} apartments in ${req.area || req.city}, ${req.city}. 
-  IMPORTANT: Retrieve 5-10 REAL listings from major sites (Magicbricks, 99acres, Housing). Do NOT filter by budget yet.
+  IMPORTANT: Retrieve 5-10 REAL listings from major sites. 
   CRITICAL: include "latitude" and "longitude" for map visualization. 
   OUTPUT FORMAT: {"listings": [{"project": string, "price": number, "size_sqft": number, "psf": number, "latitude": number, "longitude": number}]}`;
   
@@ -146,18 +183,16 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
     }
   }
 
-  // DATA RECOVERY & SPATIAL NODE SYNTHESIS
   const cityLower = req.city.toLowerCase();
   const baseCoord = CITY_CENTERS[cityLower] || { lat: 18.5204, lng: 73.8567 };
 
-  listings = listings.map((l, idx) => {
+  listings = listings.map((l) => {
     const price = robustParseNumber(l.price);
     const size = robustParseNumber(l.size_sqft) || (req.size || 1100);
     let psf = robustParseNumber(l.psf);
     if (psf > 0 && psf < 1000) psf *= 1000; 
     if (psf === 0 && price > 0) psf = price / size;
 
-    // Spatial Node Recovery: If coordinates are missing, jitter around city/locality center
     let latitude = l.latitude;
     let longitude = l.longitude;
     if (!latitude || !longitude || latitude === 0) {
