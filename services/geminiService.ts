@@ -33,43 +33,101 @@ export function formatPrice(val: number): string {
   return `₹${val.toLocaleString('en-IN')}`;
 }
 
-const extractJsonFromText = (text: string): any => {
-  try {
-    const cleanedText = text.replace(/```json|```/g, '').trim();
-    return JSON.parse(cleanedText);
-  } catch {
-    const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-    if (jsonMatch) return JSON.parse(jsonMatch[0]);
-    throw new Error("Could not extract valid data.");
-  }
-};
-
 export async function getCommercialAnalysis(req: CommercialRequest): Promise<CommercialResult> {
   const valuation = await getCommercialValuationInternal({
     city: req.city, area: req.area, pincode: req.pincode, propertyType: req.type, size: req.sqft
   });
   const listings: CommercialListing[] = (valuation.comparables || []).map(l => ({
-    title: l.project || "Commercial Hub",
-    price: formatPrice(l.price || (l.psf * req.sqft)),
-    address: req.area, type: req.type, intent: req.intent, sourceUrl: "https://www.99acres.com", sqft: l.size_sqft || req.sqft,
+    title: l.title || "Commercial Hub",
+    price: l.price,
+    address: req.area, type: req.type, intent: req.intent, sourceUrl: l.sourceUrl || "https://www.99acres.com", sqft: l.sqft || req.sqft,
     latitude: l.latitude, longitude: l.longitude
   }));
   return {
     fairValue: formatPrice(valuation.estimatedValue),
-    yieldPotential: req.intent === 'Buy' ? "5.5% - 7.2%" : "N/A",
-    footfallScore: valuation.confidence === 'high' ? 88 : 72,
-    businessInsights: valuation.notes || `Market analysis shows a ${valuation.confidence} confidence level.`,
-    negotiationScript: "Focus on lease fit-out periods and CAM inclusions.",
+    yieldPotential: valuation.yieldPercentage || "N/A",
+    footfallScore: valuation.learningSignals || 70,
+    businessInsights: valuation.notes || "Analyzed via commercial market node.",
+    negotiationScript: valuation.negotiationScript || "Focus on lease fit-out periods.",
     confidenceScore: valuation.confidence === 'high' ? 95 : 75,
     listings, 
     groundingSources: valuation.groundingSources || []
   };
 }
 
+export async function getBuyAnalysis(req: BuyRequest): Promise<BuyResult> {
+  const valuation = await getBuyValuation({ city: req.city, area: req.area, pincode: req.pincode, propertyType: req.bhk, size: req.sqft, facing: req.facing, budget: (req as any).budget });
+  return {
+    fairValue: formatPrice(valuation.estimatedValue), 
+    valuationRange: `${formatPrice(valuation.rangeLow)} - ${formatPrice(valuation.rangeHigh)}`,
+    recommendation: (valuation as any).recommendation || 'Fair Price', 
+    negotiationScript: valuation.negotiationScript || "Leverage market comps.",
+    listings: valuation.comparables || [], 
+    marketSentiment: (valuation as any).marketSentiment || 'Stable', 
+    sentimentScore: (valuation as any).sentimentScore || 80,
+    registrationEstimate: valuation.registrationEstimate || formatPrice(valuation.estimatedValue * 0.07), 
+    appreciationPotential: valuation.appreciationPotential || "5-7% annually",
+    confidenceScore: valuation.confidence === 'high' ? 92 : 75, 
+    valuationJustification: valuation.notes || "Grounded via intelligence layer.",
+    insights: [{ title: "Area Pulse", description: `Detected active market activity in ${req.area}.`, type: "trend" }], 
+    groundingSources: valuation.groundingSources || [],
+    source: valuation.source,
+    isBudgetAlignmentFailure: valuation.isBudgetAlignmentFailure,
+    suggestedMinimum: valuation.suggestedMinimum,
+    learningSignals: valuation.learningSignals,
+    notes: valuation.notes
+  };
+}
+
+export async function getRentAnalysis(req: RentRequest): Promise<RentResult> {
+  const valuation = await getRentValuationInternal({ city: req.city, area: req.area, pincode: req.pincode, propertyType: req.bhk, size: req.sqft, budget: (req as any).budget });
+  return {
+    rentalValue: formatPrice(valuation.estimatedValue), 
+    yieldPercentage: valuation.yieldPercentage || "3-4%", 
+    rentOutAlert: valuation.depositCalc || "Standard Deposit Apply",
+    depositCalc: valuation.depositCalc || "3-6 Months", 
+    negotiationScript: valuation.negotiationScript || "Focus on tenure stability.", 
+    marketSummary: valuation.notes || "Rental indices are stable.",
+    tenantDemandScore: valuation.tenantDemandScore || 75, 
+    confidenceScore: valuation.confidence === 'high' ? 90 : 70, 
+    valuationJustification: valuation.valuationJustification || "Leasehold analysis complete.",
+    propertiesFoundCount: valuation.comparables?.length || 0, 
+    listings: valuation.comparables || [], 
+    insights: [], 
+    groundingSources: valuation.groundingSources || [],
+    isBudgetAlignmentFailure: valuation.isBudgetAlignmentFailure,
+    suggestedMinimum: valuation.suggestedMinimum,
+    notes: valuation.notes
+  };
+}
+
+export async function getLandValuationAnalysis(req: LandRequest): Promise<LandResult> {
+  const valuation = await getLandValuationInternal({ city: req.city, area: req.area, pincode: req.pincode, propertyType: "Plot", size: req.plotSize, budget: (req as any).budget });
+  return {
+    landValue: formatPrice(valuation.estimatedValue), 
+    perSqmValue: `₹${valuation.pricePerUnit.toLocaleString()} / sqyd`,
+    devROI: (valuation as any).devROI || "15-20%", 
+    negotiationStrategy: valuation.negotiationScript || "Verify FSI utilization.", 
+    confidenceScore: valuation.confidence === 'high' ? 85 : 65,
+    zoningAnalysis: valuation.notes || "Residential Use", 
+    valuationJustification: valuation.valuationJustification || "Plot node synced.",
+    listings: (valuation.comparables || []),
+    insights: [],
+    isBudgetAlignmentFailure: valuation.isBudgetAlignmentFailure,
+    suggestedMinimum: valuation.suggestedMinimum
+  };
+}
+
 export async function getEssentialsAnalysis(category: string, city: string, area: string): Promise<EssentialResult> {
   const prompt = `Find 5 real local business contacts for "${category}" in ${area}, ${city}. Output STRICT JSON: {"category": "${category}", "services": [{"name": string, "contact": string, "address": string, "rating": string, "distance": string, "isOpen": boolean, "sourceUrl": string}], "neighborhoodContext": string}`;
   const { text } = await callLLMWithFallback(prompt, { temperature: 0.1 });
-  return extractJsonFromText(text);
+  try {
+    const cleanedText = text.replace(/```json|```/g, '').trim();
+    return JSON.parse(cleanedText);
+  } catch {
+    const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    return jsonMatch ? JSON.parse(jsonMatch[0]) : { category, services: [], neighborhoodContext: "Search failed." };
+  }
 }
 
 export async function askCibilExpert(messages: ChatMessage[], currentScore: number): Promise<string> {
@@ -85,105 +143,9 @@ export async function resolveLocalityData(query: string, city: string, mode: 'lo
     : `Search the web for the correct 6-digit PIN code of "${query}" in ${city}, India. JSON ARRAY of strings: ["123456"]`;
   try {
     const { text } = await callLLMWithFallback(prompt, { temperature: 0.1 });
-    return extractJsonFromText(text);
-  } catch (e) { 
-    console.error("Locality resolution failed", e);
-    return []; 
-  }
-}
-
-export async function getBuyAnalysis(req: BuyRequest): Promise<BuyResult> {
-  const valuation = await getBuyValuation({ city: req.city, area: req.area, pincode: req.pincode, propertyType: req.bhk, size: req.sqft, facing: req.facing, budget: (req as any).budget });
-  const listings: SaleListing[] = (valuation.comparables || []).map(l => ({
-    title: l.project || "Verified Listing", 
-    price: formatPrice(l.price), 
-    priceValue: l.price, 
-    address: req.area || req.city, 
-    pincode: req.pincode, 
-    sourceUrl: "https://www.99acres.com", 
-    bhk: req.bhk,
-    latitude: l.latitude,
-    longitude: l.longitude
-  }));
-  return {
-    fairValue: formatPrice(valuation.estimatedValue), 
-    valuationRange: `${formatPrice(valuation.rangeLow)} - ${formatPrice(valuation.rangeHigh)}`,
-    recommendation: valuation.estimatedValue > (req as any).budget * 1.1 ? 'Overpriced' : (valuation.estimatedValue < (req as any).budget * 0.9 ? 'Good Buy' : 'Fair Price'), 
-    negotiationScript: "Analyze the price per sqft of comparable nodes and leverage construction age.",
-    listings, 
-    marketSentiment: valuation.confidence === 'high' ? 'Stable Demand' : 'Volatile', 
-    sentimentScore: valuation.confidence === 'high' ? 88 : 65,
-    registrationEstimate: formatPrice(valuation.estimatedValue * 0.07), 
-    appreciationPotential: "5.5% annually",
-    confidenceScore: valuation.confidence === 'high' ? 92 : 75, 
-    valuationJustification: valuation.notes || `Grounded via real-time market search (${valuation.source}).`,
-    insights: [{ title: "Area Pulse", description: `Detected ${listings.length} nodes in ${req.area || req.city}.`, type: "trend" }], 
-    groundingSources: valuation.groundingSources || [],
-    source: valuation.source,
-    isBudgetAlignmentFailure: valuation.isBudgetAlignmentFailure,
-    suggestedMinimum: valuation.suggestedMinimum,
-    learningSignals: valuation.learningSignals,
-    notes: valuation.notes
-  };
-}
-
-export async function getRentAnalysis(req: RentRequest): Promise<RentResult> {
-  const valuation = await getRentValuationInternal({ city: req.city, area: req.area, pincode: req.pincode, propertyType: req.bhk, size: req.sqft, budget: (req as any).budget });
-  const listings: RentalListing[] = (valuation.comparables || []).map(l => ({
-    title: l.project || "Lease Node", 
-    rent: formatPrice(l.monthlyRent), 
-    address: req.area || req.city, 
-    sourceUrl: "https://www.nobroker.in", 
-    bhk: req.bhk, 
-    qualityScore: 8, 
-    latitude: l.latitude, 
-    longitude: l.longitude, 
-    facing: req.facing || "Any"
-  }));
-  return {
-    rentalValue: formatPrice(valuation.estimatedValue), 
-    yieldPercentage: "3.2% - 4.1%", 
-    rentOutAlert: valuation.isBudgetAlignmentFailure ? "High Competition" : "Steady Demand",
-    depositCalc: "3-6 Months", 
-    negotiationScript: "Tenure stability is your strongest leverage point in this sector.", 
-    marketSummary: valuation.notes || "Rental indices in this micro-market are stabilizing.",
-    tenantDemandScore: 78, 
-    confidenceScore: valuation.confidence === 'high' ? 90 : 70, 
-    valuationJustification: `Calculated via web listing aggregation (${valuation.source}).`,
-    propertiesFoundCount: listings.length, 
-    listings, 
-    insights: [], 
-    groundingSources: valuation.groundingSources || [],
-    isBudgetAlignmentFailure: valuation.isBudgetAlignmentFailure,
-    suggestedMinimum: valuation.suggestedMinimum,
-    notes: valuation.notes
-  };
-}
-
-export async function getLandValuationAnalysis(req: LandRequest): Promise<LandResult> {
-  const valuation = await getLandValuationInternal({ city: req.city, area: req.area, pincode: req.pincode, propertyType: "Plot", size: req.plotSize, budget: (req as any).budget });
-  return {
-    landValue: formatPrice(valuation.estimatedValue), 
-    perSqmValue: `₹${valuation.pricePerUnit.toLocaleString()} / sqyd`,
-    devROI: "14-18%", 
-    negotiationStrategy: "Verify FSI utilization and boundary fencing status.", 
-    confidenceScore: valuation.confidence === 'high' ? 85 : 65,
-    zoningAnalysis: "Residential Use Confirmed", 
-    valuationJustification: valuation.notes || `Based on land registry trends (${valuation.source}).`,
-    listings: (valuation.comparables || []).map(l => ({ 
-      title: l.project || "Land Node", 
-      price: formatPrice(l.totalPrice), 
-      size: `${l.size_sqyd} sqyd`, 
-      address: req.area || req.city, 
-      sourceUrl: "https://www.99acres.com", 
-      latitude: l.latitude, 
-      longitude: l.longitude, 
-      facing: "East" 
-    })),
-    insights: [],
-    isBudgetAlignmentFailure: valuation.isBudgetAlignmentFailure,
-    suggestedMinimum: valuation.suggestedMinimum
-  };
+    const cleanedText = text.replace(/```json|```/g, '').trim();
+    return JSON.parse(cleanedText);
+  } catch (e) { return []; }
 }
 
 export async function analyzeImageForHarmony(base64Data: string, type: string): Promise<string> {
@@ -211,24 +173,10 @@ export const askPropertyQuestion = async (
   lang: 'EN' | 'HI' = 'EN',
   intent: 'general' | 'vastu' | 'interior' | 'feng-shui' = 'general'
 ): Promise<string> => {
-  const sysPrompt = `You are the QuantCasa Expert AI. Intent: ${intent.toUpperCase()}. Respond in a structured, DeepSeek-style logical breakdown. 
-
-CRITICAL RULES:
-1. Always start sections with exactly these headers: "- Tip:", "- Details:", and "- Suggestions:".
-2. Use bullet points for details.
-3. No long paragraphs.
-
-EXAMPLE OUTPUT:
-- Tip: Optimize North-East entry for maximum natural light.
-- Details:
-  - Step 1: Current plan shows heavy blockage in the Ishanya corner.
-  - Step 2: Relocate heavy storage to the South-West to balance energy.
-- Suggestions:
-  - Should we analyze the kitchen placement?
-  - Do you want a biophilic material palette recommendation?
-
-Context: ${JSON.stringify(contextResult || {})}. 2026 Trends: Biophilic sustainability.`;
-  
+  const sysPrompt = `You are the QuantCasa Expert AI. Intent: ${intent.toUpperCase()}. Respond in a structured, logical breakdown. 
+  - Tip: [Summary]
+  - Details: [Bullet points]
+  - Suggestions: [Interactive buttons]`;
   const { text } = await callLLMWithFallback(messages[messages.length - 1].text, { systemInstruction: sysPrompt, temperature: 0.7 });
   return text;
 };
@@ -238,7 +186,7 @@ export const generatePropertyImage = async (prompt: string): Promise<string | nu
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
-      contents: { parts: [{ text: `High-res architectural 2026 render: ${prompt}. Biophilic style, sustainable materials, natural lighting, energy flow. Cinematic realism.` }] },
+      contents: { parts: [{ text: `High-res architectural render: ${prompt}. Cinematic realism.` }] },
       config: { imageConfig: { aspectRatio: "16:9" } }
     });
     for (const part of response.candidates[0].content.parts) {

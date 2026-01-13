@@ -18,10 +18,8 @@ export default async function handler(req: any, res: any) {
         ? { parts: [{ text: prompt }, { inlineData: { data: image.data, mimeType: image.mimeType } }] }
         : prompt;
 
-      // Detect if search grounding is likely needed (e.g. for listings or pincodes)
       const needsSearch = prompt.toLowerCase().includes('listing') || 
                          prompt.toLowerCase().includes('pincode') || 
-                         prompt.toLowerCase().includes('pin code') ||
                          prompt.toLowerCase().includes('price') ||
                          prompt.toLowerCase().includes('for sale');
 
@@ -32,12 +30,12 @@ export default async function handler(req: any, res: any) {
         contents: contents,
         config: {
           ...config,
-          maxOutputTokens: config.maxOutputTokens || 1200,
+          maxOutputTokens: config.maxOutputTokens || 2000,
           tools: tools,
+          responseMimeType: config.responseMimeType || (prompt.toLowerCase().includes('json') ? 'application/json' : undefined),
         }
       });
 
-      // Extract grounding sources if available
       const groundingSources = result.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((chunk: any) => ({
         uri: chunk.web?.uri,
         title: chunk.web?.title
@@ -55,7 +53,6 @@ export default async function handler(req: any, res: any) {
     }
   }
 
-  // Perplexity Failover (Text-only)
   if (!image) {
     try {
       const ppRes = await fetch(PERPLEXITY_URL, {
