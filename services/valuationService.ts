@@ -118,15 +118,16 @@ export async function getMoreListings(req: ValuationRequestBase & { mode: 'sale'
   let typeText = 'property';
   if (req.mode === 'sale') typeText = 'apartments for sale';
   else if (req.mode === 'rent') typeText = 'apartments for rent';
-  else if (req.mode === 'land') typeText = 'land/plots for sale';
-  else if (req.mode === 'commercial') typeText = 'commercial shops/offices';
+  else if (req.mode === 'land') typeText = 'land parcels and plots for sale';
+  else if (req.mode === 'commercial') typeText = `commercial ${req.propertyType} properties`;
 
-  const prompt = `Perform an EXHAUSTIVE deep scan for REAL active ${typeText} listings in ${req.area || req.city}, ${req.city}. 
-  IMPORTANT: Return as many REAL unique listings as possible (target 15-20). 
-  Ignore strict budget constraints. Include exact coordinates (latitude, longitude).
-  OUTPUT FORMAT: {"listings": [{"project": string, "price": number, "size_sqft": number, "psf": number, "latitude": number, "longitude": number, "monthlyRent": number, "totalPrice": number, "size_sqyd": number}]}`;
+  const prompt = `Perform an UNRESTRICTED EXHAUSTIVE Deep Scan for REAL active ${typeText} listings in ${req.area || req.city}, ${req.city}. 
+  CRITICAL: Return as many unique real-world listings as possible (target 30-50 nodes). 
+  Ignore previous limits. For each property, provide project name, price, size, and EXACT latitude/longitude.
+  OUTPUT FORMAT: {"listings": [{"project": string, "price": any, "size_sqft": number, "psf": number, "latitude": number, "longitude": number, "monthlyRent": any, "totalPrice": any, "size_sqyd": number}]}`;
 
-  const { text } = await callLLMWithFallback(prompt, { temperature: 0.1, maxOutputTokens: 2000 });
+  // Using a very high token limit to allow a long JSON list
+  const { text } = await callLLMWithFallback(prompt, { temperature: 0.1, maxOutputTokens: 8000 });
   let listings: any[] = [];
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -134,7 +135,7 @@ export async function getMoreListings(req: ValuationRequestBase & { mode: 'sale'
       listings = JSON.parse(jsonMatch[0]).listings || [];
     }
   } catch (e) {
-    console.error("Deep Scan Parsing Error:", e);
+    console.error("Exhaustive Scan Parsing Error:", e);
   }
 
   return listings.map(l => {
@@ -148,8 +149,8 @@ export async function getMoreListings(req: ValuationRequestBase & { mode: 'sale'
       price,
       size_sqft: size,
       psf,
-      latitude: l.latitude || (baseCoord.lat + (Math.random() - 0.5) * 0.04),
-      longitude: l.longitude || (baseCoord.lng + (Math.random() - 0.5) * 0.04)
+      latitude: l.latitude || (baseCoord.lat + (Math.random() - 0.5) * 0.05),
+      longitude: l.longitude || (baseCoord.lng + (Math.random() - 0.5) * 0.05)
     };
   }).filter(l => l.price > 100);
 }

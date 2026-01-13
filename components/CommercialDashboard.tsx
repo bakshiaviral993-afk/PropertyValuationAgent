@@ -36,8 +36,8 @@ const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
   const [isDeepScanning, setIsDeepScanning] = useState(false);
 
   useEffect(() => {
-    setAllListings(currentResult.listings || []);
-  }, [currentResult.listings]);
+    setAllListings(initialResult.listings || []);
+  }, [initialResult.listings]);
 
   useEffect(() => {
     const speechText = lang === 'HI' 
@@ -74,10 +74,10 @@ const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
       
       const formattedMore: CommercialListing[] = more.map(l => ({
         title: l.project || "Commercial Space",
-        price: formatPrice(l.price),
+        price: formatPrice(l.price || l.totalPrice || l.monthlyRent),
         address: `${l.project}, ${area}, ${city}`,
         type: initialType,
-        intent: 'Buy', // Defaulting to Buy for deep scan
+        intent: 'Buy', 
         sourceUrl: 'https://www.99acres.com',
         sqft: l.size_sqft || initialSqft,
         latitude: l.latitude,
@@ -87,7 +87,7 @@ const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
       const uniqueNew = formattedMore.filter(nm => !allListings.some(al => al.title === nm.title));
       setAllListings(prev => [...prev, ...uniqueNew]);
       
-      confetti({ particleCount: 100, spread: 50, origin: { y: 0.8 } });
+      confetti({ particleCount: 150, spread: 100, origin: { y: 0.8 } });
     } catch (e) {
       console.error("Commercial Deep Scan Failed:", e);
     } finally {
@@ -96,7 +96,6 @@ const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
     }
   };
 
-  // Prepare nodes for Google Maps
   const mapNodes = allListings.map((l, i) => ({
     title: l.title,
     price: typeof l.price === 'string' ? l.price : formatPrice(l.price as any),
@@ -110,7 +109,7 @@ const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
     <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 relative pb-20">
       {(isSearchingPincode || isUpdating) && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 bg-neo-neon text-white rounded-full font-black text-[10px] uppercase tracking-widest shadow-neo-glow flex items-center gap-3 animate-bounce">
-          <RefreshCw size={14} className="animate-spin" /> Updating commercial micro-market nodes...
+          <RefreshCw size={14} className="animate-spin" /> Deep commercial node scan in progress...
         </div>
       )}
 
@@ -174,7 +173,7 @@ const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-10">
               {allListings.map((item, idx) => (
-                <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-8 shadow-glass-3d group hover:border-neo-neon/40 transition-all animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-8 shadow-glass-3d group hover:border-neo-neon/40 transition-all animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 50}ms` }}>
                   <div className="flex justify-between items-start mb-6">
                     <div>
                       <h4 className="font-black text-white text-lg truncate uppercase leading-tight">{item.title}</h4>
@@ -196,19 +195,23 @@ const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
 
             {allListings.length > 0 && (
               <div className="flex flex-col items-center gap-6 py-10">
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em]">Extended Commercial Hub Detected</p>
+                <div className="flex items-center gap-2 mb-2">
+                   <div className="h-1 w-20 bg-gradient-to-r from-transparent to-neo-neon/20" />
+                   <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em]">Extended Commercial Hub Detected</p>
+                   <div className="h-1 w-20 bg-gradient-to-l from-transparent to-neo-neon/20" />
+                </div>
                 <button 
                   onClick={handleDeepScan}
                   disabled={isDeepScanning}
                   className="px-12 py-5 bg-white/5 border border-white/10 rounded-full text-xs font-black uppercase tracking-widest text-white hover:bg-neo-neon hover:border-neo-neon transition-all flex items-center gap-3 shadow-neo-glow group active:scale-95 disabled:opacity-50"
                 >
                   {isDeepScanning ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} className="group-hover:rotate-90 transition-transform" />}
-                  {isDeepScanning ? 'Scanning Commercial Corridors...' : 'See More Properties'}
+                  {isDeepScanning ? 'Exhaustive Node Scan...' : 'Load All Available Commercial Assets'}
                 </button>
               </div>
             )}
 
-            {allListings.length === 0 && (
+            {allListings.length === 0 && !isSearchingPincode && (
               <div className="col-span-full text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10">
                 <Briefcase size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
                 <p className="text-gray-500 font-black uppercase tracking-widest text-xs">No hyper-local commercial listings found.</p>

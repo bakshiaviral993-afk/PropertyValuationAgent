@@ -100,7 +100,7 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
       const uniqueNew = formattedMore.filter(nm => !allListings.some(al => al.title === nm.title));
       setAllListings(prev => [...prev, ...uniqueNew]);
       
-      confetti({ particleCount: 100, spread: 50, origin: { y: 0.8 } });
+      confetti({ particleCount: 150, spread: 100, origin: { y: 0.8 } });
     } catch (e) {
       console.error("Land Deep Scan Failed:", e);
     } finally {
@@ -109,22 +109,20 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
     }
   };
 
-  const mapNodes = [
-    { title: "Plot Analysis", price: result.landValue, address: allListings[0]?.address || "Target Area", lat: allListings[0]?.latitude, lng: allListings[0]?.longitude, isSubject: true },
-    ...allListings.slice(1).map(l => ({
-      title: l.title,
-      price: l.price,
-      address: l.address,
-      lat: l.latitude,
-      lng: l.longitude
-    }))
-  ];
+  const mapNodes = allListings.map((l, i) => ({
+    title: l.title,
+    price: l.price,
+    address: l.address,
+    lat: l.latitude,
+    lng: l.longitude,
+    isSubject: i === 0
+  }));
 
   return (
     <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-right-8 duration-1000 pb-20">
       {isSearchingPincode && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 bg-orange-500 text-white rounded-full font-black text-[10px] uppercase tracking-widest shadow-neo-glow flex items-center gap-3 animate-bounce">
-          <RefreshCw size={14} className="animate-spin" /> Scanning land registries & regional data...
+          <RefreshCw size={14} className="animate-spin" /> Deep land registry scan in progress...
         </div>
       )}
 
@@ -186,7 +184,7 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {allListings.map((item, idx) => (
-                  <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 group shadow-glass-3d animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                  <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 group shadow-glass-3d animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 50}ms` }}>
                     <AIPropertyImage title={item.title} address={item.address} type="Plot" />
                     <div className="mb-4">
                       <h4 className="font-black text-white truncate uppercase">{item.title}</h4>
@@ -203,19 +201,23 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
 
               {allListings.length > 0 && (
                 <div className="flex flex-col items-center gap-6 py-10">
-                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em]">Extended Land Registry Network</p>
+                  <div className="flex items-center gap-2 mb-2">
+                     <div className="h-1 w-20 bg-gradient-to-r from-transparent to-orange-500/20" />
+                     <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em]">Extended Land Registry Network</p>
+                     <div className="h-1 w-20 bg-gradient-to-l from-transparent to-orange-500/20" />
+                  </div>
                   <button 
                     onClick={handleDeepScan}
                     disabled={isDeepScanning}
                     className="px-12 py-5 bg-white/5 border border-white/10 rounded-full text-xs font-black uppercase tracking-widest text-white hover:bg-orange-500 hover:border-orange-500 transition-all flex items-center gap-3 shadow-neo-glow group active:scale-95 disabled:opacity-50"
                   >
                     {isDeepScanning ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} className="group-hover:rotate-90 transition-transform" />}
-                    {isDeepScanning ? 'Querying Regional Registries...' : 'See More Properties'}
+                    {isDeepScanning ? 'Syncing Land Registries...' : 'Load All Available Plots & Parcels'}
                   </button>
                 </div>
               )}
 
-              {allListings.length === 0 && (
+              {allListings.length === 0 && !isSearchingPincode && (
                 <div className="text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10">
                    <MapIcon size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
                    <p className="text-gray-500 font-black uppercase tracking-widest text-xs">No active land listings detected in this micro-market.</p>
