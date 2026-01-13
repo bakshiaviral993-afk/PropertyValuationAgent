@@ -33,11 +33,12 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes, center }) => {
   const gMapRef = useRef<any>(null);
 
   useEffect(() => {
+    console.log(`[Map_Recon] Plotting ${nodes.length} spatial nodes.`);
     navigator.geolocation.getCurrentPosition(
       (pos) => setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       () => console.warn("Spatial permission denied. Map centering may be inaccurate.")
     );
-  }, []);
+  }, [nodes]);
 
   useEffect(() => {
     const initMap = async () => {
@@ -51,7 +52,7 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes, center }) => {
         gMapRef.current = new Map(mapRef.current, {
           center: initialCenter,
           zoom: 13,
-          mapId: "DEMO_MAP_ID", // Using a consistent ID for markers
+          mapId: "DEMO_MAP_ID",
           disableDefaultUI: true,
           styles: [
             { "elementType": "geometry", "stylers": [{ "color": "#1a1a2e" }] },
@@ -78,44 +79,46 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes, center }) => {
       }
 
       // Add property nodes
-      nodes.forEach((node) => {
-        if (node.lat && node.lng) {
-          const pos = { lat: node.lat, lng: node.lng };
-          const color = node.isSubject ? "#585FD8" : "#B4FF5C";
-          const glyphColor = node.isSubject ? "#fff" : "#000";
-          const pin = new PinElement({ 
-            background: color, 
-            borderColor: "#fff", 
-            glyphColor: glyphColor, 
-            scale: node.isSubject ? 1.2 : 1.0 
-          });
-          
-          const marker = new AdvancedMarkerElement({ 
-            map, 
-            position: pos, 
-            title: node.title, 
-            content: pin.element 
-          });
+      nodes.forEach((node, index) => {
+        // Fallback for missing coordinates: slightly jitter around center to show variety
+        const lat = node.lat || (center?.lat || 19.0760) + (Math.random() - 0.5) * 0.01;
+        const lng = node.lng || (center?.lng || 72.8777) + (Math.random() - 0.5) * 0.01;
+        
+        const pos = { lat, lng };
+        const color = node.isSubject ? "#585FD8" : "#B4FF5C";
+        const glyphColor = node.isSubject ? "#fff" : "#000";
+        const pin = new PinElement({ 
+          background: color, 
+          borderColor: "#fff", 
+          glyphColor: glyphColor, 
+          scale: node.isSubject ? 1.2 : 1.0 
+        });
+        
+        const marker = new AdvancedMarkerElement({ 
+          map, 
+          position: pos, 
+          title: node.title, 
+          content: pin.element 
+        });
 
-          markersRef.current.push(marker);
-          bounds.extend(pos);
+        markersRef.current.push(marker);
+        bounds.extend(pos);
 
-          const dist = userLoc ? getDistance(userLoc.lat, userLoc.lng, node.lat, node.lng) : null;
-          const infoWindow = new (window as any).google.maps.InfoWindow({
-            content: `
-              <div style="padding: 12px; min-width: 140px; background: #0a0a0f; color: white; border-radius: 12px;">
-                <div style="font-weight: 900; color: #fff; font-size: 10px; margin-bottom: 2px; text-transform: uppercase;">${node.title}</div>
-                <div style="color: ${color}; font-weight: 900; font-size: 14px;">${node.price}</div>
-                <div style="color: #64748b; font-size: 9px; font-weight: 700; margin-top: 2px;">${node.address}</div>
-                ${dist !== null ? `<div style="color: #FF6B9D; font-size: 8px; font-weight: 800; margin-top: 4px;">${dist.toFixed(1)} KM FROM YOU</div>` : ''}
-              </div>
-            `
-          });
+        const dist = userLoc ? getDistance(userLoc.lat, userLoc.lng, lat, lng) : null;
+        const infoWindow = new (window as any).google.maps.InfoWindow({
+          content: `
+            <div style="padding: 12px; min-width: 140px; background: #0a0a0f; color: white; border-radius: 12px; font-family: sans-serif;">
+              <div style="font-weight: 900; color: #fff; font-size: 10px; margin-bottom: 2px; text-transform: uppercase;">${node.title}</div>
+              <div style="color: ${color}; font-weight: 900; font-size: 14px;">${node.price}</div>
+              <div style="color: #64748b; font-size: 9px; font-weight: 700; margin-top: 2px;">${node.address}</div>
+              ${dist !== null ? `<div style="color: #FF6B9D; font-size: 8px; font-weight: 800; margin-top: 4px;">${dist.toFixed(1)} KM FROM YOU</div>` : ''}
+            </div>
+          `
+        });
 
-          marker.addListener("click", () => {
-            infoWindow.open(map, marker);
-          });
-        }
+        marker.addListener("click", () => {
+          infoWindow.open(map, marker);
+        });
       });
 
       if (nodes.length > 0) {
@@ -147,8 +150,8 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes, center }) => {
       </div>
       <div className="absolute bottom-6 left-6 right-6 flex justify-center z-10 pointer-events-none">
          <div className="bg-neo-bg/80 backdrop-blur-md px-6 py-3 rounded-full border border-white/5 flex items-center gap-4">
-            <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-neo-neon" /><span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Fair Value</span></div>
-            <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#B4FF5C]" /><span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Market Comps</span></div>
+            <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-neo-neon" /><span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Target</span></div>
+            <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#B4FF5C]" /><span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Comps</span></div>
             <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-neo-pink" /><span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">You</span></div>
          </div>
       </div>

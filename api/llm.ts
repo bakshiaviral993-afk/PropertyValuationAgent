@@ -50,12 +50,15 @@ export default async function handler(req: any, res: any) {
   const { prompt, config, image } = req.body;
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+  // Mandatory instruction for all stages: LISTINGS MUST HAVE COORDINATES
+  const spatialConstraint = "\n\nCRITICAL: Every listing in the JSON must include 'latitude' and 'longitude' fields (numeric). If exact coordinates are unknown, provide approximate coordinates for the project's sector.";
+
   // 1. Stage 1: Gemini Grounding
   for (const modelName of GEMINI_MODELS) {
     try {
       const contents = image 
-        ? { parts: [{ text: prompt }, { inlineData: { data: image.data, mimeType: image.mimeType } }] }
-        : prompt;
+        ? { parts: [{ text: prompt + spatialConstraint }, { inlineData: { data: image.data, mimeType: image.mimeType } }] }
+        : prompt + spatialConstraint;
 
       const result = await ai.models.generateContent({
         model: modelName,
@@ -68,7 +71,8 @@ export default async function handler(req: any, res: any) {
       });
 
       const text = result.text;
-      if (text && !text.includes('"fairValue": 0')) {
+      const data = JSON.parse(text);
+      if (data && data.fairValue > 0 && data.listings && data.listings.length > 0) {
         return res.status(200).json({ text, source: 'gemini' });
       }
     } catch (err) {
@@ -86,7 +90,7 @@ export default async function handler(req: any, res: any) {
       },
       body: JSON.stringify({
         model: PERPLEXITY_MODEL,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: 'user', content: prompt + spatialConstraint }],
         temperature: 0.1
       })
     });
@@ -94,7 +98,8 @@ export default async function handler(req: any, res: any) {
     if (ppRes.ok) {
       const data = await ppRes.json();
       const text = data.choices[0].message.content;
-      if (text && !text.includes('"fairValue": 0')) {
+      const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || '{}');
+      if (parsed.fairValue > 0 && parsed.listings && parsed.listings.length > 0) {
         return res.status(200).json({ text, source: 'perplexity_scraper' });
       }
     }
@@ -102,7 +107,7 @@ export default async function handler(req: any, res: any) {
     console.warn("Deep scraper offline.");
   }
 
-  // 3. Stage 3: Market Median Fallback
+  // 3. Stage 3: Market Median Fallback (PRODUCING SYNTHETIC NODES FOR MAP)
   const area = extractArea(prompt);
   const city = extractCity(prompt);
   const bhk = extractBHK(prompt);
@@ -115,6 +120,14 @@ export default async function handler(req: any, res: any) {
     MARKET_CACHE.set(cacheKey, cached);
   }
 
+  // Default coordinate if everything fails (roughly city centroids)
+  const cityCoords: Record<string, {lat: number, lng: number}> = {
+    'pune': {lat: 18.5204, lng: 73.8567},
+    'mumbai': {lat: 19.0760, lng: 72.8777},
+    'bangalore': {lat: 12.9716, lng: 77.5946}
+  };
+  const baseCoord = cityCoords[city.toLowerCase()] || {lat: 20.5937, lng: 78.9629};
+
   const fallback = {
     fairValue: `₹${(cached.median / 10000000).toFixed(2)} Cr`,
     valuationRange: `₹${(cached.low / 10000000).toFixed(2)} Cr - ₹${(cached.high / 10000000).toFixed(2)} Cr`,
@@ -125,8 +138,23 @@ export default async function handler(req: any, res: any) {
     registrationEstimate: "7% of Fair Value",
     appreciationPotential: "5.4% YoY",
     confidenceScore: 65,
-    valuationJustification: "Using Jan 2026 aggregated market averages (AI grounding sparse).",
-    listings: []
+    valuationJustification: "Intelligence grounding sparse. Valuation derived via Jan 2026 market-average failover.",
+    listings: [
+      {
+        title: `${bhk} Market Reference A`,
+        price: `₹${(cached.median / 10000000).toFixed(2)} Cr`,
+        address: `${area}, ${city}`,
+        latitude: baseCoord.lat + 0.002,
+        longitude: baseCoord.lng + 0.002
+      },
+      {
+        title: `${bhk} Market Reference B`,
+        price: `₹${(cached.low / 10000000).toFixed(2)} Cr`,
+        address: `${area}, ${city}`,
+        latitude: baseCoord.lat - 0.002,
+        longitude: baseCoord.lng - 0.001
+      }
+    ]
   };
 
   return res.status(200).json({ text: JSON.stringify(fallback), source: 'market_fallback' });
