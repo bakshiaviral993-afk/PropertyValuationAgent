@@ -10,7 +10,6 @@ export default async function handler(req: any, res: any) {
   const { prompt, config, image } = req.body;
   const geminiKey = process.env.API_KEY;
 
-  // Detection logic for property search intent
   const isSearchQuery = prompt.toLowerCase().includes('listing') || 
                        prompt.toLowerCase().includes('price') ||
                        prompt.toLowerCase().includes('for sale') ||
@@ -24,7 +23,6 @@ export default async function handler(req: any, res: any) {
         ? { parts: [{ text: prompt }, { inlineData: { data: image.data, mimeType: image.mimeType } }] }
         : prompt;
 
-      // Force googleSearch for all property valuation requests to ensure fresh market data
       const tools = isSearchQuery ? [{ googleSearch: {} }] : undefined;
 
       const result = await ai.models.generateContent({
@@ -44,8 +42,10 @@ export default async function handler(req: any, res: any) {
         title: chunk.web?.title
       })).filter((s: any) => s.uri) || [];
 
-      // If we got valid text and it's not a "no data" response, return it
-      if (text && !text.includes('"listings": []') && !text.includes('"fairValue": 0')) {
+      // CRITICAL: Detect "No Data" or "Zero Valuation" signals
+      const isLowQuality = !text || text.includes('"listings": []') || text.includes('"fairValue": 0') || text.length < 100;
+
+      if (!isLowQuality) {
         return res.status(200).json({ 
           text: text, 
           source: 'gemini',
@@ -53,7 +53,7 @@ export default async function handler(req: any, res: any) {
         });
       }
       
-      console.warn(`Gemini ${modelName} returned insufficient data, falling back to scraper node.`);
+      console.warn(`Gemini ${modelName} returned empty or 0 data. Transitioning to Deep Scraper.`);
     } catch (err: any) {
       if (err.status === 429) continue;
       console.error(`LLM Error with ${modelName}:`, err);
@@ -61,7 +61,7 @@ export default async function handler(req: any, res: any) {
     }
   }
 
-  // SCRAPER FALLBACK: Use Perplexity to crawl current listings if Gemini search fails
+  // SCRAPER FALLBACK: High-compute web crawl if standard LLM grounding fails
   if (!image) {
     try {
       const ppRes = await fetch(PERPLEXITY_URL, {
@@ -75,7 +75,7 @@ export default async function handler(req: any, res: any) {
           messages: [
             { 
               role: 'system', 
-              content: 'You are a real-estate web scraper. Find current property listings and prices. Always output valid JSON.' 
+              content: 'You are a professional Real Estate Scraper. Search 99acres, MagicBricks, and Housing.com. Find REAL current listings. If data is missing for a specific pincode, expand your search to the 10km surrounding area. Always output valid JSON.' 
             },
             { role: 'user', content: prompt }
           ],
@@ -85,16 +85,15 @@ export default async function handler(req: any, res: any) {
 
       if (ppRes.ok) {
         const ppJson = await ppRes.json();
-        const ppText = ppJson.choices[0].message.content;
         return res.status(200).json({ 
-          text: ppText, 
-          source: 'perplexity_scraper' 
+          text: ppJson.choices[0].message.content, 
+          source: 'deep_web_scraper' 
         });
       }
     } catch (ppErr) {
-      console.error("Scraper node failed:", ppErr);
+      console.error("Deep scraper node failed:", ppErr);
     }
   }
 
-  res.status(500).json({ error: 'Intelligence nodes unreachable or incompatible with input.' });
+  res.status(500).json({ error: 'All intelligence nodes returned 0. Market data currently opaque.' });
 }

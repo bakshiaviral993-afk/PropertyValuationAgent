@@ -47,7 +47,7 @@ const ProfessionalReport: React.FC<ProfessionalReportProps> = ({ result, lang = 
           <div className="bg-white/5 p-8 rounded-2xl border border-white/10">
             <span className="text-[9px] font-black uppercase text-slate-300 tracking-widest block mb-2">Conclusion</span>
             <div className="text-6xl font-black tracking-tighter text-white mb-4">
-              {result.isBudgetAlignmentFailure ? formatPrice(result.suggestedMinimum || 0) : result.fairValue}
+              {result.estimatedValue === 0 ? "N/A" : result.isBudgetAlignmentFailure ? formatPrice(result.suggestedMinimum || 0) : result.fairValue}
             </div>
             <div className="flex gap-4">
               <div className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase flex items-center gap-2 ${result.isBudgetAlignmentFailure ? 'bg-neo-pink' : 'bg-emerald-500'}`}>
@@ -61,10 +61,10 @@ const ProfessionalReport: React.FC<ProfessionalReportProps> = ({ result, lang = 
           </div>
           <div className="text-right">
              <p className="text-sm font-serif italic text-slate-200 leading-relaxed mb-4">
-              "{result.valuationJustification}"
+              "{result.notes || result.valuationJustification}"
              </p>
              <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-lg text-[10px] font-black uppercase">
-               <BrainCircuit size={12} /> Neural Grounding Layer Active
+               <BrainCircuit size={12} /> Source: {result.source?.toUpperCase().replace(/_/g, ' ')}
              </div>
           </div>
         </div>
@@ -123,6 +123,13 @@ const ProfessionalReport: React.FC<ProfessionalReportProps> = ({ result, lang = 
                   <td className="p-4 text-right font-black text-report-blue">{l.price}</td>
                 </tr>
               ))}
+              {result.listings.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="p-10 text-center text-slate-400 font-bold uppercase tracking-widest italic">
+                    Insufficient direct listings found in this sector.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
