@@ -19,7 +19,7 @@ import AboutModal from './components/AboutModal';
 import Logo from './components/Logo';
 import { AppMode, AppLang, BuyResult, RentResult, LandResult, CommercialResult, BuyRequest, RentRequest, LandRequest, CommercialRequest } from './types';
 import { getBuyAnalysis, getRentAnalysis, getLandValuationAnalysis, getCommercialAnalysis, parsePrice } from './services/geminiService';
-import { ArrowLeft, Zap, ShieldCheck, Sparkles, Binary, X, BarChart3, Navigation, MessageSquareText, Bell, Shield, Calculator, ShieldCheck as ShieldIcon, ShoppingBag, Briefcase, MessageSquare, Info } from 'lucide-react';
+import { ArrowLeft, Zap, ShieldCheck, Sparkles, Binary, X, BarChart3, Navigation, Bell, Shield, Calculator, ShoppingBag, Info, RefreshCw } from 'lucide-react';
 
 const App: React.FC = () => {
   const [stage, setStage] = useState<'gate' | 'onboarding' | 'chat' | 'results' | 'privacy'>('gate');
@@ -33,6 +33,7 @@ const App: React.FC = () => {
   const [showConsentModal, setShowConsentModal] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [searchNotification, setSearchNotification] = useState<string | null>(null);
   
   const [buyData, setBuyData] = useState<BuyResult | null>(null);
   const [rentData, setRentData] = useState<RentResult | null>(null);
@@ -55,18 +56,11 @@ const App: React.FC = () => {
     setShowConsentModal(false);
   };
 
-  const getContextData = () => {
-      if (mode === 'buy' && buyData) return { type: 'Sale', ...buyData };
-      if (mode === 'rent' && rentData) return { type: 'Rental', ...rentData };
-      if (mode === 'land' && landData) return { type: 'Land', ...landData };
-      if (mode === 'commercial' && commercialData) return { type: 'Commercial', ...commercialData };
-      return null;
-  };
-
   const startAnalysis = (selectedMode: AppMode, selectedLang: AppLang) => {
     setMode(selectedMode);
     setLang(selectedLang);
     setStage('chat');
+    setSearchNotification(null);
   };
 
   const handleComplete = async (data: any) => {
@@ -83,6 +77,9 @@ const App: React.FC = () => {
     try {
       if (mode === 'buy') {
         const result = await getBuyAnalysis(data as BuyRequest);
+        if (result.source === 'radius_expansion') {
+          setSearchNotification("Local listings sparse. Search expanded to 5km micro-market.");
+        }
         setBuyData(result);
       } else if (mode === 'rent') {
         const result = await getRentAnalysis(data as RentRequest);
@@ -98,7 +95,7 @@ const App: React.FC = () => {
       setStage('results');
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "An unexpected error occurred in the valuation node.");
+      alert(err.message || "Intelligence node timeout. Attempting macro-market fallback...");
     } finally {
       setIsLoading(false);
     }
@@ -150,13 +147,6 @@ const App: React.FC = () => {
             <Info size={20} />
           </button>
           <button 
-            onClick={() => setShowFeedback(true)}
-            className="hidden md:flex h-10 px-5 rounded-2xl bg-neo-pink/10 text-neo-pink text-[10px] font-black hover:bg-neo-pink hover:text-white transition-all items-center gap-2 border border-neo-pink/20 uppercase tracking-widest shadow-pink-glow active:scale-95"
-            title="Tester Feedback"
-          >
-            <MessageSquare size={14} /> Feedback
-          </button>
-          <button 
             onClick={() => { setMode('essentials'); setStage('chat'); }}
             className={`w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center transition-all border border-white/10 ${mode === 'essentials' ? 'text-neo-pink border-neo-pink/50 shadow-pink-glow' : 'text-gray-400'}`}
             title="Local Essentials"
@@ -183,53 +173,16 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Floating Mobile Feedback Button */}
-      <button 
-        onClick={() => setShowFeedback(true)}
-        className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-neo-pink text-white rounded-full shadow-pink-glow z-[150] flex items-center justify-center active:scale-90 transition-all"
-      >
-        <MessageSquare size={24} />
-      </button>
-
-      {/* Modals Container */}
-      <div className="relative z-[500]">
-        {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
-        {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
-        
-        {showAlerts && (
-          <div className="fixed top-24 right-6 md:right-10 z-[200] w-full max-w-sm animate-in slide-in-from-top-10 duration-500">
-            <div className="bg-neo-glass backdrop-blur-3xl border border-neo-gold/30 rounded-[32px] p-6 shadow-neo-glow">
-              <div className="flex justify-between items-center mb-6">
-                <h4 className="text-xs font-black text-neo-gold uppercase tracking-widest">Auspicious Alerts</h4>
-                <button onClick={() => setShowAlerts(false)} className="text-gray-500 hover:text-white"><X size={16}/></button>
-              </div>
-              <div className="space-y-4">
-                <div className="p-4 bg-neo-neon/10 border border-neo-neon/20 rounded-2xl">
-                  <p className="text-[10px] text-neo-neon font-black uppercase mb-1">Today's Pulse</p>
-                  <p className="text-xs text-gray-300">Swati Nakshatra detected. Ideal for property site visits before 2 PM.</p>
-                </div>
-                <div className="p-4 bg-neo-gold/10 border border-neo-gold/20 rounded-2xl">
-                  <p className="text-[10px] text-neo-gold font-black uppercase mb-1">Market Alert</p>
-                  <p className="text-xs text-gray-300">Mumbai residential index projected to rise 4.2% this quarter.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showQuickCalc && (
-          <div className="fixed inset-0 z-[300] bg-neo-bg/80 backdrop-blur-xl flex items-center justify-center p-6 animate-in zoom-in duration-300">
-            <div className="w-full max-w-2xl relative">
-              <ValuationCalculator onClose={() => setShowQuickCalc(false)} />
-            </div>
-          </div>
-        )}
-      </div>
+      {searchNotification && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 bg-neo-neon text-white rounded-full font-black text-[10px] uppercase tracking-widest shadow-neo-glow flex items-center gap-3 animate-in slide-in-from-top-4">
+          <RefreshCw size={14} className="animate-spin" /> {searchNotification}
+        </div>
+      )}
 
       <main className="flex-1 max-w-7xl mx-auto w-full p-6 md:p-10 flex flex-col lg:flex-row gap-10">
         <div className={`transition-all duration-1000 w-full lg:w-[440px] shrink-0 ${stage === 'results' ? 'hidden lg:block opacity-20 pointer-events-none grayscale' : 'mx-auto'}`}>
           {mode === 'expert' ? (
-              <PropertyChat lang={lang} contextResult={getContextData()} />
+              <PropertyChat lang={lang} contextResult={null} />
           ) : (
               <ChatInterface mode={mode} lang={lang} onComplete={handleComplete} isLoading={isLoading} />
           )}
@@ -266,9 +219,6 @@ const App: React.FC = () => {
                               <BarChart3 className={mode === 'rent' || mode === 'commercial' ? 'text-emerald-500' : mode === 'land' ? 'text-orange-500' : 'text-neo-neon'} size={32} />
                               <h2 className="text-4xl font-black text-white tracking-tighter uppercase">Fiscal Simulator</h2>
                           </div>
-                          <p className="text-[10px] text-gray-500 uppercase tracking-[0.4em] font-black opacity-60">
-                            {financeTab === 'calc' ? `${mode.toUpperCase()} _ ASSET _ FEASIBILITY` : "LENDING _ AI _ NODE"}
-                          </p>
                       </div>
 
                       <div className="bg-white/5 p-1.5 rounded-2xl border border-white/10 flex gap-2">
@@ -282,7 +232,7 @@ const App: React.FC = () => {
                           onClick={() => setFinanceTab('approval')}
                           className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${financeTab === 'approval' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}
                         >
-                          <ShieldIcon size={14}/> AI Approval
+                          <Shield size={14}/> AI Approval
                         </button>
                       </div>
                     </div>
@@ -318,7 +268,6 @@ const App: React.FC = () => {
         </div>
         <div className="text-[10px] font-black tracking-widest uppercase opacity-30">© 2025 QUANTCASA LABS</div>
       </footer>
-      {showConsentModal && <DPDPModal onAccept={handleConsent} onReadMore={() => setStage('privacy')} />}
     </div>
   );
 };

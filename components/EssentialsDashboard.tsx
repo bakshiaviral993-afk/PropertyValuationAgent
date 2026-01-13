@@ -1,9 +1,7 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, MapPin, Phone, Star, Clock, ExternalLink, Zap, AlertTriangle, ShieldCheck, ShoppingCart, Home, Droplet, Coffee, HeartPulse, Baby, Truck, Landmark, Loader2, X, Sparkles, Info } from 'lucide-react';
+import { Search, MapPin, Phone, Star, Clock, ExternalLink, Zap, ShoppingCart, Home, Droplet, HeartPulse, Baby, Truck, Landmark, Loader2, X, Sparkles, Info } from 'lucide-react';
 import { EssentialResult, EssentialService } from '../types';
 import { getEssentialsAnalysis } from '../services/geminiService';
-// Standard relative import from the new .ts data source
 import { essentialsData } from '../data/essentials';
 
 interface EssentialsDashboardProps {
@@ -25,10 +23,8 @@ const EssentialsDashboard: React.FC<EssentialsDashboardProps> = ({ city, area, o
   }, []);
 
   const sortedCategories = useMemo(() => {
-    // Hoist Priority 3 if night mode, or keep Priority 1 at top
     return [...essentialsData].sort((a, b) => {
       if (isNightMode) {
-        // Priority 3 (Emergency) and Chemist go to top at night
         const isEmergencyA = a.priority === 3 || a.id === 'chemist';
         const isEmergencyB = b.priority === 3 || b.id === 'chemist';
         if (isEmergencyA && !isEmergencyB) return -1;
@@ -52,6 +48,7 @@ const EssentialsDashboard: React.FC<EssentialsDashboardProps> = ({ city, area, o
     setIsLoading(true);
     setResult(null);
     try {
+      // Use the LLM grounded search to fetch REAL business contacts
       const data = await getEssentialsAnalysis(category, city, area);
       setResult(data);
     } catch (e) {
@@ -74,7 +71,6 @@ const EssentialsDashboard: React.FC<EssentialsDashboardProps> = ({ city, area, o
 
   return (
     <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-10 duration-700 pb-20">
-      {/* Header & Search */}
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -106,7 +102,6 @@ const EssentialsDashboard: React.FC<EssentialsDashboardProps> = ({ city, area, o
         </div>
       </div>
 
-      {/* Categories Grid */}
       {!result && !isLoading && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 overflow-y-auto pr-2 scrollbar-hide max-h-[60vh]">
           {filteredCategories.map(cat => (
@@ -139,23 +134,21 @@ const EssentialsDashboard: React.FC<EssentialsDashboardProps> = ({ city, area, o
         </div>
       )}
 
-      {/* Loading State */}
       {isLoading && (
         <div className="flex-1 flex flex-col items-center justify-center gap-6 py-20">
           <div className="relative">
             <Loader2 size={64} className="text-neo-neon animate-spin" />
             <div className="absolute inset-0 bg-neo-neon blur-[50px] opacity-20" />
           </div>
-          <p className="text-sm font-black text-gray-500 uppercase tracking-[0.4em] animate-pulse">Scanning Neural Nodes...</p>
+          <p className="text-sm font-black text-gray-500 uppercase tracking-[0.4em] animate-pulse">Scanning Neural Nodes for {activeCategory}...</p>
         </div>
       )}
 
-      {/* Result View */}
       {result && (
         <div className="space-y-8 animate-in slide-in-from-right-10 duration-500 pb-20">
           <div className="flex justify-between items-center">
             <h3 className="text-xl font-black text-white uppercase tracking-tighter flex items-center gap-3">
-              <Sparkles className="text-neo-neon" size={20} /> Verified Results: {result.category}
+              <Sparkles className="text-neo-neon" size={20} /> Verified Nodes: {result.category}
             </h3>
             <button onClick={() => setResult(null)} className="p-2 bg-white/5 rounded-xl text-gray-500 hover:text-white transition-all"><X size={20} /></button>
           </div>
@@ -183,9 +176,11 @@ const EssentialsDashboard: React.FC<EssentialsDashboardProps> = ({ city, area, o
                   <a href={`tel:${svc.contact}`} className="flex-1 md:flex-none h-14 px-8 bg-neo-neon text-white rounded-2xl flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest shadow-neo-glow hover:scale-105 active:scale-95 transition-all">
                     <Phone size={16} /> {svc.contact}
                   </a>
-                  <a href={svc.sourceUrl} target="_blank" rel="noopener" className="h-14 w-14 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-gray-500 hover:text-white hover:border-white/30 transition-all">
-                    <ExternalLink size={20} />
-                  </a>
+                  {svc.sourceUrl && (
+                    <a href={svc.sourceUrl} target="_blank" rel="noopener" className="h-14 w-14 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-gray-500 hover:text-white hover:border-white/30 transition-all">
+                      <ExternalLink size={20} />
+                    </a>
+                  )}
                 </div>
               </div>
             ))}
