@@ -1,28 +1,36 @@
-
 import { SaleListing, RentalListing } from '../types';
 
 /**
- * Robust price parser using Regex (inspired by Python's 're')
- * Handles formats like: "₹3.5 Cr", "45 Lakhs", "12,000", etc.
+ * Robust price parser with range handling and unit detection.
+ * Handles: "₹3.5 Cr", "45 - 50 Lakhs", "12,000", "1.2 Crore"
  */
 export const parsePrice = (priceStr: any): number => {
-  if (priceStr === null || priceStr === undefined) return 0;
+  if (priceStr === null || priceStr === undefined || priceStr === '') return 0;
   
-  const s = String(priceStr);
-  const cleanStr = s.replace(/,/g, '').trim();
-  const regex = /([\d.]+)\s*(Cr|L|Lakh|Crore|k|Thousand)?/i;
-  const match = cleanStr.match(regex);
+  const s = String(priceStr)
+    .replace(/[^0-9.\-lLcrkCR]/g, ' ')
+    .trim()
+    .toLowerCase();
+
+  // Handle ranges: take the median of the range for statistical accuracy
+  if (s.includes('-') || s.includes('–')) {
+    const parts = s.split(/[-–]/);
+    const low = parsePrice(parts[0]);
+    const high = parsePrice(parts[1]);
+    return low > 0 && high > 0 ? (low + high) / 2 : low || high;
+  }
+
+  const numMatch = s.match(/(\d+(?:\.\d+)?)/);
+  if (!numMatch) return 0;
   
-  if (!match) return 0;
+  let value = parseFloat(numMatch[1]);
   
-  let value = parseFloat(match[1]);
-  const unit = match[2]?.toLowerCase();
+  // Unit multipliers
+  if (s.includes('cr') || s.includes('crore')) value *= 10000000;
+  else if (s.includes('l') || s.includes('lakh')) value *= 100000;
+  else if (s.includes('k') || s.includes('thousand')) value *= 1000;
   
-  if (unit === 'cr' || unit === 'crore') value *= 10000000;
-  else if (unit === 'l' || unit === 'lakh') value *= 100000;
-  else if (unit === 'k' || unit === 'thousand') value *= 1000;
-  
-  return value;
+  return Math.round(value);
 };
 
 export interface PropertyStats {
@@ -40,9 +48,6 @@ export interface PropertyStats {
   };
 }
 
-/**
- * Calculates deep statistical metrics for a collection of prices
- */
 export const calculateListingStats = (prices: number[]): PropertyStats | null => {
   if (prices.length === 0) return null;
   
@@ -59,35 +64,29 @@ export const calculateListingStats = (prices: number[]): PropertyStats | null =>
     const pos = (count - 1) * p;
     const base = Math.floor(pos);
     const rest = pos - base;
-    if (sorted[base + 1] !== undefined) {
-      return sorted[base] + rest * (sorted[base + 1] - sorted[base]);
-    } else {
-      return sorted[base];
-    }
+    return sorted[base + 1] !== undefined 
+      ? sorted[base] + rest * (sorted[base + 1] - sorted[base])
+      : sorted[base];
   };
 
-  const q1 = getQuartile(0.25);
-  const q2 = median;
-  const q3 = getQuartile(0.75);
-
   const variance = prices.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / count;
-  const stdDev = Math.sqrt(variance);
 
   return {
     mean,
     median,
     min: sorted[0],
     max: sorted[count - 1],
-    stdDev,
+    stdDev: Math.sqrt(variance),
     variance,
     count,
-    quartiles: { q1, q2, q3 }
+    quartiles: { 
+      q1: getQuartile(0.25), 
+      q2: median, 
+      q3: getQuartile(0.75) 
+    }
   };
 };
 
-/**
- * Asset vintage calculation
- */
 export const calculateAge = (constructionYear: number): number => {
   return new Date().getFullYear() - constructionYear;
 };

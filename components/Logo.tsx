@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface LogoProps {
@@ -6,7 +5,7 @@ interface LogoProps {
   size?: number;
 }
 
-const Logo: React.FC<LogoProps> = ({ className = "", size = 40 }) => {
+const Logo: React.FC<LogoProps> = React.memo(({ className = "", size = 40 }) => {
   return (
     <svg 
       width={size} 
@@ -23,7 +22,6 @@ const Logo: React.FC<LogoProps> = ({ className = "", size = 40 }) => {
         </linearGradient>
       </defs>
       
-      {/* 1. The Large Arc (Starts from the roof's left tip and sweeps over) */}
       <path 
         d="M25 75 A 32 32 0 1 1 72 45" 
         stroke="url(#logo-gradient)" 
@@ -32,7 +30,6 @@ const Logo: React.FC<LogoProps> = ({ className = "", size = 40 }) => {
         fill="none" 
       />
       
-      {/* 2. The Main Structure (Thick inverted V / Peak) */}
       <path 
         d="M25 75 L52 45 L79 75" 
         stroke="url(#logo-gradient)" 
@@ -41,20 +38,18 @@ const Logo: React.FC<LogoProps> = ({ className = "", size = 40 }) => {
         strokeLinejoin="round" 
       />
       
-      {/* 3. The Intelligence Node / Sun */}
       <circle cx="72" cy="45" r="4.5" fill="url(#logo-gradient)" />
       
-      {/* 4. Radiant Rays */}
       <line x1="79" y1="36" x2="88" y2="28" stroke="url(#logo-gradient)" strokeWidth="4.5" strokeLinecap="round" />
       <line x1="83" y1="45" x2="93" y2="45" stroke="url(#logo-gradient)" strokeWidth="4.5" strokeLinecap="round" />
       <line x1="79" y1="54" x2="88" y2="62" stroke="url(#logo-gradient)" strokeWidth="4.5" strokeLinecap="round" />
       
-      {/* 5. Internal Quantitative Bars */}
       <rect x="42" y="65" width="5.5" height="10" rx="1.5" fill="url(#logo-gradient)" opacity="0.6" />
       <rect x="50" y="55" width="5.5" height="20" rx="1.5" fill="url(#logo-gradient)" />
       <rect x="58" y="68" width="5.5" height="7" rx="1.5" fill="url(#logo-gradient)" opacity="0.6" />
     </svg>
   );
-};
+});
 
+Logo.displayName = 'Logo';
 export default Logo;
