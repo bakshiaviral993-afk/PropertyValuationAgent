@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { MapPin, Navigation, Building, Info } from 'lucide-react';
 
@@ -49,25 +50,26 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => 
       const { Map, LatLngBounds } = await (window as any).google.maps.importLibrary("maps") as any;
       const { AdvancedMarkerElement, PinElement } = await (window as any).google.maps.importLibrary("marker") as any;
 
-      // Filter and sanitize nodes to ensure we only try to plot valid coordinates
+      // Filter and sanitize nodes
       const validNodes = nodes.map((node, i) => {
         const lat = node.lat ?? node.latitude;
         const lng = node.lng ?? node.longitude;
         return { ...node, lat, lng, id: i };
       }).filter(n => n.lat !== undefined && n.lng !== undefined && !isNaN(n.lat) && !isNaN(n.lng));
 
-      console.log(`[Map_Diagnostic] Plotting ${validNodes.length} validated nodes.`);
-
       if (!gMapRef.current) {
         const initialCenter = center || (validNodes.length > 0 ? { lat: validNodes[0].lat!, lng: validNodes[0].lng! } : { lat: 18.5204, lng: 73.8567 });
+        
+        // CRITICAL FIX: Removed mapId which conflicts with custom styles and causes ApiProjectMapError
         gMapRef.current = new Map(mapRef.current, {
           center: initialCenter,
           zoom: 14,
-          mapId: "DEMO_MAP_ID",
           disableDefaultUI: true,
           styles: [
             { "elementType": "geometry", "stylers": [{ "color": "#0a0a0f" }] },
             { "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
+            { "elementType": "labels.text.stroke", "stylers": [{ "color": "#0a0a0f" }] },
+            { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#1e293b" }] },
             { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#000000" }] }
           ]
         });
@@ -87,12 +89,10 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => 
         bounds.extend(userLoc);
       }
 
-      validNodes.forEach((node, index) => {
-        // Spatial Jitter Algorithm: prevents marker stacking if AI returns same center for multiple properties
-        const jitter = (Math.random() - 0.5) * 0.0015;
+      validNodes.forEach((node) => {
+        const jitter = (Math.random() - 0.5) * 0.0005;
         const pos = { lat: node.lat! + jitter, lng: node.lng! + jitter };
         
-        // Create custom DOM content for the marker (Rich UI Tag)
         const tag = document.createElement("div");
         tag.className = "asset-tag animate-in zoom-in duration-300";
         tag.style.cssText = `
@@ -106,17 +106,15 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => 
           font-weight: 900;
           box-shadow: 0 4px 15px rgba(0,0,0,0.5);
           white-space: nowrap;
-          pointer-events: auto;
           cursor: pointer;
           display: flex;
           flex-direction: column;
           align-items: center;
           gap: 2px;
-          transform: translateY(-50%);
         `;
         
         tag.innerHTML = `
-          <div style="font-size: 8px; opacity: 0.7; text-transform: uppercase;">${node.title.substring(0, 15)}${node.title.length > 15 ? '...' : ''}</div>
+          <div style="font-size: 8px; opacity: 0.7; text-transform: uppercase;">${node.title.substring(0, 15)}</div>
           <div style="color: ${node.isSubject ? '#fff' : '#00F6FF'}; font-size: 11px;">${node.price}</div>
         `;
 
@@ -133,16 +131,11 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => 
         const dist = userLoc ? getDistance(userLoc.lat, userLoc.lng, pos.lat, pos.lng) : null;
         const infoWindow = new (window as any).google.maps.InfoWindow({
           content: `
-            <div style="padding: 16px; min-width: 200px; background: #0a0a0f; color: white; font-family: sans-serif;">
-              <div style="font-weight: 900; color: #585FD8; font-size: 10px; margin-bottom: 4px; text-transform: uppercase;">${node.title}</div>
-              <div style="font-weight: 900; font-size: 18px; margin-bottom: 2px;">${node.price}</div>
-              <div style="color: #64748b; font-size: 10px; font-weight: 700; margin-bottom: 8px;">${node.address}</div>
-              ${dist !== null ? `
-                <div style="border-top: 1px solid rgba(255,255,255,0.1); pt-2; mt-2; display: flex; align-items: center; gap: 6px;">
-                  <div style="width: 6px; height: 6px; border-radius: 50%; background: #FF6B9D;"></div>
-                  <span style="color: #FF6B9D; font-size: 9px; font-weight: 900; text-transform: uppercase;">${dist.toFixed(1)} KM FROM YOUR POSITION</span>
-                </div>
-              ` : ''}
+            <div style="padding: 12px; min-width: 180px; background: #0a0a0f; color: white;">
+              <div style="font-weight: 900; color: #585FD8; font-size: 10px; text-transform: uppercase;">${node.title}</div>
+              <div style="font-weight: 900; font-size: 16px;">${node.price}</div>
+              <div style="color: #64748b; font-size: 10px; margin-bottom: 8px;">${node.address}</div>
+              ${dist !== null ? `<div style="color: #FF6B9D; font-size: 9px; font-weight: 900;">${dist.toFixed(1)} KM AWAY</div>` : ''}
             </div>
           `
         });
@@ -154,7 +147,6 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => 
 
       if (validNodes.length > 0) {
         map.fitBounds(bounds);
-        // Prevent extreme zoom in on single markers
         const listener = (window as any).google.maps.event.addListener(map, "idle", () => {
           if (map.getZoom() > 16) map.setZoom(16);
           (window as any).google.maps.event.removeListener(listener);
@@ -168,31 +160,12 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => 
   return (
     <div className="relative w-full h-[550px] rounded-[48px] overflow-hidden border border-white/10 group shadow-neo-glow transition-all hover:border-white/20">
       <div ref={mapRef} className="w-full h-full" />
-      
-      {/* Dynamic Overlay HUD */}
-      <div className="absolute top-8 left-8 right-8 flex justify-between items-start pointer-events-none">
-        <div className="bg-neo-bg/90 backdrop-blur-xl p-5 rounded-[32px] border border-white/10 shadow-neo-glow pointer-events-auto">
+      <div className="absolute top-8 left-8 bg-neo-bg/90 backdrop-blur-xl p-5 rounded-[32px] border border-white/10 shadow-neo-glow">
            <div className="flex items-center gap-3">
              <div className="w-2 h-2 rounded-full bg-neo-neon animate-pulse" />
-             <span className="text-[10px] font-black text-neo-neon uppercase tracking-widest">Grounding Map active</span>
+             <span className="text-[10px] font-black text-neo-neon uppercase tracking-widest">Grounded Node Map</span>
            </div>
-           <p className="text-sm text-white font-black mt-1">{nodes.length} Spatial Nodes Located</p>
-        </div>
-
-        {userLoc && (
-           <div className="bg-neo-bg/90 backdrop-blur-xl px-5 py-3 rounded-full border border-neo-pink/20 flex items-center gap-3 shadow-pink-glow pointer-events-auto">
-              <Navigation size={14} className="text-neo-pink animate-bounce" />
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">User Sync Active</span>
-           </div>
-        )}
-      </div>
-
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 pointer-events-none">
-         <div className="bg-neo-bg/80 backdrop-blur-md px-8 py-4 rounded-full border border-white/10 flex items-center gap-6 shadow-2xl">
-            <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-neo-neon" /><span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Subject</span></div>
-            <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-neo-pink" /><span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">User</span></div>
-            <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#1e293b]" /><span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Peers</span></div>
-         </div>
+           <p className="text-sm text-white font-black mt-1">{nodes.length} Spatial Points</p>
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { ValuationResult, ValuationRequest, Comparable } from '../types';
 import { 
@@ -19,7 +20,6 @@ const formatCurrency = (val: number) => {
   return `₹${val.toLocaleString('en-IN')}`;
 };
 
-// --- HELPER: Haversine Distance ---
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371; // km
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -30,8 +30,6 @@ const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
-
-// --- MICRO-WIDGETS ---
 
 const CostDial = ({ 
   label, 
@@ -128,7 +126,6 @@ const CircularConfidenceGauge = ({ score }: { score: number }) => {
   );
 };
 
-// --- Google Maps Component ---
 const GooglePropertyMap = ({ lat, lng, comparables }: { lat: number, lng: number, comparables: Comparable[] }) => {
     const mapRef = useRef<HTMLDivElement>(null);
     const [userLoc, setUserLoc] = useState<{lat: number, lng: number} | null>(null);
@@ -142,18 +139,14 @@ const GooglePropertyMap = ({ lat, lng, comparables }: { lat: number, lng: number
 
     useEffect(() => {
         const initMap = async () => {
-            // Fix: Cast window to any to access global google object without TS errors
             if (!mapRef.current || !(window as any).google) return;
             
-            // Fix: Cast window to any to access global google object without TS errors
             const { Map } = await (window as any).google.maps.importLibrary("maps") as any;
-            // Fix: Cast window to any to access global google object without TS errors
             const { AdvancedMarkerElement, PinElement } = await (window as any).google.maps.importLibrary("marker") as any;
 
             const mapOptions = {
                 center: { lat, lng },
                 zoom: 14,
-                mapId: "DEMO_MAP_ID",
                 disableDefaultUI: true,
                 styles: [
                     { "elementType": "geometry", "stylers": [{ "color": "#212121" }] },
@@ -167,18 +160,15 @@ const GooglePropertyMap = ({ lat, lng, comparables }: { lat: number, lng: number
 
             const map = new Map(mapRef.current, mapOptions);
 
-            // 1. User Location Marker
             if (userLoc) {
                 const userPin = new PinElement({ background: "#FF6B9D", borderColor: "#fff", glyphColor: "#fff", scale: 0.8 });
                 new AdvancedMarkerElement({ map, position: userLoc, title: "Your Location", content: userPin.element });
             }
 
-            // 2. Subject Property Marker
             const subjectPin = new PinElement({ background: "#585FD8", borderColor: "#fff", glyphColor: "#fff", scale: 1.2 });
             new AdvancedMarkerElement({ map, position: { lat, lng }, title: "Target Asset", content: subjectPin.element });
 
-            // 3. Comparables
-            comparables.forEach((comp, idx) => {
+            comparables.forEach((comp) => {
                 if (comp.latitude && comp.longitude) {
                     const compPin = new PinElement({ background: "#B4FF5C", borderColor: "#000", glyphColor: "#000", scale: 0.9 });
                     new AdvancedMarkerElement({ map, position: { lat: comp.latitude, lng: comp.longitude }, title: comp.projectName, content: compPin.element });
@@ -198,14 +188,6 @@ const GooglePropertyMap = ({ lat, lng, comparables }: { lat: number, lng: number
                     <p className="text-[10px] text-white font-bold">{comparables.length} Grounded Nodes</p>
                 </div>
             </div>
-            {userLoc && (
-                <div className="absolute bottom-4 right-4 z-10">
-                    <div className="bg-neo-bg/80 backdrop-blur-md px-4 py-2 rounded-xl border border-white/5 flex items-center gap-2">
-                        <Navigation size={12} className="text-neo-pink" />
-                        <span className="text-[9px] font-black text-gray-400 uppercase">Live Distance Matrix Active</span>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
@@ -341,12 +323,6 @@ const ValuationReport: React.FC<ValuationReportProps> = ({ result, request }) =>
                                 </div>
                             );
                         })}
-                        {result.comparables.length === 0 && (
-                            <div className="text-center py-10 opacity-40">
-                                <Info size={32} className="mx-auto mb-2" />
-                                <p className="text-[10px] font-black uppercase tracking-widest">No matching nodes in current budget radius.</p>
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>
