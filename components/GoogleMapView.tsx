@@ -28,12 +28,44 @@ const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => 
   return R * c;
 };
 
+// Load Google Maps Script dynamically
+const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    // Check if already loaded
+    if ((window as any).google?.maps) {
+      resolve();
+      return;
+    }
+
+    // Check if script is already being loaded
+    if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+      // Wait for it to load
+      const checkInterval = setInterval(() => {
+        if ((window as any).google?.maps) {
+          clearInterval(checkInterval);
+          resolve();
+        }
+      }, 100);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Google Maps script'));
+    document.head.appendChild(script);
+  });
+};
+
 const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
   const markersRef = useRef<any[]>([]);
   const gMapRef = useRef<any>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
@@ -43,18 +75,30 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => 
   }, []);
 
   useEffect(() => {
-    const initMap = () => {
+    const initMap = async () => {
       if (!mapRef.current) return;
-      
-      // Check if Google Maps is loaded
-      const google = (window as any).google;
-      if (!google?.maps) {
-        console.warn("Google Maps not loaded yet, retrying...");
-        setTimeout(initMap, 500);
-        return;
-      }
 
       try {
+        // Get API key from environment variable
+        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+        
+        if (!apiKey) {
+          setLoadError('Google Maps API key not configured');
+          console.error('[Map_Error] No API key found. Please set VITE_GOOGLE_MAPS_API_KEY in Vercel environment variables.');
+          return;
+        }
+
+        console.log('[Map_Diagnostic] Loading Google Maps...');
+        
+        // Load Google Maps script
+        await loadGoogleMapsScript(apiKey);
+        
+        const google = (window as any).google;
+        
+        if (!google?.maps) {
+          throw new Error('Google Maps failed to load');
+        }
+
         console.log("[Map_Diagnostic] Received Nodes:", nodes.length, nodes);
 
         // Validate and prepare nodes
@@ -73,7 +117,7 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => 
           gMapRef.current = new google.maps.Map(mapRef.current, {
             center: initialCenter,
             zoom: 14,
-            gestureHandling: 'greedy', // Ensures scrolling works on touch devices
+            gestureHandling: 'greedy',
             disableDefaultUI: false,
             styles: [
               { "elementType": "geometry", "stylers": [{ "color": "#0a0a0f" }] },
@@ -85,6 +129,7 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => 
           });
           
           setMapReady(true);
+          setLoadError(null);
           console.log("[Map_Diagnostic] Map initialized successfully");
         }
 
@@ -157,32 +202,43 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => 
         if (validNodes.length > 0 || userLoc) {
           map.fitBounds(bounds);
           
-          // Adjust zoom after fitting bounds
-          const listener = google.maps.event.addListenerOnce(map, "idle", () => {
+          google.maps.event.addListenerOnce(map, "idle", () => {
             if (map.getZoom() > 16) map.setZoom(16);
           });
           
           console.log("[Map_Diagnostic] Bounds fitted and zoom adjusted");
         }
 
-      } catch (error) {
+      } catch (error: any) {
         console.error("[Map_Error] Failed to initialize map:", error);
+        setLoadError(error.message || 'Failed to load map');
         setMapReady(false);
       }
     };
 
-    // Start initialization
     initMap();
   }, [nodes, center, userLoc]);
 
   return (
     <div className="relative w-full h-[550px] rounded-[48px] border border-white/10 group shadow-neo-glow transition-all hover:border-white/20">
       <div ref={mapRef} className="w-full h-full rounded-[48px]" />
+      
+      {loadError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-neo-bg/90 backdrop-blur-xl rounded-[48px]">
+          <div className="text-center p-8">
+            <div className="text-neo-pink text-6xl mb-4">⚠️</div>
+            <h3 className="text-xl font-black text-white mb-2">Map Loading Failed</h3>
+            <p className="text-sm text-gray-400 mb-4">{loadError}</p>
+            <p className="text-xs text-gray-500">Check console for details</p>
+          </div>
+        </div>
+      )}
+      
       <div className="absolute top-8 left-8 bg-neo-bg/90 backdrop-blur-xl p-5 rounded-[32px] border border-white/10 shadow-neo-glow pointer-events-none">
         <div className="flex items-center gap-3">
           <div className="w-2 h-2 rounded-full bg-neo-neon animate-pulse" />
           <span className="text-[10px] font-black text-neo-neon uppercase tracking-widest">
-            {mapReady ? 'Active Mapping' : 'Initializing Maps...'}
+            {loadError ? 'Map Error' : mapReady ? 'Active Mapping' : 'Loading Maps...'}
           </span>
         </div>
         <p className="text-sm text-white font-black mt-1">{nodes.length} Grounded Nodes</p>
