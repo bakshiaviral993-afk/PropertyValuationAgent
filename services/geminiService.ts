@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { 
   BuyRequest, BuyResult, 
@@ -33,6 +34,14 @@ export function formatPrice(val: number): string {
   return `₹${val.toLocaleString('en-IN')}`;
 }
 
+export function formatRent(val: number): string {
+  // Rent should never show as Cr unless it's a massive warehouse
+  if (val >= 10000000) return `₹${(val / 100000).toFixed(2)} L`; // Cap at L if suspiciously high
+  if (val >= 100000) return `₹${(val / 100000).toFixed(2)} L`;
+  if (val >= 1000) return `₹${(val / 1000).toFixed(1)} K`;
+  return `₹${val.toLocaleString('en-IN')}`;
+}
+
 export async function getCommercialAnalysis(req: CommercialRequest): Promise<CommercialResult> {
   const valuation = await getCommercialValuationInternal({
     city: req.city, area: req.area, pincode: req.pincode, propertyType: req.type, size: req.sqft
@@ -44,7 +53,7 @@ export async function getCommercialAnalysis(req: CommercialRequest): Promise<Com
     latitude: l.latitude, longitude: l.longitude
   }));
   return {
-    fairValue: formatPrice(valuation.estimatedValue),
+    fairValue: req.intent === 'Buy' ? formatPrice(valuation.estimatedValue) : formatRent(valuation.estimatedValue),
     yieldPotential: valuation.yieldPercentage || "N/A",
     footfallScore: valuation.learningSignals || 70,
     businessInsights: valuation.notes || "Analyzed via commercial market node.",
@@ -82,7 +91,7 @@ export async function getBuyAnalysis(req: BuyRequest): Promise<BuyResult> {
 export async function getRentAnalysis(req: RentRequest): Promise<RentResult> {
   const valuation = await getRentValuationInternal({ city: req.city, area: req.area, pincode: req.pincode, propertyType: req.bhk, size: req.sqft, budget: (req as any).budget });
   return {
-    rentalValue: formatPrice(valuation.estimatedValue), 
+    rentalValue: formatRent(valuation.estimatedValue), 
     yieldPercentage: valuation.yieldPercentage || "3-4%", 
     rentOutAlert: valuation.depositCalc || "Standard Deposit Apply",
     depositCalc: valuation.depositCalc || "3-6 Months", 

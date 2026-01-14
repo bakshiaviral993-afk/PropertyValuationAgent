@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { RentResult, RentalListing, AppLang } from '../types';
 import { 
   MapPin, ExternalLink, Building2, Loader2, BarChart3, LayoutGrid,
   Receipt, TrendingUp, RefreshCw, Sparkles, CheckCircle, AlertCircle, Map as MapIcon, Info, Plus
 } from 'lucide-react';
-import { generatePropertyImage } from '../services/geminiService';
+import { generatePropertyImage, formatRent } from '../services/geminiService';
 import { speak } from '../services/voiceService';
 import MarketStats from './MarketStats';
 import { parsePrice, calculateListingStats } from '../utils/listingProcessor';
@@ -13,22 +14,13 @@ import { getMoreListings } from '../services/valuationService';
 // @ts-ignore
 import confetti from 'canvas-confetti';
 
+/* Define RentDashboardProps interface to fix "Cannot find name 'RentDashboardProps'" error */
 interface RentDashboardProps {
   result: RentResult;
   lang?: AppLang;
   onAnalyzeFinance?: () => void;
   userBudget?: number;
 }
-
-const formatPriceDisplay = (val: any): string => {
-  if (val === null || val === undefined) return "N/A";
-  let cleanVal = String(val);
-  if (cleanVal.includes('₹') || cleanVal.toLowerCase().includes('lakh')) return cleanVal;
-  const num = parseFloat(cleanVal.replace(/[^0-9.]/g, ''));
-  if (isNaN(num)) return cleanVal;
-  if (num >= 100000) return `₹${(num / 100000).toFixed(2)} L`;
-  return `₹${num.toLocaleString('en-IN')}`;
-};
 
 const AIPropertyImage = ({ title, address, type }: { title: string, address: string, type: string }) => {
   const [imgUrl, setImgUrl] = useState<string | null>(null);
@@ -80,7 +72,7 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
   const isAboveBudget = userBudget && fairValueNum > userBudget * 1.1;
 
   useEffect(() => {
-    const rentText = formatPriceDisplay(result.rentalValue);
+    const rentText = formatRent(fairValueNum);
     const speechText = lang === 'HI' 
       ? `आपके क्षेत्र के लिए अनुमानित किराया ${rentText} प्रति माह है।`
       : `The estimated rental value for your area is ${rentText} per month.`;
@@ -106,7 +98,7 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
       
       const formattedMore: RentalListing[] = more.map(l => ({
         title: l.project,
-        rent: formatPriceDisplay(l.monthlyRent || l.price),
+        rent: formatRent(parsePrice(l.monthlyRent || l.price)),
         address: `${l.project}, ${area}, ${city}`,
         sourceUrl: 'https://www.nobroker.in',
         bhk: allListings[0]?.bhk || 'Residential',
@@ -132,10 +124,10 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
   const listingStats = calculateListingStats(listingPrices);
 
   const mapNodes = [
-    { title: "Grounded Node", price: result.rentalValue, address: allListings[0]?.address || "Selected Area", lat: allListings[0]?.latitude, lng: allListings[0]?.longitude, isSubject: true },
+    { title: "Grounded Node", price: formatRent(fairValueNum), address: allListings[0]?.address || "Selected Area", lat: allListings[0]?.latitude, lng: allListings[0]?.longitude, isSubject: true },
     ...allListings.slice(1).map(l => ({
       title: l.title,
-      price: formatPriceDisplay(l.rent),
+      price: formatRent(parsePrice(l.rent)),
       address: l.address,
       lat: l.latitude,
       lng: l.longitude
@@ -186,7 +178,7 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
                   <span className={`text-[10px] font-black uppercase tracking-widest block ${isAboveBudget ? 'text-neo-pink' : 'text-emerald-500'}`}>Est. Monthly Rent</span>
                 </div>
                 <div className="text-4xl font-black text-white tracking-tighter">
-                  {formatPriceDisplay(result.rentalValue)}
+                  {formatRent(fairValueNum)}
                 </div>
                 <div className="mt-2 flex items-center gap-2">
                    {isAboveBudget ? (
@@ -231,8 +223,8 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {allListings.map((item, idx) => {
-                  const itemRent = parsePrice(item.rent);
-                  const isMatch = userBudget && itemRent <= userBudget * 1.05;
+                  const itemRentVal = parsePrice(item.rent);
+                  const isMatch = userBudget && itemRentVal <= userBudget * 1.05;
                   
                   return (
                     <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 shadow-glass-3d hover:border-emerald-500/30 transition-all group relative overflow-hidden animate-in zoom-in duration-500">
@@ -248,7 +240,7 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
                           <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-1 font-bold uppercase tracking-widest truncate"><MapPin size={12}/> {item.address}</p>
                         </div>
                         <div className="text-right shrink-0">
-                          <div className="text-xl font-black text-emerald-500">{formatPriceDisplay(item.rent)}</div>
+                          <div className="text-xl font-black text-emerald-500">{formatRent(itemRentVal)}</div>
                         </div>
                       </div>
                       <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-500 hover:border-emerald-500 transition-all">
@@ -272,14 +264,6 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
                   </button>
                 </div>
               )}
-
-              {allListings.length === 0 && !isSearchingPincode && (
-                <div className="text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10">
-                   <Building2 size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
-                   <p className="text-gray-500 font-black uppercase tracking-widest text-xs">No hyper-local listings found for this budget node.</p>
-                   <p className="text-[10px] text-gray-600 uppercase mt-2">Try expanding search radius or adjusting budget parameters.</p>
-                </div>
-              )}
             </div>
           </div>
         </>
@@ -288,4 +272,5 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
   );
 };
 
+/* Add default export to fix "Module 'file:///components/RentDashboard' has no default export" error */
 export default RentDashboard;

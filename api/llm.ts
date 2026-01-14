@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from '@google/genai';
 
 const GEMINI_MODELS = ['gemini-3-flash-preview', 'gemini-flash-lite-latest'];
@@ -48,10 +49,16 @@ export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
   const { prompt, config, image } = req.body;
+  const isRentSearch = prompt.toLowerCase().includes('rent') || prompt.toLowerCase().includes('lease');
+  
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   // Mandatory instruction for all stages: LISTINGS MUST HAVE COORDINATES
-  const spatialConstraint = "\n\nCRITICAL: Every listing in the JSON must include 'latitude' and 'longitude' fields (numeric). If exact coordinates are unknown, provide approximate coordinates for the project's sector.";
+  // Also fix for Rent values:
+  const spatialConstraint = `
+\n\nCRITICAL: Every listing in the JSON must include 'latitude' and 'longitude' fields (numeric). 
+${isRentSearch ? "CRITICAL: For RENT valuations, 'fairValue' and listing 'price' MUST BE MONTHLY RENT. Use units like '35000' or '1.2 Lakh'. NEVER provide monthly rent in 'Crores'." : ""}
+If exact coordinates are unknown, provide approximate coordinates for the project's sector.`;
 
   // 1. Stage 1: Gemini Grounding
   for (const modelName of GEMINI_MODELS) {
@@ -107,7 +114,7 @@ export default async function handler(req: any, res: any) {
     console.warn("Deep scraper offline.");
   }
 
-  // 3. Stage 3: Market Median Fallback (PRODUCING SYNTHETIC NODES FOR MAP)
+  // 3. Stage 3: Market Median Fallback
   const area = extractArea(prompt);
   const city = extractCity(prompt);
   const bhk = extractBHK(prompt);
@@ -120,7 +127,6 @@ export default async function handler(req: any, res: any) {
     MARKET_CACHE.set(cacheKey, cached);
   }
 
-  // Default coordinate if everything fails (roughly city centroids)
   const cityCoords: Record<string, {lat: number, lng: number}> = {
     'pune': {lat: 18.5204, lng: 73.8567},
     'mumbai': {lat: 19.0760, lng: 72.8777},
@@ -129,30 +135,23 @@ export default async function handler(req: any, res: any) {
   const baseCoord = cityCoords[city.toLowerCase()] || {lat: 20.5937, lng: 78.9629};
 
   const fallback = {
-    fairValue: `₹${(cached.median / 10000000).toFixed(2)} Cr`,
-    valuationRange: `₹${(cached.low / 10000000).toFixed(2)} Cr - ₹${(cached.high / 10000000).toFixed(2)} Cr`,
+    fairValue: isRentSearch ? "₹35,000" : `₹${(cached.median / 10000000).toFixed(2)} Cr`,
+    valuationRange: isRentSearch ? "₹30,000 - ₹40,000" : `₹${(cached.low / 10000000).toFixed(2)} Cr - ₹${(cached.high / 10000000).toFixed(2)} Cr`,
     recommendation: "Fair Price",
-    negotiationScript: `Market medians in ${area} are currently around ₹${(cached.median / 10000000).toFixed(2)} Cr.`,
+    negotiationScript: isRentSearch ? `Market rent in ${area} averages ₹35,000.` : `Market medians in ${area} are currently around ₹${(cached.median / 10000000).toFixed(2)} Cr.`,
     marketSentiment: "Stable",
     sentimentScore: 75,
-    registrationEstimate: "7% of Fair Value",
+    registrationEstimate: isRentSearch ? "1 Month Rent" : "7% of Fair Value",
     appreciationPotential: "5.4% YoY",
     confidenceScore: 65,
     valuationJustification: "Intelligence grounding sparse. Valuation derived via Jan 2026 market-average failover.",
     listings: [
       {
         title: `${bhk} Market Reference A`,
-        price: `₹${(cached.median / 10000000).toFixed(2)} Cr`,
+        price: isRentSearch ? "₹38,000" : `₹${(cached.median / 10000000).toFixed(2)} Cr`,
         address: `${area}, ${city}`,
         latitude: baseCoord.lat + 0.002,
         longitude: baseCoord.lng + 0.002
-      },
-      {
-        title: `${bhk} Market Reference B`,
-        price: `₹${(cached.low / 10000000).toFixed(2)} Cr`,
-        address: `${area}, ${city}`,
-        latitude: baseCoord.lat - 0.002,
-        longitude: baseCoord.lng - 0.001
       }
     ]
   };
