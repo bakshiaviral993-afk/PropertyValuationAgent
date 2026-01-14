@@ -1,31 +1,15 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <script>
-      window.process = { 
-        env: { 
-          NODE_ENV: 'production',
-          API_KEY: '',
-          DATABASE_URL: ''
-        } 
-      };
-    </script>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#0a0a0f">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M25 75 L52 45 L79 75' stroke='%2300F6FF' stroke-width='8' fill='none'/></svg>">
     <title>QuantCasa | Professional Property Valuation</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=Lora:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-    <script>
-      // Load Google Maps API dynamically with explicit key parameter
-      (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Re-using existing usage."):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
-        key: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
-        v: "weekly"
-      });
-    </script>
+    
     <script>
       tailwind.config = {
         darkMode: 'class',
@@ -67,7 +51,6 @@
       .gm-style-iw { background: #0a0a0f !important; color: white !important; border-radius: 16px !important; padding: 0 !important; border: 1px solid rgba(88, 95, 216, 0.4) !important; }
       .gm-style-iw-d { overflow: hidden !important; }
       .gm-style-iw-tc::after { background: #0a0a0f !important; }
-      /* Ensure markers are visible above map elements */
       .asset-tag { pointer-events: auto !important; z-index: 100 !important; }
     </style>
     <script type="importmap">
@@ -96,6 +79,31 @@
   </head>
   <body>
     <div id="root"></div>
+    
+    <!-- Load Google Maps API BEFORE the app module -->
+    <script type="module">
+      // This runs as a module so we can use import.meta
+      (g=>{
+        var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;
+        b=b[c]||(b[c]={});
+        var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{
+          await (a=m.createElement("script"));
+          e.set("libraries",[...r]+"");
+          for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);
+          e.set("callback",c+".maps."+q);
+          a.src=`https://maps.${c}apis.com/maps/api/js?`+e;
+          d[q]=f;
+          a.onerror=()=>h=n(Error(p+" could not load."));
+          a.nonce=m.querySelector("script[nonce]")?.nonce||"";
+          m.head.append(a)
+        }));
+        d[l]?console.warn(p+" only loads once. Re-using existing usage."):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))
+      })({
+        key: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
+        v: "weekly"
+      });
+    </script>
+    
     <script type="module" src="./index.tsx"></script>
   </body>
 </html>
