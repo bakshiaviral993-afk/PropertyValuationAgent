@@ -1,6 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { MapPin, Navigation, Building, Info } from 'lucide-react';
-
 interface MapNode {
   title: string;
   price: string;
