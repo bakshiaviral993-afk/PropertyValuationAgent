@@ -1,5 +1,4 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { MapPin, Navigation, Building, Info } from 'lucide-react';
 
 interface MapNode {
   title: string;
@@ -10,15 +9,21 @@ interface MapNode {
   latitude?: number;
   longitude?: number;
   isSubject?: boolean;
+  isEssential?: boolean;
+  essentialType?: string;
+  markerColor?: string;
+  contact?: string;
+  rating?: string;
 }
 
 interface GoogleMapViewProps {
   nodes: MapNode[];
   center?: { lat: number; lng: number };
+  showEssentials?: boolean;
 }
 
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371; // km
+  const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
   const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
@@ -28,18 +33,14 @@ const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => 
   return R * c;
 };
 
-// Load Google Maps Script dynamically
 const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
   return new Promise((resolve, reject) => {
-    // Check if already loaded
     if ((window as any).google?.maps) {
       resolve();
       return;
     }
 
-    // Check if script is already being loaded
     if (document.querySelector('script[src*="maps.googleapis.com"]')) {
-      // Wait for it to load
       const checkInterval = setInterval(() => {
         if ((window as any).google?.maps) {
           clearInterval(checkInterval);
@@ -59,7 +60,7 @@ const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
   });
 };
 
-const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => {
+const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center, showEssentials = false }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
   const markersRef = useRef<any[]>([]);
@@ -79,29 +80,22 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => 
       if (!mapRef.current) return;
 
       try {
-        // Get API key from environment variable
         const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
         
         if (!apiKey) {
           setLoadError('Google Maps API key not configured');
-          console.error('[Map_Error] No API key found. Please set VITE_GOOGLE_MAPS_API_KEY in Vercel environment variables.');
+          console.error('[Map_Error] No API key found');
           return;
         }
 
         console.log('[Map_Diagnostic] Loading Google Maps...');
-        
-        // Load Google Maps script
         await loadGoogleMapsScript(apiKey);
         
         const google = (window as any).google;
-        
-        if (!google?.maps) {
-          throw new Error('Google Maps failed to load');
-        }
+        if (!google?.maps) throw new Error('Google Maps failed to load');
 
         console.log("[Map_Diagnostic] Received Nodes:", nodes.length, nodes);
 
-        // Validate and prepare nodes
         const validNodes = nodes.map((node, i) => {
           const lat = node.lat ?? node.latitude;
           const lng = node.lng ?? node.longitude;
@@ -110,7 +104,6 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => 
 
         console.log("[Map_Diagnostic] Plotting", validNodes.length, "validated nodes.");
 
-        // Initialize map only once
         if (!gMapRef.current) {
           const initialCenter = center || (validNodes.length > 0 ? { lat: validNodes[0].lat!, lng: validNodes[0].lng! } : { lat: 18.5204, lng: 73.8567 });
           
@@ -136,11 +129,10 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => 
         const map = gMapRef.current;
         const bounds = new google.maps.LatLngBounds();
 
-        // Clear existing markers
         markersRef.current.forEach(m => m.setMap(null));
         markersRef.current = [];
 
-        // Add user location marker
+        // User location marker
         if (userLoc) {
           const userMarker = new google.maps.Marker({
             map,
@@ -153,64 +145,108 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => 
               fillOpacity: 1,
               strokeWeight: 2,
               strokeColor: "#ffffff"
-            }
+            },
+            zIndex: 1000
           });
           markersRef.current.push(userMarker);
           bounds.extend(userLoc);
-          console.log("[Map_Diagnostic] User location marker added");
         }
 
-        // Add property markers
+        // Property and Essential markers
         validNodes.forEach((node, idx) => {
           const pos = { lat: node.lat!, lng: node.lng! };
           
+          let markerIcon;
+          let labelText;
+          let labelColor;
+          
+          if (node.isEssential) {
+            // Essential service marker - use custom colored pin
+            markerIcon = {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 10,
+              fillColor: node.markerColor || '#FCD34D',
+              fillOpacity: 1,
+              strokeWeight: 3,
+              strokeColor: "#ffffff"
+            };
+            labelText = node.essentialType?.charAt(0).toUpperCase() || 'E';
+            labelColor = "#ffffff";
+          } else {
+            // Property marker - standard with price
+            markerIcon = undefined; // Use default red pin
+            labelText = node.price.length > 8 ? node.price.substring(0, 7) + ".." : node.price;
+            labelColor = "#ffffff";
+          }
+
           const marker = new google.maps.Marker({
             map,
             position: pos,
             title: node.title,
-            label: {
-              text: node.price.length > 8 ? node.price.substring(0, 7) + ".." : node.price,
-              color: "#ffffff",
+            icon: markerIcon,
+            label: markerIcon ? {
+              text: labelText,
+              color: labelColor,
+              fontSize: "12px",
+              fontWeight: "900"
+            } : {
+              text: labelText,
+              color: labelColor,
               fontSize: "10px",
               fontWeight: "900"
-            }
+            },
+            zIndex: node.isEssential ? 500 : 100
           });
 
           markersRef.current.push(marker);
           bounds.extend(pos);
 
           const dist = userLoc ? getDistance(userLoc.lat, userLoc.lng, pos.lat, pos.lng) : null;
-          const infoWindow = new google.maps.InfoWindow({
-            content: `
+          
+          let infoContent;
+          if (node.isEssential) {
+            infoContent = `
+              <div style="padding: 12px; min-width: 200px; background: #0a0a0f; color: white; border-radius: 8px;">
+                <div style="font-weight: 900; color: ${node.markerColor || '#FCD34D'}; font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">${node.essentialType || 'Essential Service'}</div>
+                <div style="font-weight: 900; font-size: 14px; color: #ffffff; margin: 4px 0;">${node.title}</div>
+                <div style="color: #64748b; font-size: 10px; margin-bottom: 8px;">${node.address}</div>
+                ${node.rating ? `<div style="color: #FCD34D; font-size: 10px; font-weight: 900; margin-bottom: 4px;">⭐ ${node.rating}</div>` : ''}
+                ${node.contact ? `<div style="color: #00F6FF; font-size: 10px; font-weight: 900; margin-bottom: 4px;">📞 ${node.contact}</div>` : ''}
+                ${dist !== null ? `<div style="color: #FF6B9D; font-size: 9px; font-weight: 900;">${dist.toFixed(1)} KM AWAY</div>` : ''}
+              </div>
+            `;
+          } else {
+            infoContent = `
               <div style="padding: 12px; min-width: 180px; background: #0a0a0f; color: white; border-radius: 8px;">
                 <div style="font-weight: 900; color: #585FD8; font-size: 10px; text-transform: uppercase;">${node.title}</div>
                 <div style="font-weight: 900; font-size: 16px; color: #00F6FF; margin: 4px 0;">${node.price}</div>
                 <div style="color: #64748b; font-size: 10px; margin-bottom: 8px;">${node.address}</div>
                 ${dist !== null ? `<div style="color: #FF6B9D; font-size: 9px; font-weight: 900;">${dist.toFixed(1)} KM AWAY</div>` : ''}
               </div>
-            `
+            `;
+          }
+
+          const infoWindow = new google.maps.InfoWindow({
+            content: infoContent
           });
 
           marker.addListener("click", () => {
             infoWindow.open(map, marker);
           });
 
-          console.log(`[Map_Diagnostic] Marker ${idx + 1} added: ${node.title}`);
+          console.log(`[Map_Diagnostic] Marker ${idx + 1} added: ${node.title} ${node.isEssential ? '(Essential)' : '(Property)'}`);
         });
 
-        // Fit bounds if we have nodes
         if (validNodes.length > 0 || userLoc) {
           map.fitBounds(bounds);
-          
           google.maps.event.addListenerOnce(map, "idle", () => {
             if (map.getZoom() > 16) map.setZoom(16);
           });
-          
-          console.log("[Map_Diagnostic] Bounds fitted and zoom adjusted");
+          console.log("[Map_Diagnostic] Bounds fitted");
         }
 
       } catch (error: any) {
-        console.error("[Map_Error] Failed to initialize map:", error);
+        console.error("[Map_Error]", error);
         setLoadError(error.message || 'Failed to load map');
         setMapReady(false);
       }
@@ -218,6 +254,9 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => 
 
     initMap();
   }, [nodes, center, userLoc]);
+
+  const propertyCount = nodes.filter(n => !n.isEssential).length;
+  const essentialCount = nodes.filter(n => n.isEssential).length;
 
   return (
     <div className="relative w-full h-[550px] rounded-[48px] border border-white/10 group shadow-neo-glow transition-all hover:border-white/20">
@@ -235,14 +274,44 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes = [], center }) => 
       )}
       
       <div className="absolute top-8 left-8 bg-neo-bg/90 backdrop-blur-xl p-5 rounded-[32px] border border-white/10 shadow-neo-glow pointer-events-none">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-2">
           <div className="w-2 h-2 rounded-full bg-neo-neon animate-pulse" />
           <span className="text-[10px] font-black text-neo-neon uppercase tracking-widest">
-            {loadError ? 'Map Error' : mapReady ? 'Active Mapping' : 'Loading Maps...'}
+            {loadError ? 'Map Error' : mapReady ? 'Active Mapping' : 'Loading...'}
           </span>
         </div>
-        <p className="text-sm text-white font-black mt-1">{nodes.length} Grounded Nodes</p>
+        {showEssentials && essentialCount > 0 ? (
+          <div className="space-y-1">
+            <p className="text-xs text-white font-black">{propertyCount} Properties</p>
+            <p className="text-xs text-neo-gold font-black">{essentialCount} Essentials</p>
+          </div>
+        ) : (
+          <p className="text-sm text-white font-black">{nodes.length} Grounded Nodes</p>
+        )}
       </div>
+
+      {showEssentials && essentialCount > 0 && (
+        <div className="absolute bottom-8 left-8 right-8 bg-neo-bg/90 backdrop-blur-xl p-4 rounded-[24px] border border-white/10 shadow-neo-glow pointer-events-none">
+          <div className="flex flex-wrap gap-3 text-[9px] font-black uppercase tracking-widest">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#585FD8]" />
+              <span className="text-gray-400">Properties</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#FF6B9D]" />
+              <span className="text-gray-400">Emergency</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#585FD8]" />
+              <span className="text-gray-400">Daily</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#FCD34D]" />
+              <span className="text-gray-400">Routine</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
