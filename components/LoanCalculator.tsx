@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Calculator, Landmark, ShieldCheck, Zap, Info, Wallet, 
   TrendingUp, ArrowRight, Building2, MapIcon, BarChart3,
-  Receipt, HardHat, FileText, Coins, ArrowRightLeft, Percent
+  Receipt, HardHat, FileText, Coins, ArrowRightLeft, Percent,
+  CreditCard, Home
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import { AppMode } from '../types';
@@ -27,6 +27,9 @@ const LoanCalculator: React.FC<LoanCalculatorProps> = ({ initialValue = 10000000
   const [securityDepositMonths, setSecurityDepositMonths] = useState(3);
   const [brokerageMonths, setBrokerageMonths] = useState(1);
   const [analysisYears, setAnalysisYears] = useState(10);
+  const [rentLoanType, setRentLoanType] = useState<'analysis' | 'personal-loan'>('analysis');
+  const [personalLoanRate, setPersonalLoanRate] = useState(12.5);
+  const [personalLoanTenure, setPersonalLoanTenure] = useState(3);
 
   // Land mode states
   const [constructionRate, setConstructionRate] = useState(2800); 
@@ -61,39 +64,63 @@ const LoanCalculator: React.FC<LoanCalculatorProps> = ({ initialValue = 10000000
         summary: "Buy Mode: Leverage mortgage to build equity. Appreciation over 10 years often offsets interest costs."
       });
     } else if (mode === 'rent') {
-      let totalRent = 0;
-      let currentRent = propertyValue; 
-      const months = analysisYears * 12;
-      for (let i = 1; i <= months; i++) {
-        totalRent += currentRent;
-        if (i % 12 === 0) currentRent *= (1 + annualRentEscalation / 100);
-      }
-      const upfront = propertyValue * (securityDepositMonths + brokerageMonths);
-      
-      // Comparison: What if this money was invested?
-      const monthlySip = propertyValue * 0.5; // Hypothetical SIP
-      const futureWealth = monthlySip * ((Math.pow(1 + 0.01, months) - 1) / 0.01);
+      if (rentLoanType === 'personal-loan') {
+        // Personal Loan for Security Deposit + Brokerage + Advance
+        const upfrontCost = propertyValue * (securityDepositMonths + brokerageMonths);
+        const monthlyRate = personalLoanRate / (12 * 100);
+        const n = personalLoanTenure * 12;
+        const emi = (upfrontCost * monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1);
+        const totalPayment = emi * n;
+        const totalInterest = totalPayment - upfrontCost;
+        
+        // Total cost = rent + personal loan EMI
+        const monthlyRent = propertyValue;
+        const totalRentForLoanPeriod = monthlyRent * n;
+        const totalCostWithLoan = totalRentForLoanPeriod + totalPayment;
 
-      setSimResult({
-        primaryMetric: Math.round(totalRent),
-        secondaryMetric: Math.round(upfront),
-        tertiaryMetric: Math.round(futureWealth),
-        breakdown: [
-          { name: 'Total Rent', value: Math.round(totalRent), fill: '#10b981' },
-          { name: 'Upfront Cost', value: Math.round(upfront), fill: '#34d399' }
-        ],
-        summary: "Rent Mode: Mobility is key. This analysis shows your total wealth leakage over time vs potential savings investment."
-      });
+        setSimResult({
+          primaryMetric: Math.round(emi),
+          secondaryMetric: Math.round(totalInterest),
+          tertiaryMetric: Math.round(totalCostWithLoan),
+          breakdown: [
+            { name: 'Loan Principal', value: Math.round(upfrontCost), fill: '#10b981' },
+            { name: 'Loan Interest', value: Math.round(totalInterest), fill: '#34d399' },
+            { name: 'Rent Paid', value: Math.round(totalRentForLoanPeriod), fill: '#6ee7b7' }
+          ],
+          summary: `Personal Loan Mode: Taking a personal loan of ₹${(upfrontCost/100000).toFixed(1)}L at ${personalLoanRate}% for ${personalLoanTenure} years to fund upfront rental costs. Your combined monthly outflow (rent + EMI) will be ₹${(monthlyRent + emi).toLocaleString()}.`
+        });
+      } else {
+        // Regular Rent Analysis
+        let totalRent = 0;
+        let currentRent = propertyValue; 
+        const months = analysisYears * 12;
+        for (let i = 1; i <= months; i++) {
+          totalRent += currentRent;
+          if (i % 12 === 0) currentRent *= (1 + annualRentEscalation / 100);
+        }
+        const upfront = propertyValue * (securityDepositMonths + brokerageMonths);
+        
+        const monthlySip = propertyValue * 0.5;
+        const futureWealth = monthlySip * ((Math.pow(1 + 0.01, months) - 1) / 0.01);
+
+        setSimResult({
+          primaryMetric: Math.round(totalRent),
+          secondaryMetric: Math.round(upfront),
+          tertiaryMetric: Math.round(futureWealth),
+          breakdown: [
+            { name: 'Total Rent', value: Math.round(totalRent), fill: '#10b981' },
+            { name: 'Upfront Cost', value: Math.round(upfront), fill: '#34d399' }
+          ],
+          summary: "Rent Analysis: Mobility is key. This shows your total wealth leakage over time vs potential savings investment."
+        });
+      }
     } else if (mode === 'land') {
-      // For land, initialValue is the plot cost
-      // We need to estimate building area. If plot size wasn't passed, we assume 1500 sqft base.
       const estimatedPlotSize = 1500; 
       const buildableArea = estimatedPlotSize * fsiUsed;
       const constructionCost = buildableArea * constructionRate;
       const permissionCost = buildableArea * permissionCostSqft;
       const totalProjectCost = propertyValue + constructionCost + permissionCost;
       
-      // Revenue estimate based on 2x cost (market avg)
       const projectedRevenue = totalProjectCost * 1.6;
       const netProfit = projectedRevenue - totalProjectCost;
 
@@ -105,12 +132,31 @@ const LoanCalculator: React.FC<LoanCalculatorProps> = ({ initialValue = 10000000
           { name: 'Construction', value: Math.round(constructionCost), fill: '#f97316' },
           { name: 'Land & Fees', value: Math.round(propertyValue + permissionCost), fill: '#fb923c' }
         ],
-        summary: "Land Mode: Wealth is generated through conversion. Optimizing FSI and construction quality drives project yield."
+        summary: "Land Mode: Self-construction loan enables wealth creation through development. Optimizing FSI and build quality drives project yield."
+      });
+    } else if (mode === 'commercial') {
+      // Commercial uses home loan logic
+      const loanAmount = propertyValue * (1 - downPaymentPercent / 100);
+      const monthlyRate = interestRate / (12 * 100);
+      const n = tenureYears * 12;
+      const emi = (loanAmount * monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1);
+      const totalPayment = emi * n;
+      const totalInterest = totalPayment - loanAmount;
+
+      setSimResult({
+        primaryMetric: Math.round(emi),
+        secondaryMetric: Math.round(totalInterest),
+        tertiaryMetric: Math.round(totalPayment),
+        breakdown: [
+          { name: 'Principal', value: Math.round(loanAmount), fill: '#585FD8' },
+          { name: 'Interest', value: Math.round(totalInterest), fill: '#FF6B9D' }
+        ],
+        summary: "Commercial Property Loan: Higher interest rates but rental yields offset EMI burden. Focus on footfall-driven appreciation."
       });
     }
-  }, [propertyValue, downPaymentPercent, interestRate, tenureYears, annualRentEscalation, securityDepositMonths, brokerageMonths, analysisYears, constructionRate, fsiUsed, permissionCostSqft, mode, initialValue]);
+  }, [propertyValue, downPaymentPercent, interestRate, tenureYears, annualRentEscalation, securityDepositMonths, brokerageMonths, analysisYears, constructionRate, fsiUsed, permissionCostSqft, mode, initialValue, rentLoanType, personalLoanRate, personalLoanTenure]);
 
-  const themeColor = mode === 'rent' ? 'text-emerald-500' : mode === 'land' ? 'text-orange-500' : 'text-neo-neon';
+  const themeColor = mode === 'rent' ? 'text-emerald-500' : mode === 'land' ? 'text-orange-500' : mode === 'commercial' ? 'text-neo-neon' : 'text-neo-neon';
   const accentColor = mode === 'rent' ? 'bg-emerald-500' : mode === 'land' ? 'bg-orange-500' : 'bg-neo-neon';
   const accentBorder = mode === 'rent' ? 'border-emerald-500/20' : mode === 'land' ? 'border-orange-500/20' : 'border-neo-neon/20';
 
@@ -122,6 +168,29 @@ const LoanCalculator: React.FC<LoanCalculatorProps> = ({ initialValue = 10000000
              <Coins size={14} className={themeColor}/> Configuration Nodes
            </h3>
            
+           {mode === 'rent' && (
+             <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10 mb-4">
+               <button
+                 onClick={() => setRentLoanType('analysis')}
+                 className={`flex-1 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                   rentLoanType === 'analysis' ? 'bg-emerald-500 text-white shadow-neo-glow' : 'text-gray-400'
+                 }`}
+               >
+                 <BarChart3 size={12} className="inline mr-2" />
+                 Rent Analysis
+               </button>
+               <button
+                 onClick={() => setRentLoanType('personal-loan')}
+                 className={`flex-1 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                   rentLoanType === 'personal-loan' ? 'bg-emerald-500 text-white shadow-neo-glow' : 'text-gray-400'
+                 }`}
+               >
+                 <CreditCard size={12} className="inline mr-2" />
+                 Personal Loan
+               </button>
+             </div>
+           )}
+           
            {mode === 'rent' ? (
              <>
                <div className="space-y-4">
@@ -130,26 +199,60 @@ const LoanCalculator: React.FC<LoanCalculatorProps> = ({ initialValue = 10000000
                   </div>
                   <input type="range" min="5000" max="500000" step="1000" value={propertyValue} onChange={(e)=>setPropertyValue(Number(e.target.value))} className="w-full accent-emerald-500"/>
                </div>
-               <div className="grid grid-cols-2 gap-4">
-                 <div className="space-y-4">
-                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
-                      <span>Annual Hike</span> <span className="text-emerald-500">{annualRentEscalation}%</span>
-                    </div>
-                    <input type="range" min="0" max="15" step="1" value={annualRentEscalation} onChange={(e)=>setAnnualRentEscalation(Number(e.target.value))} className="w-full accent-emerald-500"/>
-                 </div>
-                 <div className="space-y-4">
-                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
-                      <span>Timeline</span> <span className="text-emerald-500">{analysisYears} Yr</span>
-                    </div>
-                    <input type="range" min="1" max="20" step="1" value={analysisYears} onChange={(e)=>setAnalysisYears(Number(e.target.value))} className="w-full accent-emerald-500"/>
-                 </div>
-               </div>
-               <div className="space-y-4">
-                  <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
-                    <span>Security Deposit (Months)</span> <span className="text-emerald-500">{securityDepositMonths} Mo</span>
-                  </div>
-                  <input type="range" min="1" max="12" step="1" value={securityDepositMonths} onChange={(e)=>setSecurityDepositMonths(Number(e.target.value))} className="w-full accent-emerald-500"/>
-               </div>
+               
+               {rentLoanType === 'personal-loan' ? (
+                 <>
+                   <div className="space-y-4">
+                      <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
+                        <span>Personal Loan Rate</span> <span className="text-emerald-500">{personalLoanRate}%</span>
+                      </div>
+                      <input type="range" min="10" max="18" step="0.5" value={personalLoanRate} onChange={(e)=>setPersonalLoanRate(Number(e.target.value))} className="w-full accent-emerald-500"/>
+                   </div>
+                   <div className="space-y-4">
+                      <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
+                        <span>Loan Tenure</span> <span className="text-emerald-500">{personalLoanTenure} Years</span>
+                      </div>
+                      <input type="range" min="1" max="5" step="1" value={personalLoanTenure} onChange={(e)=>setPersonalLoanTenure(Number(e.target.value))} className="w-full accent-emerald-500"/>
+                   </div>
+                   <div className="grid grid-cols-2 gap-4">
+                     <div className="space-y-4">
+                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
+                          <span>Security (Months)</span> <span className="text-emerald-500">{securityDepositMonths} Mo</span>
+                        </div>
+                        <input type="range" min="1" max="12" step="1" value={securityDepositMonths} onChange={(e)=>setSecurityDepositMonths(Number(e.target.value))} className="w-full accent-emerald-500"/>
+                     </div>
+                     <div className="space-y-4">
+                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
+                          <span>Brokerage (Mo)</span> <span className="text-emerald-500">{brokerageMonths} Mo</span>
+                        </div>
+                        <input type="range" min="0" max="2" step="0.5" value={brokerageMonths} onChange={(e)=>setBrokerageMonths(Number(e.target.value))} className="w-full accent-emerald-500"/>
+                     </div>
+                   </div>
+                 </>
+               ) : (
+                 <>
+                   <div className="grid grid-cols-2 gap-4">
+                     <div className="space-y-4">
+                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
+                          <span>Annual Hike</span> <span className="text-emerald-500">{annualRentEscalation}%</span>
+                        </div>
+                        <input type="range" min="0" max="15" step="1" value={annualRentEscalation} onChange={(e)=>setAnnualRentEscalation(Number(e.target.value))} className="w-full accent-emerald-500"/>
+                     </div>
+                     <div className="space-y-4">
+                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
+                          <span>Timeline</span> <span className="text-emerald-500">{analysisYears} Yr</span>
+                        </div>
+                        <input type="range" min="1" max="20" step="1" value={analysisYears} onChange={(e)=>setAnalysisYears(Number(e.target.value))} className="w-full accent-emerald-500"/>
+                     </div>
+                   </div>
+                   <div className="space-y-4">
+                      <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
+                        <span>Security Deposit (Months)</span> <span className="text-emerald-500">{securityDepositMonths} Mo</span>
+                      </div>
+                      <input type="range" min="1" max="12" step="1" value={securityDepositMonths} onChange={(e)=>setSecurityDepositMonths(Number(e.target.value))} className="w-full accent-emerald-500"/>
+                   </div>
+                 </>
+               )}
              </>
            ) : mode === 'land' ? (
              <>
@@ -229,10 +332,15 @@ const LoanCalculator: React.FC<LoanCalculatorProps> = ({ initialValue = 10000000
            </div>
            <div className="text-center mt-6">
              <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">
-               {mode === 'rent' ? `Total Rent Outflow (${analysisYears}Y)` : mode === 'land' ? 'Total Development Cost' : 'Estimated Monthly EMI'}
+               {mode === 'rent' && rentLoanType === 'personal-loan' ? 'Monthly EMI' :
+                mode === 'rent' ? `Total Rent Outflow (${analysisYears}Y)` : 
+                mode === 'land' ? 'Total Development Cost' : 
+                'Estimated Monthly EMI'}
              </span>
              <div className="text-4xl font-black text-white tracking-tighter">
-               ₹{mode === 'buy' ? simResult.primaryMetric.toLocaleString() : (simResult.primaryMetric / 10000000).toFixed(2) + ' Cr'}
+               ₹{(mode === 'buy' || mode === 'commercial' || (mode === 'rent' && rentLoanType === 'personal-loan')) ? 
+                  simResult.primaryMetric.toLocaleString() : 
+                  (simResult.primaryMetric / 10000000).toFixed(2) + ' Cr'}
              </div>
            </div>
         </div>
@@ -242,7 +350,10 @@ const LoanCalculator: React.FC<LoanCalculatorProps> = ({ initialValue = 10000000
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
           <div className="space-y-2">
             <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest block">
-              {mode === 'rent' ? 'Initial Cash Required' : mode === 'land' ? 'Project Alpha (Profit)' : 'Total Interest Burden'}
+              {mode === 'rent' && rentLoanType === 'personal-loan' ? 'Total Interest Paid' :
+               mode === 'rent' ? 'Initial Cash Required' : 
+               mode === 'land' ? 'Project Alpha (Profit)' : 
+               'Total Interest Burden'}
             </span>
             <div className={`text-2xl font-black ${themeColor}`}>
               ₹{mode === 'land' ? (simResult.secondaryMetric / 10000000).toFixed(2) + ' Cr' : (simResult.secondaryMetric / 100000).toFixed(1) + ' Lakhs'}
@@ -250,7 +361,10 @@ const LoanCalculator: React.FC<LoanCalculatorProps> = ({ initialValue = 10000000
           </div>
           <div className="space-y-2">
             <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest block">
-              {mode === 'rent' ? 'SIP Potential' : mode === 'land' ? 'Yield On Cost' : 'Total Acquisition Cost'}
+              {mode === 'rent' && rentLoanType === 'personal-loan' ? 'Total Cost (Rent+Loan)' :
+               mode === 'rent' ? 'SIP Potential' : 
+               mode === 'land' ? 'Yield On Cost' : 
+               'Total Acquisition Cost'}
             </span>
             <div className={`text-2xl font-black text-white`}>
               {mode === 'land' ? simResult.tertiaryMetric + '%' : '₹' + (simResult.tertiaryMetric / 10000000).toFixed(2) + ' Cr'}
