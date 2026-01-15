@@ -1,381 +1,215 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { BuyResult, SaleListing, AppLang } from '../types';
-import { 
-  TrendingUp, MapPin, Share2, 
-  FileText, Home, Building2,
-  Save, Sparkles, BarChart3, LayoutGrid, Sparkle, Video, Download, RefreshCw, 
-  Landmark, AlertCircle, CheckCircle, BrainCircuit, Map as MapIcon, Loader2, ShieldAlert, Plus
-} from 'lucide-react';
-// @ts-ignore
-import confetti from 'canvas-confetti';
-// @ts-ignore
-import { jsPDF } from 'jspdf';
-// @ts-ignore
-import html2canvas from 'html2canvas';
-import { parsePrice, formatPrice, generatePropertyImage } from '../services/geminiService';
-import { speak } from '../services/voiceService';
-import MarketStats from './MarketStats';
-import { calculateListingStats } from '../utils/listingProcessor';
-import HarmonyDashboard from './HarmonyDashboard';
-import VideoGenerator from './VideoGenerator';
-import ProfessionalReport from './ProfessionalReport';
+import React, { useState, useEffect } from 'react';
+import { BuyResult, AppLang } from '../types';
+import { Home, TrendingUp, MapPin, Map as MapIcon, LayoutGrid, ShoppingBag, AlertCircle } from 'lucide-react';
 import GoogleMapView from './GoogleMapView';
-import { getMoreListings } from '../services/valuationService';
+import EssentialsDashboard from './EssentialsDashboard';
+import { speak } from '../services/voiceService';
 
 interface BuyDashboardProps {
   result: BuyResult;
   lang?: AppLang;
-  onAnalyzeFinance?: (value: number) => void;
   userBudget?: number;
+  onAnalyzeFinance?: () => void;
+  city: string;
+  area: string;
 }
 
-const safeRender = (value: any): string => {
-  if (value === null || value === undefined) return "";
-  return String(value);
-};
-
-const AIListingImage = ({ listing, onShowVideo }: { listing: SaleListing, onShowVideo: () => void }) => {
-  const [imgUrl, setImgUrl] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  const PLACEHOLDERS = [
-    'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1600607687940-4e524cb35a3a?w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=800&auto=format&fit=crop'
-  ];
-
-  useEffect(() => {
-    if (listing.image) {
-      setImgUrl(listing.image);
-    }
-  }, [listing]);
-
-  const handleManualGenerate = async () => {
-    setIsGenerating(true);
-    const prompt = `Modern luxury apartment building named "${listing.title}" in ${listing.address}. High-end architectural photography, daytime, cinematic lighting.`;
-    const url = await generatePropertyImage(prompt);
-    if (url) setImgUrl(url);
-    setIsGenerating(false);
-  };
-
-  const currentPlaceholder = PLACEHOLDERS[Math.abs(listing.title.length) % PLACEHOLDERS.length];
-
-  return (
-    <div className="w-full h-48 rounded-2xl overflow-hidden mb-4 bg-white/5 flex items-center justify-center relative group/img border border-white/10 shadow-sm">
-      <img 
-          src={imgUrl || currentPlaceholder} 
-          className={`w-full h-full object-cover transition-all duration-1000 ${!imgUrl ? 'opacity-40 grayscale group-hover/img:opacity-60' : 'group-hover/img:scale-110'}`} 
-          alt={safeRender(listing.title)} 
-      />
-      
-      {!imgUrl && (
-        <div className="absolute inset-0 flex items-center justify-center">
-           <button 
-             onClick={(e) => { e.preventDefault(); handleManualGenerate(); }}
-             disabled={isGenerating}
-             className="px-4 py-2 bg-neo-neon text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-neo-glow flex items-center gap-2 hover:scale-105 transition-all"
-           >
-             {isGenerating ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} 
-             {isGenerating ? 'Synthesizing...' : 'AI Preview'}
-           </button>
-        </div>
-      )}
-
-      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-        <div className="px-4 py-2 bg-neo-pink text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-pink-glow flex items-center gap-2">
-          <Video size={14} /> Walkthrough Ready
-        </div>
-      </div>
-      
-      <div className="absolute top-2 right-2 px-2 py-1 rounded bg-black/60 backdrop-blur-md text-[7px] font-black text-white uppercase tracking-tighter border border-white/10">
-        Signal_Grounded
-      </div>
-    </div>
-  );
-};
-
-const BuyDashboard: React.FC<BuyDashboardProps> = ({ result, lang = 'EN', onAnalyzeFinance, userBudget }) => {
-  const reportRef = useRef<HTMLDivElement>(null);
-  const [isSaved, setIsSaved] = useState(false);
-  const [viewMode, setViewMode] = useState<'dashboard' | 'stats' | 'harmony' | 'pro-report' | 'map'>('pro-report');
-  const [selectedVideo, setSelectedVideo] = useState<{prompt: string, title: string} | null>(null);
-  const [isSearchingPincode, setIsSearchingPincode] = useState(false);
+const BuyDashboard: React.FC<BuyDashboardProps> = ({ 
+  result, 
+  lang = 'EN', 
+  userBudget, 
+  onAnalyzeFinance,
+  city,
+  area
+}) => {
+  const [viewMode, setViewMode] = useState<'dashboard' | 'map' | 'essentials'>('dashboard');
+  const [essentialNodes, setEssentialNodes] = useState<any[]>([]);
   
-  const [allListings, setAllListings] = useState<SaleListing[]>(result.listings || []);
-  const [isDeepScanning, setIsDeepScanning] = useState(false);
+  // Auto-fetch essential categories
+  const autoFetchCategories = ['Grocery Store', 'Chemist/Pharmacy', 'Hospital/Clinic'];
 
   useEffect(() => {
-    setAllListings(result.listings || []);
-  }, [result.listings]);
-
-  useEffect(() => {
-    if (!result.isBudgetAlignmentFailure) {
-      confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-    }
-    const priceValue = parsePrice(result.fairValue);
-    const priceText = formatPrice(priceValue);
-    const speechText = result.isBudgetAlignmentFailure 
-      ? (lang === 'HI' ? `चेतावनी: आपकी बजट सीमा बाजार मूल्य से कम है। इस क्षेत्र में कम से कम ${formatPrice(result.suggestedMinimum || 0)} की आवश्यकता होगी।` : `Warning: Your budget is below the current market entry barrier. You will need at least ${formatPrice(result.suggestedMinimum || 0)} for this locality.`)
-      : (lang === 'HI' ? `संपत्ति का सही मूल्य ${priceText} है।` : `The asset's fair market value is ${priceText}.`);
+    const speechText = lang === 'HI' 
+      ? `संपत्ति का उचित मूल्य ${result.fairValue} है।` 
+      : `The fair market value is ${result.fairValue}.`;
     speak(speechText, lang === 'HI' ? 'hi-IN' : 'en-IN');
-  }, [result.fairValue, lang, result.isBudgetAlignmentFailure, result.suggestedMinimum]);
+  }, [result.fairValue, lang]);
 
-  const handleDownloadPDF = async () => {
-    if (!reportRef.current) return;
-    const canvas = await html2canvas(reportRef.current, { 
-      scale: 2, 
-      useCORS: true, 
-      backgroundColor: '#ffffff' 
-    });
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, (canvas.height * pageWidth) / canvas.width);
-    pdf.save(`QuantCasa_Report_${Date.now()}.pdf`);
-  };
+  // Prepare property nodes for map
+  const propertyNodes = result.comparables.map((comp, i) => ({
+    title: comp.title,
+    price: comp.price,
+    address: comp.address,
+    lat: comp.latitude,
+    lng: comp.longitude,
+    isSubject: i === 0
+  }));
 
-  const handleDeepScan = async () => {
-    if (isDeepScanning) return;
-    setIsDeepScanning(true);
-    setIsSearchingPincode(true);
-    
-    try {
-      const city = result.listings[0]?.address?.split(',').pop()?.trim() || 'Unknown City';
-      const area = result.listings[0]?.address?.split(',')[0]?.trim() || '';
-      
-      const more = await getMoreListings({
-        city,
-        area,
-        propertyType: result.listings[0]?.bhk || 'Residential',
-        size: 1100,
-        mode: 'sale'
-      });
-      
-      const formattedMore: SaleListing[] = more.map(l => ({
-        title: l.project,
-        price: formatPrice(l.price),
-        priceValue: l.price,
-        address: `${l.project}, ${area}, ${city}`,
-        pincode: result.listings[0]?.pincode || '',
-        sourceUrl: 'https://www.99acres.com',
-        bhk: result.listings[0]?.bhk || 'Residential',
-        latitude: l.latitude,
-        longitude: l.longitude
-      }));
-
-      // Filter out duplicates based on title
-      const uniqueNew = formattedMore.filter(nm => !allListings.some(al => al.title === nm.title));
-      setAllListings(prev => [...prev, ...uniqueNew]);
-      
-      confetti({ particleCount: 100, spread: 50, origin: { y: 0.8 } });
-    } catch (e) {
-      console.error("Deep Scan Failed:", e);
-    } finally {
-      setIsDeepScanning(false);
-      setIsSearchingPincode(false);
-    }
-  };
-
-  const handleShare = async () => {
-    const price = result.isBudgetAlignmentFailure ? formatPrice(result.suggestedMinimum || 0) : result.fairValue;
-    const location = allListings[0]?.address || "Selected Locality";
-    const shareText = `Just found the fair market value for a property in ${location} using QuantCasa: ${price}! Check out this AI-powered valuation report.`;
-    
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'QuantCasa Valuation Report',
-          text: shareText,
-          url: window.location.href,
-        });
-      } catch (err) {
-        console.error("Error sharing:", err);
-      }
-    } else {
-      const mailtoLink = `mailto:?subject=Property Valuation - QuantCasa&body=${encodeURIComponent(shareText + "\n\nView more at: " + window.location.href)}`;
-      window.location.href = mailtoLink;
-    }
-  };
-
-  const listingPrices = allListings.map(l => parsePrice(l.price));
-  const listingStats = calculateListingStats(listingPrices);
-  const fairValNum = parsePrice(result.fairValue);
-
-  const mapNodes = [
-    { title: "Target Asset", price: result.fairValue, address: allListings[0]?.address || "Selected Area", lat: allListings[0]?.latitude, lng: allListings[0]?.longitude, isSubject: true },
-    ...allListings.slice(1).map(l => ({
-      title: l.title,
-      price: formatPrice(parsePrice(l.price)),
-      address: l.address,
-      lat: l.latitude,
-      lng: l.longitude
-    }))
-  ];
+  // Combine property and essential nodes for map view
+  const allMapNodes = [...propertyNodes, ...essentialNodes];
 
   return (
-    <div className="h-full space-y-10 overflow-y-auto pb-24 scrollbar-hide px-2">
-      {isSearchingPincode && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 bg-neo-neon text-white rounded-full font-black text-[10px] uppercase tracking-widest shadow-neo-glow flex items-center gap-3 animate-bounce">
-          <RefreshCw size={14} className="animate-spin" /> Deep market scraping in progress...
-        </div>
-      )}
-
-      {selectedVideo && (
-        <div className="fixed inset-0 z-[500] bg-neo-bg/80 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <VideoGenerator 
-            prompt={`${selectedVideo.prompt} in ${allListings[0]?.address}`} 
-            title={selectedVideo.title} 
-            onClose={() => setSelectedVideo(null)} 
-          />
-        </div>
-      )}
-
-      <div className="bg-neo-glass border border-white/10 p-8 rounded-[48px] flex flex-wrap gap-6 items-center justify-between shadow-neo-glow no-print">
-        <div className="flex items-center gap-6">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-report-blue to-neo-neon flex items-center justify-center text-white shadow-neo-glow">
-            <Landmark size={24} />
+    <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-right-8 duration-1000 pb-20">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-neo-neon/10 rounded-2xl text-neo-neon shadow-neo-glow">
+            <Home size={24} />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-white tracking-tighter uppercase">Valuation Console</h2>
-            <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10 mt-2 overflow-x-auto scrollbar-hide">
-              <button onClick={() => setViewMode('pro-report')} className={`px-4 py-1.5 rounded-xl text-[9px] font-black transition-all uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'pro-report' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
-                <FileText size={12} /> Analyst Report
-              </button>
-              <button onClick={() => setViewMode('dashboard')} className={`px-4 py-1.5 rounded-xl text-[9px] font-black transition-all uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'dashboard' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
-                <LayoutGrid size={12} /> Live Deck
-              </button>
-              <button onClick={() => setViewMode('map')} className={`px-4 py-1.5 rounded-xl text-[9px] font-black transition-all uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'map' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
-                <MapIcon size={12} /> Map View
-              </button>
-              <button onClick={() => setViewMode('stats')} className={`px-4 py-1.5 rounded-xl text-[9px] font-black transition-all uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'stats' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
-                <BarChart3 size={12} /> Statistics
-              </button>
-              <button onClick={() => setViewMode('harmony')} className={`px-4 py-1.5 rounded-xl text-[9px] font-black transition-all uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'harmony' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
-                <Sparkle size={12} /> Harmony
-              </button>
-            </div>
+            <h2 className="text-2xl font-black text-white uppercase tracking-tighter">
+              Property Analysis
+            </h2>
+            <p className="text-[10px] text-gray-500 uppercase font-black opacity-60 tracking-widest">
+              {area}, {city}
+            </p>
           </div>
         </div>
-        <div className="flex gap-3">
-           <button onClick={handleDownloadPDF} className="px-6 py-4 bg-neo-neon text-white rounded-[20px] font-black uppercase text-[10px] tracking-widest flex items-center gap-3 shadow-neo-glow hover:scale-[1.02] active:scale-95 transition-all">
-             <Download size={16}/> Export Report
-           </button>
-           <button 
-             onClick={handleShare}
-             className="p-4 rounded-[20px] bg-white/5 border border-white/10 text-neo-pink hover:bg-white/10 transition-all shadow-glass-3d"
-             title="Share Report"
-           >
-             <Share2 size={20}/>
-           </button>
-           <button onClick={() => setIsSaved(true)} className={`p-4 rounded-[20px] border transition-all ${isSaved ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white/5 border-white/10 text-neo-neon hover:bg-white/10'}`}>
-             <Save size={20}/>
-           </button>
+
+        <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10 gap-1">
+          <button
+            onClick={() => setViewMode('dashboard')}
+            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+              viewMode === 'dashboard' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400'
+            }`}
+          >
+            <LayoutGrid size={12} className="inline mr-2" />
+            Dashboard
+          </button>
+          <button
+            onClick={() => setViewMode('map')}
+            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+              viewMode === 'map' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400'
+            }`}
+          >
+            <MapIcon size={12} className="inline mr-2" />
+            Map View
+          </button>
+          <button
+            onClick={() => setViewMode('essentials')}
+            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+              viewMode === 'essentials' ? 'bg-neo-gold text-white shadow-neo-glow' : 'text-gray-400'
+            }`}
+          >
+            <ShoppingBag size={12} className="inline mr-2" />
+            Essentials
+          </button>
         </div>
       </div>
 
-      <div ref={reportRef} className={`${viewMode === 'pro-report' ? 'bg-white' : ''} transition-colors duration-500 rounded-[40px] overflow-hidden shadow-2xl`}>
-        {viewMode === 'pro-report' && <ProfessionalReport result={result} userBudget={userBudget} />}
-        {viewMode === 'map' && <GoogleMapView nodes={mapNodes} />}
-        {viewMode === 'dashboard' && (
-          <div className="p-4 space-y-10 no-print">
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-              <div className={`xl:col-span-2 rounded-[48px] p-10 border relative overflow-hidden shadow-glass-3d group transition-all ${result.isBudgetAlignmentFailure ? 'bg-neo-pink/5 border-neo-pink/20' : 'bg-white/5 border-white/10'}`}>
-                <div className="absolute top-0 right-0 p-20 opacity-5 rotate-12 transition-transform group-hover:scale-110 duration-1000">
-                  <Landmark size={240} className={result.isBudgetAlignmentFailure ? 'text-neo-pink' : 'text-neo-neon'} />
-                </div>
-                
-                {result.isBudgetAlignmentFailure ? (
-                  <div className="relative z-10">
-                    <span className="text-[10px] font-black text-neo-pink uppercase tracking-[0.4em] mb-4 block">Market Entry Barrier</span>
-                    <div className="text-6xl font-black text-white tracking-tighter mb-4 leading-tight">
-                      {formatPrice(result.suggestedMinimum || 0)}
-                    </div>
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-8">Minimum Required Capital</p>
-                  </div>
-                ) : (
-                  <div className="relative z-10">
-                    <span className="text-[10px] font-black text-neo-neon uppercase tracking-[0.4em] mb-4 block">Precise Fair Value</span>
-                    <div className="text-6xl font-black text-white tracking-tighter mb-8 leading-tight">
-                      {formatPrice(fairValNum)}
-                    </div>
-                  </div>
-                )}
-                
-                {result.notes && (
-                  <div className={`mb-6 p-4 border rounded-2xl flex items-start gap-3 relative z-10 animate-in slide-in-from-left duration-500 ${result.isBudgetAlignmentFailure ? 'bg-neo-pink/10 border-neo-pink/20' : 'bg-white/5 border-white/10'}`}>
-                    {result.isBudgetAlignmentFailure ? <ShieldAlert className="text-neo-pink shrink-0 mt-0.5" size={18} /> : <AlertCircle className="text-neo-neon shrink-0 mt-0.5" size={18} />}
-                    <p className="text-[11px] font-bold text-gray-200 leading-relaxed italic">{result.notes}</p>
-                  </div>
-                )}
-
-                <div className="flex gap-4 relative z-10">
-                  <div className={`px-8 py-3 rounded-full text-xs font-black border uppercase tracking-widest flex items-center gap-2 ${result.isBudgetAlignmentFailure ? 'bg-neo-pink/20 text-neo-pink border-neo-pink/30' : result.recommendation === 'Fair Price' || result.recommendation === 'Good Buy' ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30' : 'bg-neo-pink/20 text-neo-pink border-neo-pink/30'}`}>
-                    {result.isBudgetAlignmentFailure ? <AlertCircle size={14}/> : result.recommendation === 'Fair Price' || result.recommendation === 'Good Buy' ? <CheckCircle size={14}/> : <AlertCircle size={14}/>}
-                    {result.isBudgetAlignmentFailure ? 'Recalibration Needed' : safeRender(result.recommendation)}
-                  </div>
-                  {result.learningSignals ? (
-                    <div className="px-6 py-3 rounded-full bg-neo-neon/10 text-neo-neon text-[9px] font-black border border-neo-neon/30 uppercase tracking-widest flex items-center gap-2 animate-pulse">
-                      <BrainCircuit size={12}/> Neural Calibration Active
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-              <div className="bg-white/5 rounded-[40px] p-10 border border-white/10 flex flex-col items-center justify-center text-center shadow-glass-3d">
-                  <TrendingUp size={40} className="text-neo-neon mb-4" />
-                  <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Sentiment</span>
-                  <div className="text-2xl font-black text-white uppercase tracking-tighter">{safeRender(result.marketSentiment)}</div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {allListings.map((l, i) => (
-                <div key={i} className="bg-white/5 rounded-[32px] p-6 border border-white/10 hover:border-neo-neon/50 transition-all shadow-glass-3d flex flex-col group animate-in slide-in-from-bottom duration-500" style={{ animationDelay: `${i % 6 * 100}ms` }}>
-                  <AIListingImage listing={l} onShowVideo={() => setSelectedVideo({prompt: l.title, title: l.title})} />
-                  <h4 className="font-black text-white text-lg leading-tight mb-2 truncate uppercase">{l.title}</h4>
-                  <div className="flex items-center gap-1.5 text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-6">
-                    <MapPin size={12} className="text-neo-neon shrink-0" /> {l.address}
-                  </div>
-                  <div className="mt-auto flex justify-between items-center pt-4 border-t border-white/5">
-                    <div className="text-lg font-black text-neo-neon">{formatPrice(parsePrice(l.price))}</div>
-                    <a href={l.sourceUrl} target="_blank" rel="noopener" className="p-3 bg-white/5 rounded-xl hover:bg-neo-neon hover:text-white transition-all">
-                      <Share2 size={16} />
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {allListings.length > 0 && (
-              <div className="flex flex-col items-center gap-6 py-10">
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em]">End of Current Grounded Signal</p>
-                <button 
-                  onClick={handleDeepScan}
-                  disabled={isDeepScanning}
-                  className="px-12 py-5 bg-white/5 border border-white/10 rounded-full text-xs font-black uppercase tracking-widest text-white hover:bg-neo-neon hover:border-neo-neon transition-all flex items-center gap-3 shadow-neo-glow group active:scale-95 disabled:opacity-50"
+      {viewMode === 'dashboard' && (
+        <>
+          {/* Existing Buy Dashboard Content */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 border-t-2 border-t-neo-neon shadow-glass-3d">
+              <span className="text-[10px] font-black text-neo-neon uppercase block mb-1">Fair Value</span>
+              <div className="text-4xl font-black text-white tracking-tighter">{result.fairValue}</div>
+              {onAnalyzeFinance && (
+                <button
+                  onClick={onAnalyzeFinance}
+                  className="mt-6 w-full px-4 py-2 rounded-xl bg-neo-neon/10 border border-neo-neon/30 text-neo-neon text-[10px] font-black uppercase tracking-widest hover:bg-neo-neon hover:text-white transition-all flex items-center justify-center gap-2"
                 >
-                  {isDeepScanning ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} className="group-hover:rotate-90 transition-transform" />}
-                  {isDeepScanning ? 'Performing Deep Spatial Scan...' : 'See More Properties'}
+                  <TrendingUp size={12} /> Fiscal Simulator
                 </button>
-              </div>
-            )}
+              )}
+            </div>
 
-            {allListings.length === 0 && (
-                <div className="col-span-full text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10 animate-in fade-in duration-700">
-                   <Building2 size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
-                   <p className="text-gray-500 font-black uppercase tracking-widest text-xs">
-                     {result.isBudgetAlignmentFailure ? 'No properties found within your selected budget.' : 'No direct listing matches found.'}
-                   </p>
-                   <p className="text-[10px] text-gray-600 uppercase mt-2">
-                     {result.isBudgetAlignmentFailure ? `Grounded entry barrier identified at ~${formatPrice(result.suggestedMinimum || 0)}.` : 'Valuation derived via neural calibration nodes.'}
-                   </p>
-                </div>
-            )}
+            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 border-t-2 border-t-emerald-500 shadow-glass-3d">
+              <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Appreciation</span>
+              <div className="text-4xl font-black text-emerald-500 tracking-tighter">
+                {result.appreciationRate}
+              </div>
+            </div>
+
+            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 border-t-2 border-t-neo-gold shadow-glass-3d">
+              <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Market Score</span>
+              <div className="text-4xl font-black text-white tracking-tighter">
+                {result.confidenceScore}/100
+              </div>
+            </div>
           </div>
-        )}
-        {viewMode === 'stats' && listingStats && <MarketStats stats={listingStats} prices={listingPrices} />}
-        {viewMode === 'harmony' && <HarmonyDashboard contextResult={result} lang={lang} />}
-      </div>
+
+          {userBudget && (
+            <div className="bg-gradient-to-r from-neo-pink/10 to-neo-neon/10 border border-neo-pink/20 rounded-[32px] p-6 flex items-center gap-4">
+              <AlertCircle size={24} className="text-neo-pink shrink-0" />
+              <div className="flex-1">
+                <h4 className="text-sm font-black text-white uppercase mb-1">Budget Analysis</h4>
+                <p className="text-xs text-gray-400">
+                  Your budget: ₹{(userBudget / 10000000).toFixed(2)} Cr • 
+                  Fair value: {result.fairValue} • 
+                  {/* Add budget comparison logic */}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 border-l-4 border-l-neo-neon">
+            <h3 className="text-xs font-black text-white mb-4 uppercase tracking-widest">
+              Market Intelligence
+            </h3>
+            <p className="text-gray-300 leading-relaxed italic text-sm">
+              "{result.valuationJustification}"
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {result.comparables.map((comp, idx) => (
+              <div
+                key={idx}
+                className="bg-white/5 border border-white/10 rounded-[32px] p-8 shadow-glass-3d hover:border-neo-neon/40 transition-all"
+              >
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h4 className="font-black text-white text-lg uppercase leading-tight">
+                      {comp.title}
+                    </h4>
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mt-1">
+                      {comp.address}
+                    </p>
+                  </div>
+                  <div className="text-xl font-black text-white">{comp.price}</div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4 mb-6 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                    {comp.sqft || 'N/A'} SQFT
+                  </div>
+                  <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                    {comp.bedrooms || 'N/A'} BHK
+                  </div>
+                  <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                    {comp.age || 'N/A'}
+                  </div>
+                </div>
+
+                <a
+                  href={comp.sourceUrl}
+                  target="_blank"
+                  rel="noopener"
+                  className="w-full py-4 rounded-2xl bg-neo-neon text-white text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-neo-glow transition-all active:scale-95"
+                >
+                  Verify Listing
+                </a>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {viewMode === 'map' && (
+        <GoogleMapView 
+          nodes={allMapNodes} 
+          showEssentials={essentialNodes.length > 0}
+        />
+      )}
+
+      {viewMode === 'essentials' && (
+        <EssentialsDashboard
+          city={city}
+          area={area}
+          autoFetchCategories={autoFetchCategories}
+          propertyNodes={propertyNodes}
+        />
+      )}
     </div>
   );
 };
