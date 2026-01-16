@@ -45,13 +45,10 @@ export function formatRent(val: number): string {
 // Critical fix: Parse the LLM response properly
 async function parseLLMResponse(raw: any): Promise<any> {
   try {
-    // Backend sends JSON string in "text" field for fallback
     if (raw.text && typeof raw.text === 'string') {
-      // Clean up any markdown or extra text
       const cleaned = raw.text.replace(/```json|```/g, '').trim();
       return JSON.parse(cleaned);
     }
-    // If already structured (unlikely but safe)
     return raw;
   } catch (e) {
     console.error('LLM response parse failed:', e, raw);
@@ -69,16 +66,13 @@ export async function getBuyAnalysis(req: BuyRequest): Promise<BuyResult> {
     facing: req.facing,
     budget: (req as any).budget
   });
-
-  // Parse LLM response if needed
   const parsed = await parseLLMResponse(valuation);
-
   return {
     fairValue: formatPrice(valuation.estimatedValue || parsed.fairValue),
     valuationRange: `${formatPrice(valuation.rangeLow || 0)} - ${formatPrice(valuation.rangeHigh || 0)}`,
     recommendation: (valuation as any).recommendation || parsed.recommendation || 'Fair Price',
     negotiationScript: valuation.negotiationScript || parsed.negotiationScript || "Leverage market comps.",
-    listings: parsed.listings || valuation.comparables || [], // ← key fix: use parsed.listings
+    listings: parsed.listings || valuation.comparables || [],
     marketSentiment: (valuation as any).marketSentiment || 'Stable',
     sentimentScore: (valuation as any).sentimentScore || 80,
     registrationEstimate: valuation.registrationEstimate || formatPrice((valuation.estimatedValue || 0) * 0.07),
@@ -95,7 +89,6 @@ export async function getBuyAnalysis(req: BuyRequest): Promise<BuyResult> {
   };
 }
 
-// Apply same parse fix to other analysis functions
 export async function getRentAnalysis(req: RentRequest): Promise<RentResult> {
   const valuation = await getRentValuationInternal({
     city: req.city,
@@ -105,9 +98,7 @@ export async function getRentAnalysis(req: RentRequest): Promise<RentResult> {
     size: req.sqft,
     budget: (req as any).budget
   });
-
   const parsed = await parseLLMResponse(valuation);
-
   return {
     rentalValue: formatRent(valuation.estimatedValue || parsed.fairValue),
     yieldPercentage: valuation.yieldPercentage || parsed.yieldPercentage || "3-4%",
@@ -119,7 +110,7 @@ export async function getRentAnalysis(req: RentRequest): Promise<RentResult> {
     confidenceScore: valuation.confidence === 'high' ? 90 : 70,
     valuationJustification: valuation.valuationJustification || "Leasehold analysis complete.",
     propertiesFoundCount: valuation.comparables?.length || parsed.listings?.length || 0,
-    listings: parsed.listings || valuation.comparables || [], // ← key fix
+    listings: parsed.listings || valuation.comparables || [],
     insights: [],
     groundingSources: valuation.groundingSources || [],
     isBudgetAlignmentFailure: valuation.isBudgetAlignmentFailure,
@@ -128,7 +119,6 @@ export async function getRentAnalysis(req: RentRequest): Promise<RentResult> {
   };
 }
 
-// Similar fixes for Land and Commercial
 export async function getLandValuationAnalysis(req: LandRequest): Promise<LandResult> {
   const valuation = await getLandValuationInternal({
     city: req.city,
@@ -138,9 +128,7 @@ export async function getLandValuationAnalysis(req: LandRequest): Promise<LandRe
     size: req.plotSize,
     budget: (req as any).budget
   });
-
   const parsed = await parseLLMResponse(valuation);
-
   return {
     landValue: formatPrice(valuation.estimatedValue || parsed.fairValue),
     perSqmValue: `₹${(valuation.pricePerUnit || 0).toLocaleString()} / sqyd`,
@@ -164,9 +152,7 @@ export async function getCommercialAnalysis(req: CommercialRequest): Promise<Com
     propertyType: req.type,
     size: req.sqft
   });
-
   const parsed = await parseLLMResponse(valuation);
-
   const listings: CommercialListing[] = (parsed.listings || valuation.comparables || []).map((l: any) => ({
     title: l.title || "Commercial Hub",
     price: l.price,
@@ -178,7 +164,6 @@ export async function getCommercialAnalysis(req: CommercialRequest): Promise<Com
     latitude: l.latitude,
     longitude: l.longitude
   }));
-
   return {
     fairValue: req.intent === 'Buy' ? formatPrice(valuation.estimatedValue || parsed.fairValue) : formatRent(valuation.estimatedValue || parsed.fairValue),
     yieldPotential: valuation.yieldPercentage || parsed.yieldPotential || "N/A",
@@ -191,7 +176,7 @@ export async function getCommercialAnalysis(req: CommercialRequest): Promise<Com
   };
 }
 
-// The missing function that caused the build failure — added here
+// MISSING FUNCTION THAT CAUSED BUILD FAILURE — ADDED HERE
 export async function resolveLocalityData(
   query: string,
   city: string,
@@ -211,10 +196,7 @@ export async function resolveLocalityData(
   }
 }
 
-// Rest of your functions (copy them as-is from your original file)
-// ... getEssentialsAnalysis, askCibilExpert, analyzeImageForHarmony, askPropertyQuestion, generatePropertyImage ...
-
-// Export everything at the bottom (prevents "not exported" errors)
+// Export everything so imports work
 export {
   parsePrice,
   formatPrice,
@@ -224,5 +206,5 @@ export {
   getLandValuationAnalysis,
   getCommercialAnalysis,
   resolveLocalityData,
-  // add other functions here if they are imported elsewhere
+  // add any other functions you import elsewhere
 };
