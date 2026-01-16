@@ -22,19 +22,15 @@ export default function GoogleMapView({
   const mapRef = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null);
   const markers = useRef<any[]>([]);
-  const [budget, setBudget] = useState(10000000);
+  const [budget, setBudget] = useState<number | null>(null);
 
   // ---------- LOAD MAP ----------
   useEffect(() => {
-    loadMap();
+    if (!window.google?.maps) loadScript();
+    else initMap();
   }, []);
 
-  async function loadMap() {
-    if (window.google?.maps) {
-      initMap();
-      return;
-    }
-
+  function loadScript() {
     const script = document.createElement("script");
     script.src = `https://maps.googleapis.com/maps/api/js?key=${
       import.meta.env.VITE_GOOGLE_MAPS_API_KEY
@@ -55,37 +51,35 @@ export default function GoogleMapView({
 
     map.current = new Map(mapRef.current, {
       center: { lat: 18.5204, lng: 73.8567 },
-      zoom: 13,
+      zoom: 12,
       mapId: import.meta.env.VITE_GOOGLE_MAP_ID,
       disableDefaultUI: true,
     });
 
     initAutocomplete(PlaceAutocompleteElement);
-    renderMarkers();
   }
 
-  // ---------- AUTOCOMPLETE (NEW API) ----------
+  // ---------- AUTOCOMPLETE ----------
   function initAutocomplete(PlaceAutocompleteElement: any) {
     const container = document.getElementById("autocomplete-container");
     if (!container) return;
 
     container.innerHTML = "";
 
-    const autocomplete = new PlaceAutocompleteElement({
-      types: ["locality", "sublocality", "administrative_area_level_2"],
+    const ac = new PlaceAutocompleteElement({
+      types: ["locality", "sublocality"],
     });
 
-    autocomplete.addEventListener("gmp-placeselect", async (e: any) => {
+    ac.addEventListener("gmp-placeselect", async (e: any) => {
       const place = e.place;
       await place.fetchFields({ fields: ["location"] });
+      if (!place.location) return;
 
-      if (place.location) {
-        map.current.panTo(place.location);
-        map.current.setZoom(14);
-      }
+      map.current.panTo(place.location);
+      map.current.setZoom(14);
     });
 
-    container.appendChild(autocomplete);
+    container.appendChild(ac);
   }
 
   // ---------- MARKERS ----------
@@ -95,15 +89,16 @@ export default function GoogleMapView({
   }
 
   function renderMarkers() {
-    if (!map.current) return;
+    if (!map.current || properties.length === 0) return;
 
     clearMarkers();
 
     const AdvancedMarker =
       window.google.maps.marker.AdvancedMarkerElement;
+    const bounds = new window.google.maps.LatLngBounds();
 
     properties
-      .filter((p) => p.price <= budget)
+      .filter((p) => (budget ? p.price <= budget : true))
       .forEach((p) => {
         const el = document.createElement("div");
         el.className =
@@ -116,32 +111,48 @@ export default function GoogleMapView({
           content: el,
         });
 
+        bounds.extend(marker.position);
         markers.current.push(marker);
       });
+
+    if (!bounds.isEmpty()) map.current.fitBounds(bounds);
   }
 
+  // ---------- WHEN DATA ARRIVES ----------
+  useEffect(() => {
+    if (properties.length === 0) return;
+
+    const maxPrice = Math.max(...properties.map((p) => p.price));
+    setBudget(maxPrice);
+    renderMarkers();
+  }, [properties]);
+
+  // ---------- FILTER ----------
   useEffect(() => {
     if (map.current) renderMarkers();
-  }, [budget, properties]);
+  }, [budget]);
 
   return (
     <div className="w-full h-full relative">
-      {/* Controls */}
       <div className="absolute top-4 left-4 z-10 bg-white p-4 rounded-xl shadow-lg w-72">
         <div id="autocomplete-container" className="mb-3" />
 
-        <label className="text-sm font-semibold">
-          Budget: ₹{(budget / 100000).toFixed(1)}L
-        </label>
-        <input
-          type="range"
-          min={1000000}
-          max={50000000}
-          step={500000}
-          value={budget}
-          onChange={(e) => setBudget(Number(e.target.value))}
-          className="w-full"
-        />
+        {budget && (
+          <>
+            <label className="text-sm font-semibold">
+              Budget: ₹{(budget / 100000).toFixed(1)}L
+            </label>
+            <input
+              type="range"
+              min={1000000}
+              max={budget}
+              step={500000}
+              value={budget}
+              onChange={(e) => setBudget(Number(e.target.value))}
+              className="w-full"
+            />
+          </>
+        )}
       </div>
 
       <div ref={mapRef} className="w-full h-full" />
