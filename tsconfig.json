@@ -11,12 +11,12 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    // Strict mode kept, but relaxed the most problematic flags
-    "strict": true,                           // kept – good practice
-    "noImplicitAny": false,                   // ← relaxed – most common deployment blocker
-    "noUnusedLocals": false,                  // ← relaxed – many components have unused props/vars
-    "noUnusedParameters": false,              // ← relaxed – frequent in callbacks
-    "noFallthroughCasesInSwitch": true,       // kept – safe
+    // Relaxed only these — keeps most safety
+    "strict": true,
+    "noImplicitAny": false,               // ← critical: stops implicit any errors
+    "noUnusedLocals": false,              // ← stops unused variable errors
+    "noUnusedParameters": false,          // ← stops unused param errors
+    "noFallthroughCasesInSwitch": true,
 
     "types": ["node"]
   },
