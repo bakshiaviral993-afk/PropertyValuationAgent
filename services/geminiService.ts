@@ -12,9 +12,7 @@ import {
 import { callLLMWithFallback } from "./llmFallback";
 import { getBuyValuation, getRentValuationInternal, getLandValuationInternal, getCommercialValuationInternal } from "./valuationService";
 
-// ────────────────────────────────────────────────
 // Price parsing helpers (unchanged)
-// ────────────────────────────────────────────────
 export function parsePrice(p: any): number {
   if (p === null || p === undefined) return 0;
   if (typeof p === 'number') return p;
@@ -44,9 +42,7 @@ export function formatRent(val: number): string {
   return `₹${val.toLocaleString('en-IN')}`;
 }
 
-// ────────────────────────────────────────────────
-// LLM Response Parser (unchanged)
-// ────────────────────────────────────────────────
+// Critical fix: Parse the LLM response properly
 async function parseLLMResponse(raw: any): Promise<any> {
   try {
     if (raw.text && typeof raw.text === 'string') {
@@ -60,9 +56,6 @@ async function parseLLMResponse(raw: any): Promise<any> {
   }
 }
 
-// ────────────────────────────────────────────────
-// Your original analysis functions (kept exactly as-is)
-// ────────────────────────────────────────────────
 export async function getBuyAnalysis(req: BuyRequest): Promise<BuyResult> {
   const valuation = await getBuyValuation({
     city: req.city,
@@ -173,7 +166,7 @@ export async function getCommercialAnalysis(req: CommercialRequest): Promise<Com
   }));
   return {
     fairValue: req.intent === 'Buy' ? formatPrice(valuation.estimatedValue || parsed.fairValue) : formatRent(valuation.estimatedValue || parsed.fairValue),
-    yieldPotential: valuation.yieldPercentage || parsed.yieldPotential || "N/A",
+    yieldPotential: valuation.yieldPercentage || parsed.yieldPercentage || "N/A",
     footfallScore: valuation.learningSignals || 70,
     businessInsights: valuation.notes || parsed.note || "Analyzed via commercial market node.",
     negotiationScript: valuation.negotiationScript || "Focus on lease fit-out periods.",
@@ -184,8 +177,8 @@ export async function getCommercialAnalysis(req: CommercialRequest): Promise<Com
 }
 
 // ────────────────────────────────────────────────
-// Previously added functions (kept unchanged)
-// ────────────────────────────────────────────────
+ // The missing function that caused the previous build failure — kept here
+ // ────────────────────────────────────────────────
 export async function resolveLocalityData(
   query: string,
   city: string,
@@ -205,6 +198,24 @@ export async function resolveLocalityData(
   }
 }
 
+// ────────────────────────────────────────────────
+ // Added missing functions for App.tsx and EssentialsDashboard (getEssentialsAnalysis, etc.)
+ // ────────────────────────────────────────────────
+export async function getEssentialsAnalysis(category: string, city: string, area: string): Promise<EssentialResult> {
+  const prompt = `Find 5 real local business contacts for "${category}" in ${area}, ${city}. Output STRICT JSON: {"category": "${category}", "services": [{"name": string, "contact": string, "address": string, "rating": string, "distance": string, "isOpen": boolean, "sourceUrl": string}], "neighborhoodContext": string}`;
+  const { text } = await callLLMWithFallback(prompt, { temperature: 0.1 });
+  try {
+    const cleanedText = text.replace(/```json|```/g, '').trim();
+    return JSON.parse(cleanedText);
+  } catch {
+    const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    return jsonMatch ? JSON.parse(jsonMatch[0]) : { category, services: [], neighborhoodContext: "Search failed." };
+  }
+}
+
+// ────────────────────────────────────────────────
+ // Added missing functions from PropertyChat.tsx (askPropertyQuestion, generatePropertyImage, analyzeImageForHarmony)
+ // ────────────────────────────────────────────────
 export async function askPropertyQuestion(
   messages: ChatMessage[],
   contextResult?: any,
@@ -268,8 +279,8 @@ MANDATORY OUTPUT FORMAT:
 }
 
 // ────────────────────────────────────────────────
-// NEW: Add the missing askCibilExpert function (imported in CibilCoach.tsx)
-// ────────────────────────────────────────────────
+ // Added missing askCibilExpert (for CibilCoach.tsx)
+ // ────────────────────────────────────────────────
 export async function askCibilExpert(messages: ChatMessage[], currentScore: number): Promise<string> {
   const history = messages.map(m => `${m.sender}: ${m.text}`).join('\n');
   const prompt = `QuantCasa Credit Health Expert. Score: ${currentScore}. History: ${history}. Ask one diagnostic question with OPTIONS: [O1, O2].`;
@@ -283,6 +294,5 @@ export async function askCibilExpert(messages: ChatMessage[], currentScore: numb
 }
 
 // ────────────────────────────────────────────────
-// Exports — individual exports only (no duplicate block)
-// ────────────────────────────────────────────────
-// All functions above are already exported — no need for extra export { ... }
+ // No duplicate export block — individual exports are sufficient
+ // ────────────────────────────────────────────────
