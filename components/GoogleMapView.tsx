@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { MarkerClusterer } from "@googlemaps/markerclusterer";
 import { usePropertyMapStore } from "@/components/store/usePropertyMapStore";
 
 const MAP_ID = "2185f915fc843bc0827abfdd";
 
 declare global {
   interface Window {
-    initMap: () => void;
     google: any;
+    MarkerClusterer: any;
+    initMap: () => void;
   }
 }
 
@@ -17,27 +17,37 @@ export default function GoogleMapView() {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const map = useRef<any>(null);
   const markers = useRef<any[]>([]);
+  const clusterer = useRef<any>(null);
 
   const { properties, setSelectedId, setHoveredId } =
     usePropertyMapStore();
 
   useEffect(() => {
-    if (window.google) {
+    if (window.google && window.MarkerClusterer) {
       initMap();
       return;
     }
 
     window.initMap = initMap;
 
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&v=weekly&libraries=marker&callback=initMap`;
-    script.async = true;
-    script.defer = true;
-    document.head.appendChild(script);
+    // Google Maps
+    const mapScript = document.createElement("script");
+    mapScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&v=weekly&libraries=marker&callback=initMap`;
+    mapScript.async = true;
+    mapScript.defer = true;
+
+    // MarkerClusterer CDN
+    const clusterScript = document.createElement("script");
+    clusterScript.src =
+      "https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js";
+    clusterScript.async = true;
+
+    document.head.appendChild(mapScript);
+    document.head.appendChild(clusterScript);
   }, []);
 
   const initMap = () => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !window.google) return;
 
     map.current = new google.maps.Map(mapRef.current, {
       center: { lat: 18.5204, lng: 73.8567 },
@@ -49,8 +59,9 @@ export default function GoogleMapView() {
   };
 
   const renderMarkers = () => {
-    if (!map.current) return;
+    if (!map.current || !window.google) return;
 
+    // Clear old markers
     markers.current.forEach((m) => (m.map = null));
     markers.current = [];
 
@@ -79,10 +90,15 @@ export default function GoogleMapView() {
 
     markers.current = newMarkers;
 
-    new MarkerClusterer({
-      map: map.current,
-      markers: newMarkers,
-    });
+    // Cluster
+    if (clusterer.current) clusterer.current.clearMarkers();
+
+    if (window.MarkerClusterer) {
+      clusterer.current = new window.MarkerClusterer({
+        map: map.current,
+        markers: newMarkers,
+      });
+    }
   };
 
   useEffect(() => {
