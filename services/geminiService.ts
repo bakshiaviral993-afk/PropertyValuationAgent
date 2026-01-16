@@ -12,7 +12,9 @@ import {
 import { callLLMWithFallback } from "./llmFallback";
 import { getBuyValuation, getRentValuationInternal, getLandValuationInternal, getCommercialValuationInternal } from "./valuationService";
 
-// Price parsing helpers (unchanged)
+// ────────────────────────────────────────────────
+// Price parsing helpers (unchanged from your original)
+// ────────────────────────────────────────────────
 export function parsePrice(p: any): number {
   if (p === null || p === undefined) return 0;
   if (typeof p === 'number') return p;
@@ -42,7 +44,9 @@ export function formatRent(val: number): string {
   return `₹${val.toLocaleString('en-IN')}`;
 }
 
-// Critical fix: Parse the LLM response properly
+// ────────────────────────────────────────────────
+// LLM Response Parser (unchanged)
+// ────────────────────────────────────────────────
 async function parseLLMResponse(raw: any): Promise<any> {
   try {
     if (raw.text && typeof raw.text === 'string') {
@@ -56,6 +60,9 @@ async function parseLLMResponse(raw: any): Promise<any> {
   }
 }
 
+// ────────────────────────────────────────────────
+// Your original analysis functions (kept exactly as-is)
+// ────────────────────────────────────────────────
 export async function getBuyAnalysis(req: BuyRequest): Promise<BuyResult> {
   const valuation = await getBuyValuation({
     city: req.city,
@@ -176,7 +183,10 @@ export async function getCommercialAnalysis(req: CommercialRequest): Promise<Com
   };
 }
 
-// The missing function that caused the previous build failure — kept here
+// ────────────────────────────────────────────────
+// Previously missing functions — added to fix import errors
+// ────────────────────────────────────────────────
+
 export async function resolveLocalityData(
   query: string,
   city: string,
@@ -196,8 +206,73 @@ export async function resolveLocalityData(
   }
 }
 
-// Rest of your functions (getEssentialsAnalysis, askCibilExpert, etc.) remain unchanged
-// ... copy them as-is from your original file
+// Added: askPropertyQuestion (imported & used in PropertyChat.tsx)
+export async function askPropertyQuestion(
+  messages: ChatMessage[],
+  contextResult?: any,
+  lang: 'EN' | 'HI' = 'EN',
+  intent: 'general' | 'vastu' | 'interior' | 'feng-shui' = 'general'
+): Promise<string> {
+  const sysPrompt = `You are the QuantCasa Expert AI. Intent: ${intent.toUpperCase()}. Respond in a structured, logical breakdown.
+  - Tip: [Summary]
+  - Details: [Bullet points]
+  - Suggestions: [Interactive buttons]`;
 
-// NO duplicate export block here — that was causing the "multiple exports" error
-// The individual exports above are sufficient
+  const lastMessage = messages[messages.length - 1]?.text || '';
+
+  const { text } = await callLLMWithFallback(lastMessage, {
+    systemInstruction: sysPrompt,
+    temperature: 0.7,
+    ...(contextResult && { context: contextResult })
+  });
+
+  return text;
+}
+
+// Added: generatePropertyImage (imported & used in PropertyChat.tsx)
+export async function generatePropertyImage(prompt: string): Promise<string | null> {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: { parts: [{ text: `High-res architectural render: ${prompt}. Cinematic realism.` }] },
+      config: { imageConfig: { aspectRatio: "16:9" } }
+    });
+
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
+    }
+    return null;
+  } catch (err) {
+    console.error('Image generation failed:', err);
+    return null;
+  }
+}
+
+// Added: analyzeImageForHarmony (mentioned in earlier versions — kept for completeness)
+export async function analyzeImageForHarmony(base64Data: string, type: string): Promise<string> {
+  const prompt = `Analyze this property image for 2026 trendy ${type} compliance. Detect spatial zones, energy flow, and architectural defects. Suggest trendy Biophilic improvements.
+MANDATORY OUTPUT FORMAT:
+- Tip: [Short summary]
+- Details:
+  - Step 1: [Observation]
+  - Step 2: [Remedy]
+- Suggestions:
+  - [Follow-up 1]
+  - [Follow-up 2]`;
+
+  const { text } = await callLLMWithFallback(prompt, {
+    image: { data: base64Data.split(',')[1], mimeType: 'image/jpeg' },
+    model: 'gemini-3-flash-preview'
+  });
+
+  return text;
+}
+
+// ────────────────────────────────────────────────
+// Exports (individual exports are sufficient — no duplicate block needed)
+// ────────────────────────────────────────────────
+// All functions above are already exported individually
+// No need for extra export { ... } block — it causes duplicate export errors
