@@ -11,7 +11,6 @@ import {
 } from "../types";
 import { callLLMWithFallback } from "./llmFallback";
 import { getBuyValuation, getRentValuationInternal, getLandValuationInternal, getCommercialValuationInternal } from "./valuationService";
-
 // Price parsing helpers (unchanged)
 export function parsePrice(p: any): number {
   if (p === null || p === undefined) return 0;
