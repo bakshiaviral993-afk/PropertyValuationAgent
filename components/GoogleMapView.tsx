@@ -15,7 +15,7 @@ interface GoogleMapViewProps {
   nodes: MapNode[];
 }
 
-const MAP_ID = "DEMO_MAP_ID";
+const MAP_ID = "2185f915fc843bc0827abfdd";
 
 declare global {
   interface Window {
