@@ -1,3 +1,7 @@
+// llmFallback.ts
+// Updated: Added type annotations for TS safety and better error handling
+// Date: 16-Jan-2026
+
 export interface LLMResponse {
   text: string;
   source: 'gemini' | 'perplexity_scraper' | 'market_fallback';
@@ -7,7 +11,7 @@ export interface LLMResponse {
 /**
  * Executes a fetch with exponential backoff retry logic.
  */
-async function fetchWithRetry(url: string, options: any, maxRetries = 3): Promise<Response> {
+async function fetchWithRetry(url: string, options: RequestInit, maxRetries: number = 3): Promise<Response> {
   let lastError: any;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
