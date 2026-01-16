@@ -1,112 +1,93 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Loader } from "@googlemaps/js-api-loader";
 import { MarkerClusterer } from "@googlemaps/markerclusterer";
 import { usePropertyMapStore } from "@/components/store/usePropertyMapStore";
 
-const MAP_ID = "2185f915fc843bc0827abfdd"; // YOUR MAP ID
+const MAP_ID = "2185f915fc843bc0827abfdd";
+
+declare global {
+  interface Window {
+    initMap: () => void;
+    google: any;
+  }
+}
 
 export default function GoogleMapView() {
   const mapRef = useRef<HTMLDivElement | null>(null);
-  const mapInstance = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+  const map = useRef<any>(null);
+  const markers = useRef<any[]>([]);
 
-  const {
-    properties,
-    setSelectedId,
-    setHoveredId,
-    selectedId,
-  } = usePropertyMapStore();
+  const { properties, setSelectedId, setHoveredId } =
+    usePropertyMapStore();
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (window.google) {
+      initMap();
+      return;
+    }
 
-    const loader = new Loader({
-      apiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-      version: "weekly",
-      libraries: ["marker"],
-    });
+    window.initMap = initMap;
 
-    loader.load().then(() => {
-      mapInstance.current = new google.maps.Map(mapRef.current!, {
-        center: { lat: 18.5204, lng: 73.8567 }, // Pune default
-        zoom: 11,
-        mapId: MAP_ID,
-      });
-
-      renderMarkers();
-    });
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&v=weekly&libraries=marker&callback=initMap`;
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
   }, []);
 
+  const initMap = () => {
+    if (!mapRef.current) return;
+
+    map.current = new google.maps.Map(mapRef.current, {
+      center: { lat: 18.5204, lng: 73.8567 },
+      zoom: 11,
+      mapId: MAP_ID,
+    });
+
+    renderMarkers();
+  };
+
   const renderMarkers = () => {
-    if (!mapInstance.current) return;
+    if (!map.current) return;
 
-    // Clear old markers
-    markersRef.current.forEach((m) => (m.map = null));
-    markersRef.current = [];
+    markers.current.forEach((m) => (m.map = null));
+    markers.current = [];
 
-    const markers = properties.map((property) => {
+    const newMarkers = properties.map((p) => {
       const el = document.createElement("div");
       el.className =
-        "bg-black text-white px-3 py-1 rounded-xl shadow-lg text-sm cursor-pointer";
+        "bg-black text-white px-3 py-1 rounded-xl shadow text-sm cursor-pointer";
       el.innerHTML = `
-        ₹${property.price.toLocaleString("en-IN")}
-        <div class="text-[10px] opacity-80">${property.address}</div>
+        ₹${p.price.toLocaleString("en-IN")}
+        <div class="text-[10px] opacity-70">${p.address}</div>
       `;
 
-      el.onclick = () => {
-        setSelectedId(property.id);
-        mapInstance.current?.panTo({
-          lat: property.lat,
-          lng: property.lng,
-        });
-      };
+      el.onclick = () => setSelectedId(p.id);
 
       const marker = new google.maps.marker.AdvancedMarkerElement({
-        map: mapInstance.current!,
-        position: { lat: property.lat, lng: property.lng },
+        map: map.current,
+        position: { lat: p.lat, lng: p.lng },
         content: el,
       });
 
-      marker.addListener("mouseover", () =>
-        setHoveredId(property.id)
-      );
-
-      marker.addListener("mouseout", () =>
-        setHoveredId(null)
-      );
+      marker.addListener("mouseover", () => setHoveredId(p.id));
+      marker.addListener("mouseout", () => setHoveredId(null));
 
       return marker;
     });
 
-    markersRef.current = markers;
+    markers.current = newMarkers;
 
     new MarkerClusterer({
-      map: mapInstance.current!,
-      markers,
+      map: map.current,
+      markers: newMarkers,
     });
   };
 
   useEffect(() => {
-    if (!mapInstance.current) return;
     renderMarkers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [properties]);
-
-  useEffect(() => {
-    if (!selectedId) return;
-
-    const marker = markersRef.current.find(
-      (m) => (m.content as HTMLElement)?.innerText.includes(selectedId) === false
-    );
-
-    if (marker) {
-      mapInstance.current?.panTo(marker.position as google.maps.LatLngLiteral);
-    }
-  }, [selectedId]);
 
   return <div ref={mapRef} className="w-full h-full rounded-xl" />;
 }
