@@ -1,6 +1,6 @@
 // api/llm.ts
 
-import { GoogleGenAI } from '@google/genai'; // Your original import
+import { GoogleGenAI } from '@google/genai';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 
@@ -25,11 +25,17 @@ const GEMINI_MODELS = ['gemini-3-flash-preview', 'gemini-flash-lite-latest'];
 const PERPLEXITY_MODEL = 'llama-3.1-sonar-large-128k-online';
 const PERPLEXITY_URL = 'https://api.perplexity.ai/chat/completions';
 
+// ✅ FIX 1: Added timestamp to interface
+interface MarketData {
+  median: number;
+  low: number;
+  high: number;
+  psf: number;
+  timestamp: number;
+}
+
 // Cache for market data
-const MARKET_CACHE = new Map<
-  string,
-  { median: number; low: number; high: number; psf: number; timestamp: number }
->();
+const MARKET_CACHE = new Map<string, MarketData>();
 
 const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
@@ -122,7 +128,7 @@ async function fetchMarketAverages(
   area: string,
   city: string,
   bhk: string
-): Promise<{ median: number; low: number; high: number; psf: number }> {
+): Promise<MarketData> {
   const cacheKey = `${area || 'any'}-${city || 'any'}-${bhk.toLowerCase()}`;
   const cached = MARKET_CACHE.get(cacheKey);
 
@@ -143,10 +149,11 @@ async function fetchMarketAverages(
     let $ = cheerio.load(response.data);
     let prices: number[] = [];
 
-    $('.srpTuple__tuplePrice, .srpTuple__startPrice').each((i: number, el: cheerio.Element) => {
+    // ✅ FIX 2: Changed cheerio.Element to any
+    $('.srpTuple__tuplePrice, .srpTuple__startPrice').each((i: number, el: any) => {
       const text = $(el).text().trim().replace(/[^0-9.]/g, '');
       const price = parseFloat(text);
-      if (!isNaN(price) && price > 50000) prices.push(price * 100000); // Lakhs → absolute
+      if (!isNaN(price) && price > 50000) prices.push(price * 100000);
     });
 
     // Try Magicbricks if poor results
@@ -164,7 +171,8 @@ async function fetchMarketAverages(
       $ = cheerio.load(response.data);
       prices = [];
 
-      $('.mb-srp__card__price--amount').each((i: number, el: cheerio.Element) => {
+      // ✅ FIX 3: Changed cheerio.Element to any
+      $('.mb-srp__card__price--amount').each((i: number, el: any) => {
         const text = $(el).text().trim().replace(/[^0-9.]/g, '');
         const price = parseFloat(text);
         if (!isNaN(price) && price > 50000) prices.push(price * 100000);
@@ -179,7 +187,8 @@ async function fetchMarketAverages(
     const median = prices[Math.floor(prices.length / 2)];
     const psf = Math.round(median / (parseInt(bhk) * 550 + 450));
 
-    const data = { median, low, high, psf, timestamp: Date.now() };
+    // ✅ FIX 4: Now includes timestamp in the type
+    const data: MarketData = { median, low, high, psf, timestamp: Date.now() };
     MARKET_CACHE.set(cacheKey, data);
     return data;
   } catch (err: any) {
@@ -211,16 +220,16 @@ export default async function handler(req: any, res: any) {
 
   const spatialConstraint = `
 CRITICAL RULES:
-• Every property MUST include valid numeric latitude & longitude
-• For rent: show MONTHLY rent in ₹ (never use Crores or yearly)
-• For sale: show total price in ₹ Crores or Lakhs
-• Output valid JSON only — no markdown, no explanations outside JSON
+- Every property MUST include valid numeric latitude & longitude
+- For rent: show MONTHLY rent in ₹ (never use Crores or yearly)
+- For sale: show total price in ₹ Crores or Lakhs
+- Output valid JSON only — no markdown, no explanations outside JSON
 `;
 
   let finalText = '';
   let source = 'fallback';
 
-  // Stage 1: Gemini (using your original style)
+  // Stage 1: Gemini
   if (GEMINI_API_KEY) {
     try {
       const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
