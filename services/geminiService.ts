@@ -13,7 +13,7 @@ import { callLLMWithFallback } from "./llmFallback";
 import { getBuyValuation, getRentValuationInternal, getLandValuationInternal, getCommercialValuationInternal } from "./valuationService";
 
 // ────────────────────────────────────────────────
-// Price parsing helpers (unchanged from your original)
+// Price parsing helpers (unchanged)
 // ────────────────────────────────────────────────
 export function parsePrice(p: any): number {
   if (p === null || p === undefined) return 0;
@@ -184,9 +184,8 @@ export async function getCommercialAnalysis(req: CommercialRequest): Promise<Com
 }
 
 // ────────────────────────────────────────────────
-// Previously missing functions — added to fix import errors
+// Previously added functions (kept unchanged)
 // ────────────────────────────────────────────────
-
 export async function resolveLocalityData(
   query: string,
   city: string,
@@ -206,7 +205,6 @@ export async function resolveLocalityData(
   }
 }
 
-// Added: askPropertyQuestion (imported & used in PropertyChat.tsx)
 export async function askPropertyQuestion(
   messages: ChatMessage[],
   contextResult?: any,
@@ -229,7 +227,6 @@ export async function askPropertyQuestion(
   return text;
 }
 
-// Added: generatePropertyImage (imported & used in PropertyChat.tsx)
 export async function generatePropertyImage(prompt: string): Promise<string | null> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -251,7 +248,6 @@ export async function generatePropertyImage(prompt: string): Promise<string | nu
   }
 }
 
-// Added: analyzeImageForHarmony (mentioned in earlier versions — kept for completeness)
 export async function analyzeImageForHarmony(base64Data: string, type: string): Promise<string> {
   const prompt = `Analyze this property image for 2026 trendy ${type} compliance. Detect spatial zones, energy flow, and architectural defects. Suggest trendy Biophilic improvements.
 MANDATORY OUTPUT FORMAT:
@@ -272,7 +268,21 @@ MANDATORY OUTPUT FORMAT:
 }
 
 // ────────────────────────────────────────────────
-// Exports (individual exports are sufficient — no duplicate block needed)
+// NEW: Add the missing askCibilExpert function (imported in CibilCoach.tsx)
 // ────────────────────────────────────────────────
-// All functions above are already exported individually
-// No need for extra export { ... } block — it causes duplicate export errors
+export async function askCibilExpert(messages: ChatMessage[], currentScore: number): Promise<string> {
+  const history = messages.map(m => `${m.sender}: ${m.text}`).join('\n');
+  const prompt = `QuantCasa Credit Health Expert. Score: ${currentScore}. History: ${history}. Ask one diagnostic question with OPTIONS: [O1, O2].`;
+
+  const { text } = await callLLMWithFallback(messages[messages.length - 1]?.text || '', {
+    systemInstruction: prompt,
+    temperature: 0.7
+  });
+
+  return text;
+}
+
+// ────────────────────────────────────────────────
+// Exports — individual exports only (no duplicate block)
+// ────────────────────────────────────────────────
+// All functions above are already exported — no need for extra export { ... }
