@@ -323,26 +323,3 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes }) => {
 };
 
 export default GoogleMapView;
-```
-
----
-
-## **Quick Fix Checklist:**
-
-1. ✅ **Update `index.html` line 9** - Add your Google Maps API key
-2. ✅ **Replace `GoogleMapView.tsx`** - Use the code above
-3. ✅ **Check browser console** - Look for the 🔍 debug messages
-4. ✅ **Reload page** - Clear cache (Ctrl+Shift+R)
-
----
-
-## **Expected Console Output (if working):**
-```
-🔍 Checking window.process.env.GOOGLE_MAPS_API_KEY: ✅ Found
-🔍 Checking VITE_GOOGLE_MAPS_API_KEY: ❌ Not found
-🔑 Final API Key: AIzaSyC9Uu...
-📦 Loading Google Maps...
-✅ Google Maps script loaded
-✅ MarkerClusterer loaded
-🗺️ Initializing map...
-✅ Map initialized successfully
