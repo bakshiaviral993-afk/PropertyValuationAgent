@@ -176,7 +176,7 @@ export async function getCommercialAnalysis(req: CommercialRequest): Promise<Com
   };
 }
 
-// MISSING FUNCTION THAT CAUSED BUILD FAILURE — ADDED HERE
+// The missing function that caused the previous build failure — kept here
 export async function resolveLocalityData(
   query: string,
   city: string,
@@ -196,15 +196,8 @@ export async function resolveLocalityData(
   }
 }
 
-// Export everything so imports work
-export {
-  parsePrice,
-  formatPrice,
-  formatRent,
-  getBuyAnalysis,
-  getRentAnalysis,
-  getLandValuationAnalysis,
-  getCommercialAnalysis,
-  resolveLocalityData,
-  // add any other functions you import elsewhere
-};
+// Rest of your functions (getEssentialsAnalysis, askCibilExpert, etc.) remain unchanged
+// ... copy them as-is from your original file
+
+// NO duplicate export block here — that was causing the "multiple exports" error
+// The individual exports above are sufficient
