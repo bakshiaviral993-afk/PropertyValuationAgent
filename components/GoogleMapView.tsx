@@ -1,137 +1,112 @@
-import { useEffect, useRef, useState } from "react";
-import { loadGoogleMaps } from "@/utils/loadGoogleMaps";
+"use client";
+
+import { useEffect, useRef } from "react";
+import { Loader } from "@googlemaps/js-api-loader";
+import { MarkerClusterer } from "@googlemaps/markerclusterer";
 import { usePropertyMapStore } from "@/components/store/usePropertyMapStore";
 
+const MAP_ID = "2185f915fc843bc0827abfdd"; // YOUR MAP ID
 
-declare global {
-  interface Window {
-    google: any;
-    markerClusterer: any;
-  }
-}
+export default function GoogleMapView() {
+  const mapRef = useRef<HTMLDivElement | null>(null);
+  const mapInstance = useRef<google.maps.Map | null>(null);
+  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
 
-type Property = {
-  id: string;
-  lat: number;
-  lng: number;
-  price: number;
-};
+  const {
+    properties,
+    setSelectedId,
+    setHoveredId,
+    selectedId,
+  } = usePropertyMapStore();
 
-export default function GoogleMapView({
-  properties = [],
-}: {
-  properties?: Property[];
-}) {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const map = useRef<any>(null);
-  const markers = useRef<any[]>([]);
-  const cluster = useRef<any>(null);
-  const [budget, setBudget] = useState<number | null>(null);
-
-  // ---------- LOAD MAP + CLUSTER ----------
   useEffect(() => {
-    async function init() {
-      await loadGoogleMaps();
-      await loadClusterer();
-      initMap();
-    }
-    init();
-  }, []);
+    if (!mapRef.current) return;
 
-  function loadClusterer() {
-    if (window.markerClusterer) return Promise.resolve();
-
-    return new Promise<void>((resolve) => {
-      const script = document.createElement("script");
-      script.src =
-        "https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js";
-      script.onload = () => resolve();
-      document.head.appendChild(script);
+    const loader = new Loader({
+      apiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
+      version: "weekly",
+      libraries: ["marker"],
     });
-  }
 
-  // ---------- INIT MAP ----------
-  function initMap() {
-    if (!mapRef.current || map.current) return;
-
-    map.current = new window.google.maps.Map(mapRef.current, {
-      center: { lat: 18.5204, lng: 73.8567 },
-      zoom: 12,
-      mapId: import.meta.env.VITE_GOOGLE_MAP_ID,
-      disableDefaultUI: true,
-    });
-  }
-
-  // ---------- RENDER MARKERS ----------
-  function renderMarkers() {
-    if (!map.current || properties.length === 0) return;
-
-    markers.current.forEach((m) => (m.map = null));
-    markers.current = [];
-    cluster.current?.clearMarkers();
-
-    const bounds = new window.google.maps.LatLngBounds();
-
-    properties
-      .filter((p) => (budget ? p.price <= budget : true))
-      .forEach((p) => {
-        const el = document.createElement("div");
-        el.className =
-          "px-3 py-1 bg-black text-white rounded-xl text-sm font-semibold shadow";
-        el.innerText = `₹${(p.price / 100000).toFixed(1)}L`;
-
-        const marker = new window.google.maps.marker.AdvancedMarkerElement({
-          position: { lat: p.lat, lng: p.lng },
-          content: el,
-        });
-
-        markers.current.push(marker);
-        bounds.extend(marker.position);
+    loader.load().then(() => {
+      mapInstance.current = new google.maps.Map(mapRef.current!, {
+        center: { lat: 18.5204, lng: 73.8567 }, // Pune default
+        zoom: 11,
+        mapId: MAP_ID,
       });
 
-    cluster.current = new window.markerClusterer.MarkerClusterer({
-      map: map.current,
-      markers: markers.current,
+      renderMarkers();
     });
 
-    map.current.fitBounds(bounds);
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // ---------- DATA READY ----------
+  const renderMarkers = () => {
+    if (!mapInstance.current) return;
+
+    // Clear old markers
+    markersRef.current.forEach((m) => (m.map = null));
+    markersRef.current = [];
+
+    const markers = properties.map((property) => {
+      const el = document.createElement("div");
+      el.className =
+        "bg-black text-white px-3 py-1 rounded-xl shadow-lg text-sm cursor-pointer";
+      el.innerHTML = `
+        ₹${property.price.toLocaleString("en-IN")}
+        <div class="text-[10px] opacity-80">${property.address}</div>
+      `;
+
+      el.onclick = () => {
+        setSelectedId(property.id);
+        mapInstance.current?.panTo({
+          lat: property.lat,
+          lng: property.lng,
+        });
+      };
+
+      const marker = new google.maps.marker.AdvancedMarkerElement({
+        map: mapInstance.current!,
+        position: { lat: property.lat, lng: property.lng },
+        content: el,
+      });
+
+      marker.addListener("mouseover", () =>
+        setHoveredId(property.id)
+      );
+
+      marker.addListener("mouseout", () =>
+        setHoveredId(null)
+      );
+
+      return marker;
+    });
+
+    markersRef.current = markers;
+
+    new MarkerClusterer({
+      map: mapInstance.current!,
+      markers,
+    });
+  };
+
   useEffect(() => {
-    if (!properties.length) return;
-
-    const max = Math.max(...properties.map((p) => p.price));
-    setBudget(max);
+    if (!mapInstance.current) return;
     renderMarkers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [properties]);
 
   useEffect(() => {
-    renderMarkers();
-  }, [budget]);
+    if (!selectedId) return;
 
-  return (
-    <div className="w-full h-full relative">
-      <div className="absolute top-4 left-4 z-10 bg-white p-4 rounded-xl shadow w-72">
-        {budget && (
-          <>
-            <label className="text-sm font-semibold">
-              Budget: ₹{(budget / 100000).toFixed(1)}L
-            </label>
-            <input
-              type="range"
-              min={1000000}
-              max={budget}
-              step={500000}
-              value={budget}
-              onChange={(e) => setBudget(Number(e.target.value))}
-              className="w-full"
-            />
-          </>
-        )}
-      </div>
+    const marker = markersRef.current.find(
+      (m) => (m.content as HTMLElement)?.innerText.includes(selectedId) === false
+    );
 
-      <div ref={mapRef} className="w-full h-full" />
-    </div>
-  );
+    if (marker) {
+      mapInstance.current?.panTo(marker.position as google.maps.LatLngLiteral);
+    }
+  }, [selectedId]);
+
+  return <div ref={mapRef} className="w-full h-full rounded-xl" />;
 }
