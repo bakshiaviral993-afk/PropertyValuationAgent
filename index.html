@@ -1,59 +1,129 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#0a0a0f">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M25 75 L52 45 L79 75' stroke='%2300F6FF' stroke-width='8' fill='none'/></svg>">
-    <title>QuantCasa | Professional Property Valuation</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=Lora:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-    
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Plus Jakarta Sans', 'sans-serif'],
-              serif: ['Lora', 'serif'],
-            },
-            colors: {
-              'neo-bg': '#0a0a0f',
-              'neo-glass': 'rgba(26,26,46,0.7)',
-              'neo-neon': '#585FD8',
-              'neo-pink': '#FF6B9D',
-              'neo-gold': '#FCD34D',
-              'report-blue': '#004c97',
-              'report-text': '#222222',
-              'report-bg': '#f7f7f7',
-            },
-            boxShadow: {
-              'neo-glow': '0 0 30px rgba(88, 95, 216, 0.4)',
-              'glass-3d': '0 8px 32px rgba(0, 0, 0, 0.37)',
-            }
+
+<head>
+  <script>
+    window.process = {
+      env: {
+        NODE_ENV: 'production',
+        API_KEY: 'AIzaSyC9UuJdwheLdlolVmAfktRAWEoKQJ973qI'
+      }
+    };
+  </script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0a0a0f">
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M25 75 L52 45 L79 75' stroke='%2300F6FF' stroke-width='8' fill='none'/></svg>">
+  <title>QuantCasa | Professional Property Valuation</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=Lora:ital,wght@0,400;0,700;1,400&display=swap"
+    rel="stylesheet">
+
+  <script>
+    // Load Google Maps API dynamically with explicit key parameter
+    (g => { var h, a, k, p = "The Google Maps JavaScript API", c = "google", l = "importLibrary", q = "__ib__", m = document, b = window; b = b[c] || (b[c] = {}); var d = b.maps || (b.maps = {}), r = new Set, e = new URLSearchParams, u = () => h || (h = new Promise(async (f, n) => { await (a = m.createElement("script")); e.set("libraries", [...r] + ""); for (k in g) e.set(k.replace(/[A-Z]/g, t => "_" + t[0].toLowerCase()), g[k]); e.set("callback", c + ".maps." + q); a.src = `https://maps.${c}apis.com/maps/api/js?` + e; d[q] = f; a.onerror = () => h = n(Error(p + " could not load.")); a.nonce = m.querySelector("script[nonce]")?.nonce || ""; m.head.append(a) })); d[l] ? console.warn(p + " only loads once. Re-using existing usage.") : d[l] = (f, ...n) => r.add(f) && u().then(() => d[l](f, ...n)) })({
+      key: window.process.env.API_KEY || "",
+      v: "weekly",
+      loading: "async"
+    });
+  </script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            serif: ['Lora', 'serif'],
+          },
+          colors: {
+            'neo-bg': '#0a0a0f',
+            'neo-glass': 'rgba(26,26,46,0.7)',
+            'neo-neon': '#585FD8',
+            'neo-pink': '#FF6B9D',
+            'neo-gold': '#FCD34D',
+            'report-blue': '#004c97',
+            'report-text': '#222222',
+            'report-bg': '#f7f7f7',
+          },
+          boxShadow: {
+            'neo-glow': '0 0 30px rgba(88, 95, 216, 0.4)',
+            'glass-3d': '0 8px 32px rgba(0, 0, 0, 0.37)',
           }
         }
       }
-    </script>
-    <style>
-      body { background-color: #0a0a0f; color: #f8fafc; overflow-x: hidden; }
-      ::-webkit-scrollbar { width: 6px; }
-      ::-webkit-scrollbar-thumb { background: #585FD8; border-radius: 10px; }
-      .report-justification table tr:nth-child(even) { background-color: #fafafa; }
-      .report-justification thead { background-color: #004c97; color: white; }
-      @media print {
-        .no-print { display: none !important; }
-        body { background: white !important; }
-        .report-container { box-shadow: none !important; border: none !important; width: 100% !important; margin: 0 !important; }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #0a0a0f;
+      color: #f8fafc;
+      overflow-x: hidden;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #585FD8;
+      border-radius: 10px;
+    }
+
+    .report-justification table tr:nth-child(even) {
+      background-color: #fafafa;
+    }
+
+    .report-justification thead {
+      background-color: #004c97;
+      color: white;
+    }
+
+    @media print {
+      .no-print {
+        display: none !important;
       }
-      .gm-style-iw { background: #0a0a0f !important; color: white !important; border-radius: 16px !important; padding: 0 !important; border: 1px solid rgba(88, 95, 216, 0.4) !important; }
-      .gm-style-iw-d { overflow: hidden !important; }
-      .gm-style-iw-tc::after { background: #0a0a0f !important; }
-      .asset-tag { pointer-events: auto !important; z-index: 100 !important; }
-    </style>
-    <script type="importmap">
+
+      body {
+        background: white !important;
+      }
+
+      .report-container {
+        box-shadow: none !important;
+        border: none !important;
+        width: 100% !important;
+        margin: 0 !important;
+      }
+    }
+
+    .gm-style-iw {
+      background: #0a0a0f !important;
+      color: white !important;
+      border-radius: 16px !important;
+      padding: 0 !important;
+      border: 1px solid rgba(88, 95, 216, 0.4) !important;
+    }
+
+    .gm-style-iw-d {
+      overflow: hidden !important;
+    }
+
+    .gm-style-iw-tc::after {
+      background: #0a0a0f !important;
+    }
+
+    /* Ensure markers are visible above map elements */
+    .asset-tag {
+      pointer-events: auto !important;
+      z-index: 100 !important;
+    }
+  </style>
+  <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@19.2.3",
@@ -76,9 +146,11 @@
   }
 }
 </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="./index.tsx"></script>
-  </body>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="./index.tsx"></script>
+</body>
+
 </html>
