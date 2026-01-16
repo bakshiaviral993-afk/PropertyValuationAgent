@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { loadGoogleMaps } from "@/utils/loadGoogleMaps";
+import { usePropertyMapStore } from "@/components/store/usePropertyMapStore";
+
 
 declare global {
   interface Window {
