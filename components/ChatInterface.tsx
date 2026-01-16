@@ -12,6 +12,148 @@ interface ChatInterfaceProps {
   lang: AppLang;
 }
 
+// ⭐ ADDED FUNCTION - This was missing and causing the error
+function getSteps(mode: AppMode, lang: AppLang): WizardStep[] {
+  const isHindi = lang === 'HI';
+  
+  const commonSteps: WizardStep[] = [
+    { 
+      field: 'city', 
+      question: isHindi ? 'आप किस शहर में संपत्ति खोज रहे हैं?' : 'Which city are you searching in?', 
+      type: 'city-picker',
+      placeholder: 'Enter city name'
+    },
+    { 
+      field: 'area', 
+      question: isHindi ? 'कौन सा इलाका?' : 'Which area/locality?', 
+      type: 'text',
+      placeholder: 'e.g., Koramangala, Bandra'
+    },
+    { 
+      field: 'pincode', 
+      question: isHindi ? 'पिनकोड?' : 'PIN code?', 
+      type: 'number',
+      placeholder: 'e.g., 411001'
+    }
+  ];
+
+  if (mode === 'buy') {
+    return [
+      ...commonSteps,
+      { 
+        field: 'bhk', 
+        question: isHindi ? 'कितने BHK चाहिए?' : 'How many bedrooms (BHK)?', 
+        type: 'select',
+        options: ['1 BHK', '2 BHK', '3 BHK', '4 BHK', '5+ BHK']
+      },
+      { 
+        field: 'sqft', 
+        question: isHindi ? 'अपेक्षित क्षेत्रफल (sq ft)?' : 'Desired area (sq ft)?', 
+        type: 'number',
+        placeholder: 'e.g., 1200'
+      },
+      { 
+        field: 'budget', 
+        question: isHindi ? 'आपका बजट?' : 'Your budget?', 
+        type: 'number',
+        placeholder: 'e.g., 5000000'
+      },
+      { 
+        field: 'facing', 
+        question: isHindi ? 'दिशा प्राथमिकता?' : 'Preferred facing?', 
+        type: 'select',
+        options: ['East', 'West', 'North', 'South', 'Any']
+      }
+    ];
+  }
+
+  if (mode === 'rent') {
+    return [
+      ...commonSteps,
+      { 
+        field: 'bhk', 
+        question: isHindi ? 'कितने BHK चाहिए?' : 'How many bedrooms (BHK)?', 
+        type: 'select',
+        options: ['1 BHK', '2 BHK', '3 BHK', '4+ BHK']
+      },
+      { 
+        field: 'sqft', 
+        question: isHindi ? 'अपेक्षित क्षेत्रफल?' : 'Desired area (sq ft)?', 
+        type: 'number',
+        placeholder: 'e.g., 1000'
+      },
+      { 
+        field: 'budget', 
+        question: isHindi ? 'मासिक किराया बजट?' : 'Monthly rent budget?', 
+        type: 'number',
+        placeholder: 'e.g., 25000'
+      }
+    ];
+  }
+
+  if (mode === 'land') {
+    return [
+      ...commonSteps,
+      { 
+        field: 'plotSize', 
+        question: isHindi ? 'भूखंड का आकार (sq yd)?' : 'Plot size (sq yards)?', 
+        type: 'number',
+        placeholder: 'e.g., 200'
+      },
+      { 
+        field: 'budget', 
+        question: isHindi ? 'आपका बजट?' : 'Your budget?', 
+        type: 'number',
+        placeholder: 'e.g., 3000000'
+      }
+    ];
+  }
+
+  if (mode === 'commercial') {
+    return [
+      ...commonSteps,
+      { 
+        field: 'type', 
+        question: isHindi ? 'व्यावसायिक प्रकार?' : 'Commercial type?', 
+        type: 'select',
+        options: ['Shop', 'Office', 'Warehouse']
+      },
+      { 
+        field: 'sqft', 
+        question: isHindi ? 'आवश्यक क्षेत्रफल?' : 'Required area (sq ft)?', 
+        type: 'number',
+        placeholder: 'e.g., 500'
+      },
+      { 
+        field: 'intent', 
+        question: isHindi ? 'खरीदना या किराए पर लेना?' : 'Buy or Rent?', 
+        type: 'select',
+        options: ['Buy', 'Rent']
+      }
+    ];
+  }
+
+  if (mode === 'essentials') {
+    return [
+      { 
+        field: 'city', 
+        question: isHindi ? 'आप किस शहर में हैं?' : 'Which city are you in?', 
+        type: 'text',
+        placeholder: 'Enter city'
+      },
+      { 
+        field: 'area', 
+        question: isHindi ? 'कौन सा इलाका?' : 'Which area?', 
+        type: 'text',
+        placeholder: 'Enter locality'
+      }
+    ];
+  }
+
+  // Default fallback
+  return commonSteps;
+}
+
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mode, lang }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
   const [formData, setFormData] = useState<any>({});
@@ -26,22 +168,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Dynamic cities/localities – no hardcodes
-  const [cities, setCities] = useState<string[]>([]); // Fetch dynamically if needed
+  // Dynamic cities/localities
+  const [cities, setCities] = useState<string[]>([]); 
   useEffect(() => {
-    // Example dynamic fetch – replace with real API if needed
-    setCities(['Mumbai', 'Pune', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai', 'Kolkata']); // Can be fetched from backend
+    setCities(['Mumbai', 'Pune', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai', 'Kolkata']);
   }, []);
 
-  const steps: WizardStep[] = getSteps(mode, lang); // Assume getSteps is defined elsewhere
+  const steps: WizardStep[] = getSteps(mode, lang);
+  const currentStep = steps[currentStepIndex];
 
   useEffect(() => {
     chatRef.current?.scrollTo(0, chatRef.current.scrollHeight);
   }, [messages]);
 
   useEffect(() => {
-    if (!isManualEntry) {
-      setMessages(prev => [...prev, { id: Date.now().toString(), sender: 'bot', text: steps[currentStepIndex].question }]);
+    if (!isManualEntry && currentStep) {
+      setMessages(prev => [...prev, { id: Date.now().toString(), sender: 'bot', text: currentStep.question }]);
     }
     inputRef.current?.focus();
   }, [currentStepIndex, isManualEntry]);
@@ -142,14 +284,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
         {isLoading && <LoadingInsights />}
       </div>
 
-      {!isLoading && (
+      {!isLoading && currentStep && (
         <div className="mt-8">
-          {currentStep.type === 'text' || currentStep.type === 'number' ? (
+          {(currentStep.type === 'text' || currentStep.type === 'number' || currentStep.type === 'city-picker') && (
             <div className="relative flex gap-3 animate-in fade-in duration-300">
               <div className="absolute left-6 inset-y-0 flex items-center pointer-events-none text-gray-500">
                 <Edit3 size={18}/>
               </div>
               <input 
+                ref={inputRef}
                 autoFocus 
                 type={currentStep.type === 'number' ? 'number' : 'text'}
                 placeholder={currentStep.placeholder || `Enter ${currentStep.field}...`}
@@ -162,13 +305,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onComplete, isLoading, mo
                 <Send size={20} />
               </button>
             </div>
-          ) : currentStep.type === 'select' ? (
+          )}
+          
+          {currentStep.type === 'select' && (
             <div className="flex flex-wrap gap-3">
               {currentStep.options?.map(o => (
-                <button key={o} onClick={() => handleNext(o)} className="flex-1 min-w-[100px] h-12 rounded-xl bg-white/5 border border-white/5 text-xs font-bold text-gray-200 hover:border-neo-neon transition-all uppercase tracking-widest">{o}</button>
+                <button 
+                  key={o} 
+                  onClick={() => handleNext(o)} 
+                  className="flex-1 min-w-[100px] h-12 rounded-xl bg-white/5 border border-white/5 text-xs font-bold text-gray-200 hover:border-neo-neon transition-all uppercase tracking-widest"
+                >
+                  {o}
+                </button>
               ))}
             </div>
-          ) : null}
+          )}
         </div>
       )}
     </div>
