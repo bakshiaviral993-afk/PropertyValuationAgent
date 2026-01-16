@@ -15,7 +15,7 @@ interface GoogleMapViewProps {
   nodes: MapNode[];
 }
 
-const MAP_ID = "DEMO_MAP_ID"; // Use your actual Map ID from Google Cloud Console
+const MAP_ID = "2185f915fc843bc0827abfdd"; // Use your actual Map ID from Google Cloud Console
 
 declare global {
   interface Window {
