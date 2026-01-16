@@ -78,7 +78,7 @@ export async function getBuyAnalysis(req: BuyRequest): Promise<BuyResult> {
     valuationRange: `${formatPrice(valuation.rangeLow || 0)} - ${formatPrice(valuation.rangeHigh || 0)}`,
     recommendation: (valuation as any).recommendation || parsed.recommendation || 'Fair Price',
     negotiationScript: valuation.negotiationScript || parsed.negotiationScript || "Leverage market comps.",
-    listings: parsed.listings || valuation.comparables || [],  // ← key fix: use parsed.listings
+    listings: parsed.listings || valuation.comparables || [], // ← key fix: use parsed.listings
     marketSentiment: (valuation as any).marketSentiment || 'Stable',
     sentimentScore: (valuation as any).sentimentScore || 80,
     registrationEstimate: valuation.registrationEstimate || formatPrice((valuation.estimatedValue || 0) * 0.07),
@@ -119,7 +119,7 @@ export async function getRentAnalysis(req: RentRequest): Promise<RentResult> {
     confidenceScore: valuation.confidence === 'high' ? 90 : 70,
     valuationJustification: valuation.valuationJustification || "Leasehold analysis complete.",
     propertiesFoundCount: valuation.comparables?.length || parsed.listings?.length || 0,
-    listings: parsed.listings || valuation.comparables || [],  // ← key fix
+    listings: parsed.listings || valuation.comparables || [], // ← key fix
     insights: [],
     groundingSources: valuation.groundingSources || [],
     isBudgetAlignmentFailure: valuation.isBudgetAlignmentFailure,
@@ -128,7 +128,7 @@ export async function getRentAnalysis(req: RentRequest): Promise<RentResult> {
   };
 }
 
-// Similar fixes for Land and Commercial (shortened for brevity)
+// Similar fixes for Land and Commercial
 export async function getLandValuationAnalysis(req: LandRequest): Promise<LandResult> {
   const valuation = await getLandValuationInternal({
     city: req.city,
@@ -191,5 +191,38 @@ export async function getCommercialAnalysis(req: CommercialRequest): Promise<Com
   };
 }
 
-// Rest of your functions (getEssentialsAnalysis, askCibilExpert, etc.) remain unchanged
-// ... (copy them as-is from your original file)
+// The missing function that caused the build failure — added here
+export async function resolveLocalityData(
+  query: string,
+  city: string,
+  mode: 'localities' | 'pincode' = 'localities'
+): Promise<string[]> {
+  const prompt = mode === 'localities'
+    ? `List 6 major residential localities/areas in ${city}, India. Output STRICT JSON ARRAY: ["Area 1", "Area 2"]`
+    : `Search for the correct 6-digit PIN code of "${query}" in ${city}, India. Output STRICT JSON ARRAY of strings: ["411057"]`;
+
+  try {
+    const { text } = await callLLMWithFallback(prompt, { temperature: 0.1 });
+    const cleanedText = text.replace(/```json|```/g, '').trim();
+    return JSON.parse(cleanedText);
+  } catch (e) {
+    console.error('resolveLocalityData failed:', e);
+    return [];
+  }
+}
+
+// Rest of your functions (copy them as-is from your original file)
+// ... getEssentialsAnalysis, askCibilExpert, analyzeImageForHarmony, askPropertyQuestion, generatePropertyImage ...
+
+// Export everything at the bottom (prevents "not exported" errors)
+export {
+  parsePrice,
+  formatPrice,
+  formatRent,
+  getBuyAnalysis,
+  getRentAnalysis,
+  getLandValuationAnalysis,
+  getCommercialAnalysis,
+  resolveLocalityData,
+  // add other functions here if they are imported elsewhere
+};
