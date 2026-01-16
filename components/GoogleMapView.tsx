@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MarkerClusterer } from "@googlemaps/markerclusterer";
 
 interface MapNode {
   title: string;
@@ -10,7 +9,6 @@ interface MapNode {
   latitude?: number;
   longitude?: number;
   isSubject?: boolean;
-  isEssential?: boolean;
 }
 
 const loadGoogleMaps = (apiKey: string) =>
@@ -27,12 +25,23 @@ const loadGoogleMaps = (apiKey: string) =>
     document.head.appendChild(script);
   });
 
+const loadMarkerClusterer = () =>
+  new Promise<void>((resolve) => {
+    if ((window as any).MarkerClusterer) return resolve();
+
+    const script = document.createElement("script");
+    script.src =
+      "https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js";
+    script.async = true;
+    script.onload = () => resolve();
+    document.head.appendChild(script);
+  });
+
 const GoogleMapView: React.FC<{ nodes: MapNode[] }> = ({ nodes }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const markers = useRef<any[]>([]);
-  const clusterer = useRef<MarkerClusterer | null>(null);
-  const heatmap = useRef<google.maps.visualization.HeatmapLayer | null>(null);
+  const clusterer = useRef<any>(null);
 
   const [stats, setStats] = useState<{ avg: number; median: number } | null>(
     null
@@ -43,25 +52,26 @@ const GoogleMapView: React.FC<{ nodes: MapNode[] }> = ({ nodes }) => {
       if (!mapRef.current) return;
 
       const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-      if (!apiKey) {
-        console.error("❌ Google Maps API key missing");
-        return;
-      }
+      if (!apiKey) return;
 
       await loadGoogleMaps(apiKey);
-      const google = (window as any).google;
+      await loadMarkerClusterer();
 
-      // ✅ Runtime access (THIS FIXES YOUR BUILD)
+      const google = (window as any).google;
       const AdvancedMarkerElement =
         google.maps.marker.AdvancedMarkerElement;
+      const MarkerClusterer = (window as any).MarkerClusterer;
 
       if (!map.current) {
         map.current = new google.maps.Map(mapRef.current, {
           center: { lat: 18.5204, lng: 73.8567 },
           zoom: 14,
-          mapId: "QUANTCASA_MAP",
         });
       }
+
+      markers.current.forEach((m) => (m.map = null));
+      markers.current = [];
+      clusterer.current?.clearMarkers?.();
 
       const normalize = (n: MapNode) => ({
         ...n,
@@ -74,27 +84,11 @@ const GoogleMapView: React.FC<{ nodes: MapNode[] }> = ({ nodes }) => {
 
       const subjectPos = normalize(subject);
 
-      // Cleanup
-      markers.current.forEach((m) => (m.map = null));
-      markers.current = [];
-      clusterer.current?.clearMarkers();
-      heatmap.current?.setMap(null);
-
-      // Auto-select comparables (≤ 3km)
       const comparables = nodes
         .filter((n) => !n.isSubject)
         .map(normalize)
-        .filter((n) => {
-          if (!n.lat || !n.lng) return false;
-          const distance =
-            google.maps.geometry.spherical.computeDistanceBetween(
-              new google.maps.LatLng(subjectPos.lat!, subjectPos.lng!),
-              new google.maps.LatLng(n.lat!, n.lng!)
-            );
-          return distance <= 3000;
-        });
+        .filter((n) => n.lat && n.lng);
 
-      // Stats
       const prices = comparables.map((c) => c.price).sort((a, b) => a - b);
       const avg =
         prices.reduce((a, b) => a + b, 0) / Math.max(prices.length, 1);
@@ -110,23 +104,20 @@ const GoogleMapView: React.FC<{ nodes: MapNode[] }> = ({ nodes }) => {
         median: Math.round(median),
       });
 
-      // SUBJECT MARKER (DRAGGABLE)
+      // SUBJECT
       const subjectEl = document.createElement("div");
       subjectEl.className =
-        "px-4 py-2 bg-yellow-400 text-black font-bold rounded-xl shadow-xl";
+        "px-4 py-2 bg-yellow-400 text-black font-bold rounded-xl shadow";
       subjectEl.innerHTML = "SUBJECT";
 
-      const subjectMarker = new AdvancedMarkerElement({
+      new AdvancedMarkerElement({
         map: map.current,
         position: { lat: subjectPos.lat!, lng: subjectPos.lng! },
         content: subjectEl,
-        gmpDraggable: true,
         zIndex: 1000,
       });
 
-      subjectMarker.addListener("dragend", () => init());
-
-      // Comparable markers
+      // COMPARABLES
       comparables.forEach((node) => {
         const el = document.createElement("div");
         el.className =
@@ -142,21 +133,10 @@ const GoogleMapView: React.FC<{ nodes: MapNode[] }> = ({ nodes }) => {
         markers.current.push(marker);
       });
 
-      // Cluster comparables only
       clusterer.current = new MarkerClusterer({
         map: map.current,
         markers: markers.current,
       });
-
-      // Heatmap
-      heatmap.current = new google.maps.visualization.HeatmapLayer({
-        data: comparables.map(
-          (c) => new google.maps.LatLng(c.lat!, c.lng!)
-        ),
-        radius: 40,
-      });
-
-      heatmap.current.setMap(map.current);
     };
 
     init();
