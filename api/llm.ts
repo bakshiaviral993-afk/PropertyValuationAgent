@@ -1,6 +1,5 @@
 // api/llm.ts
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import axios from 'axios';
+import { GoogleGenAI } from '@google/genai';   // ← this was in your codeimport axios from 'axios';
 import * as cheerio from 'cheerio';
 
 // ────────────────────────────────────────────────
@@ -241,7 +240,7 @@ CRITICAL RULES:
   // ─── Stage 1: Try Gemini ────────────────────────────────
   if (GEMINI_API_KEY) {
     try {
-      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+      const genAI = new GoogleGenAI(GEMINI_API_KEY);
       for (const modelName of GEMINI_MODELS) {
         try {
           const model = genAI.getGenerativeModel({ model: modelName });
