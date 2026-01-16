@@ -44,7 +44,13 @@ export enum StepField {
   FSI = 'fsi'
 }
 
-export interface CommercialListing {
+// Base interface for common fields (to avoid duplicates)
+interface BaseListing {
+  latitude?: number;
+  longitude?: number;
+}
+
+export interface CommercialListing extends BaseListing {
   title: string;
   price: string;
   address: string;
@@ -52,19 +58,16 @@ export interface CommercialListing {
   intent: 'Buy' | 'Rent' | 'Lease';
   sourceUrl: string;
   sqft: number;
-  image?: string;
-  latitude?: number;
-  longitude?: number;
 }
 
 export interface CommercialResult {
   fairValue: string;
   yieldPotential: string;
   footfallScore: number;
-  negotiationScript: string;
-  listings: CommercialListing[];
   businessInsights: string;
+  negotiationScript: string;
   confidenceScore: number;
+  listings: CommercialListing[];
   groundingSources: GroundingSource[];
 }
 
@@ -75,7 +78,7 @@ export interface BuyResult {
   negotiationScript: string;
   listings: SaleListing[];
   marketSentiment: string;
-  sentimentScore: number; 
+  sentimentScore: number;
   registrationEstimate: string;
   appreciationPotential: string;
   confidenceScore: number;
@@ -89,92 +92,18 @@ export interface BuyResult {
   notes?: string;
 }
 
-export interface UserProfile {
-  name: string;
-  mobile: string;
-  email: string;
-}
-
-export interface NeighborhoodInsight {
-  title: string;
-  description: string;
-  type: 'positive' | 'development' | 'trend';
-}
-
-export interface NeighborhoodScore {
-  overall: number;
-  walkability: number;
-  grocery: number;
-  parks: number;
-  safety: number;
-  connectivity: number;
-}
-
-export interface ValuationBreakdown {
-  baseRate: string;
-  localityPremium: string;
-  amenitiesBoost: string;
-  facingAdjustment: string;
-  ageFactor: string;
-}
-
-export interface SaleListing {
-  title: string;
-  price: string;
-  priceValue: number;
-  address: string;
-  pincode: string;
-  sourceUrl: string;
-  bhk: string;
-  image?: string;
-  latitude?: number;
-  longitude?: number;
-  builderName?: string;
-  societyName?: string;
-}
-
-export interface RentalListing {
-  title: string;
-  rent: string;
-  address: string;
-  sourceUrl: string;
-  bhk: string;
-  qualityScore: number;
-  image?: string;
-  latitude?: number;
-  longitude?: number;
-  facing: string;
-}
-
-export interface LandListing {
-  title: string;
-  price: string;
-  size: string;
-  address: string;
-  sourceUrl: string;
-  image?: string;
-  latitude?: number;
-  longitude?: number;
-  facing: string;
-}
-
-export interface GroundingSource {
-  uri: string;
-  title: string;
-}
-
 export interface RentResult {
   rentalValue: string;
   yieldPercentage: string;
   rentOutAlert: string;
   depositCalc: string;
   negotiationScript: string;
-  listings: RentalListing[];
   marketSummary: string;
   tenantDemandScore: number;
   confidenceScore: number;
   valuationJustification: string;
   propertiesFoundCount: number;
+  listings: RentalListing[];
   insights: NeighborhoodInsight[];
   groundingSources: GroundingSource[];
   isBudgetAlignmentFailure?: boolean;
@@ -182,18 +111,43 @@ export interface RentResult {
   notes?: string;
 }
 
-export interface LandResult {
-  landValue: string;
-  perSqmValue: string;
-  devROI: string;
-  negotiationStrategy: string;
-  confidenceScore: number;
-  zoningAnalysis: string;
-  listings: LandListing[];
-  valuationJustification: string;
-  insights: NeighborhoodInsight[];
-  isBudgetAlignmentFailure?: boolean;
-  suggestedMinimum?: number;
+export interface SaleListing extends BaseListing {
+  title: string;
+  price: string;
+  address: string;
+  sourceUrl: string;
+  bhk: string;
+  qualityScore: number;
+  facing: string;
+}
+
+export interface RentalListing extends BaseListing {
+  title: string;
+  rent: string;
+  address: string;
+  sourceUrl: string;
+  bhk: string;
+  qualityScore: number;
+  facing: string;
+}
+
+export interface LandListing extends BaseListing {
+  title: string;
+  price: string;
+  address: string;
+  sourceUrl: string;
+  plotSize: string;
+}
+
+export interface NeighborhoodInsight {
+  title: string;
+  description: string;
+  type: 'trend' | 'alert' | 'insight';
+}
+
+export interface GroundingSource {
+  title: string;
+  url: string;
 }
 
 export interface ChatMessage {
