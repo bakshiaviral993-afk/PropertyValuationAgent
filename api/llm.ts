@@ -159,9 +159,9 @@ async function fetchMarketAverages(
     // Try Magicbricks if poor results
     if (prices.length < 4) {
       url = `https://www.magicbricks.com/property-for-sale/residential-real-estate?` +
-            `bedroom=${bhk.split(' ')[0]}&` +
-            `locality=${encodeURIComponent(area || '')}&` +
-            `cityName=${encodeURIComponent(city || '')}`;
+        `bedroom=${bhk.split(' ')[0]}&` +
+        `locality=${encodeURIComponent(area || '')}&` +
+        `cityName=${encodeURIComponent(city || '')}`;
 
       response = await axios.get(url, {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0' },
@@ -238,16 +238,16 @@ CRITICAL RULES:
         try {
           const contents = image
             ? {
-                parts: [
-                  { text: prompt + spatialConstraint },
-                  {
-                    inlineData: {
-                      data: image.data,
-                      mimeType: image.mimeType || 'image/jpeg',
-                    },
+              parts: [
+                { text: prompt + spatialConstraint },
+                {
+                  inlineData: {
+                    data: image.data,
+                    mimeType: image.mimeType || 'image/jpeg',
                   },
-                ],
-              }
+                },
+              ],
+            }
             : prompt + spatialConstraint;
 
           const result = await genAI.models.generateContent({
@@ -259,7 +259,7 @@ CRITICAL RULES:
             },
           });
 
-          finalText = result.text;
+          finalText = result.text || '';
           source = `gemini-${modelName}`;
           if (finalText) break;
         } catch (err: any) {
