@@ -1,160 +1,144 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-interface MapNode {
-  title: string;
+type Property = {
+  id: string;
+  lat: number;
+  lng: number;
   price: number;
-  address: string;
-  lat?: number;
-  lng?: number;
-  latitude?: number;
-  longitude?: number;
-  isSubject?: boolean;
+  title: string;
+};
+
+declare global {
+  interface Window {
+    google: any;
+  }
 }
 
-const loadGoogleMaps = (apiKey: string) =>
-  new Promise<void>((resolve) => {
-    if ((window as any).google?.maps) return resolve();
-
-    const script = document.createElement("script");
-    script.src =
-      `https://maps.googleapis.com/maps/api/js` +
-      `?key=${apiKey}&libraries=marker,geometry,visualization`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    document.head.appendChild(script);
-  });
-
-const loadMarkerClusterer = () =>
-  new Promise<void>((resolve) => {
-    if ((window as any).MarkerClusterer) return resolve();
-
-    const script = document.createElement("script");
-    script.src =
-      "https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js";
-    script.async = true;
-    script.onload = () => resolve();
-    document.head.appendChild(script);
-  });
-
-const GoogleMapView: React.FC<{ nodes: MapNode[] }> = ({ nodes }) => {
+export default function GoogleMapView({
+  properties,
+}: {
+  properties: Property[];
+}) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const map = useRef<google.maps.Map | null>(null);
+  const map = useRef<any>(null);
   const markers = useRef<any[]>([]);
-  const clusterer = useRef<any>(null);
+  const [budget, setBudget] = useState(10000000);
 
-  const [stats, setStats] = useState<{ avg: number; median: number } | null>(
-    null
-  );
-
+  // ---------- LOAD GOOGLE MAPS ----------
   useEffect(() => {
-    const init = async () => {
-      if (!mapRef.current) return;
+    if (window.google) {
+      initMap();
+      return;
+    }
 
-      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-      if (!apiKey) return;
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${
+      import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+    }&libraries=places,marker&v=weekly`;
+    script.async = true;
+    script.onload = initMap;
+    document.body.appendChild(script);
+  }, []);
 
-      await loadGoogleMaps(apiKey);
-      await loadMarkerClusterer();
+  // ---------- INIT MAP ----------
+  function initMap() {
+    if (!mapRef.current || map.current) return;
 
-      const google = (window as any).google;
-      const AdvancedMarkerElement =
-        google.maps.marker.AdvancedMarkerElement;
-      const MarkerClusterer = (window as any).MarkerClusterer;
+    map.current = new window.google.maps.Map(mapRef.current, {
+      center: { lat: 18.5204, lng: 73.8567 }, // Pune default
+      zoom: 13,
+      mapId: import.meta.env.VITE_GOOGLE_MAP_ID,
+      disableDefaultUI: true,
+    });
 
-      if (!map.current) {
-        map.current = new google.maps.Map(mapRef.current, {
-          center: { lat: 18.5204, lng: 73.8567 },
-          zoom: 14,
-        });
-      }
+    initAutocomplete();
+    renderMarkers();
+  }
 
-      markers.current.forEach((m) => (m.map = null));
-      markers.current = [];
-      clusterer.current?.clearMarkers?.();
+  // ---------- AUTOCOMPLETE (CITY / AREA) ----------
+  function initAutocomplete() {
+    const input = document.getElementById(
+      "location-input"
+    ) as HTMLInputElement;
 
-      const normalize = (n: MapNode) => ({
-        ...n,
-        lat: n.lat ?? n.latitude,
-        lng: n.lng ?? n.longitude,
-      });
+    if (!input) return;
 
-      const subject = nodes.find((n) => n.isSubject);
-      if (!subject) return;
+    const autocomplete = new window.google.maps.places.Autocomplete(input, {
+      types: ["(regions)"],
+    });
 
-      const subjectPos = normalize(subject);
+    autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      if (!place.geometry) return;
 
-      const comparables = nodes
-        .filter((n) => !n.isSubject)
-        .map(normalize)
-        .filter((n) => n.lat && n.lng);
+      map.current.panTo(place.geometry.location);
+      map.current.setZoom(14);
+    });
+  }
 
-      const prices = comparables.map((c) => c.price).sort((a, b) => a - b);
-      const avg =
-        prices.reduce((a, b) => a + b, 0) / Math.max(prices.length, 1);
-      const median =
-        prices.length % 2
-          ? prices[Math.floor(prices.length / 2)]
-          : (prices[prices.length / 2 - 1] +
-              prices[prices.length / 2]) /
-            2;
+  // ---------- MARKERS ----------
+  function clearMarkers() {
+    markers.current.forEach((m) => (m.map = null));
+    markers.current = [];
+  }
 
-      setStats({
-        avg: Math.round(avg),
-        median: Math.round(median),
-      });
+  function renderMarkers() {
+    if (!map.current) return;
 
-      // SUBJECT
-      const subjectEl = document.createElement("div");
-      subjectEl.className =
-        "px-4 py-2 bg-yellow-400 text-black font-bold rounded-xl shadow";
-      subjectEl.innerHTML = "SUBJECT";
+    clearMarkers();
 
-      new AdvancedMarkerElement({
-        map: map.current,
-        position: { lat: subjectPos.lat!, lng: subjectPos.lng! },
-        content: subjectEl,
-        zIndex: 1000,
-      });
+    const AdvancedMarker =
+      window.google.maps.marker.AdvancedMarkerElement;
 
-      // COMPARABLES
-      comparables.forEach((node) => {
+    properties
+      .filter((p) => p.price <= budget)
+      .forEach((p) => {
         const el = document.createElement("div");
         el.className =
-          "px-3 py-1 bg-black text-white rounded-xl text-xs font-bold shadow";
-        el.innerHTML = `₹ ${node.price}`;
+          "px-3 py-1 bg-black text-white rounded-xl text-sm font-semibold shadow";
+        el.innerText = `₹${(p.price / 100000).toFixed(1)}L`;
 
-        const marker = new AdvancedMarkerElement({
+        const marker = new AdvancedMarker({
           map: map.current,
-          position: { lat: node.lat!, lng: node.lng! },
+          position: { lat: p.lat, lng: p.lng },
           content: el,
         });
 
         markers.current.push(marker);
       });
+  }
 
-      clusterer.current = new MarkerClusterer({
-        map: map.current,
-        markers: markers.current,
-      });
-    };
-
-    init();
-  }, [nodes]);
+  // ---------- RE-FILTER ON BUDGET ----------
+  useEffect(() => {
+    if (map.current) renderMarkers();
+  }, [budget]);
 
   return (
-    <div className="relative w-full h-[600px] rounded-[32px] overflow-hidden">
-      <div ref={mapRef} className="w-full h-full" />
+    <div className="w-full h-full relative">
+      {/* Controls */}
+      <div className="absolute top-4 left-4 z-10 bg-white p-4 rounded-xl shadow-lg w-72">
+        <input
+          id="location-input"
+          placeholder="City / Area"
+          className="w-full mb-3 p-2 border rounded"
+        />
 
-      {stats && (
-        <div className="absolute top-6 left-6 bg-black text-white p-4 rounded-xl shadow-xl">
-          <div className="text-xs opacity-70">Comparable Stats</div>
-          <div className="mt-1 font-bold">Avg: ₹ {stats.avg}</div>
-          <div className="text-sm">Median: ₹ {stats.median}</div>
-        </div>
-      )}
+        <label className="text-sm font-semibold">
+          Budget: ₹{(budget / 100000).toFixed(1)}L
+        </label>
+        <input
+          type="range"
+          min={1000000}
+          max={50000000}
+          step={500000}
+          value={budget}
+          onChange={(e) => setBudget(Number(e.target.value))}
+          className="w-full"
+        />
+      </div>
+
+      {/* Map */}
+      <div ref={mapRef} className="w-full h-full" />
     </div>
   );
-};
-
-export default GoogleMapView;
+}
