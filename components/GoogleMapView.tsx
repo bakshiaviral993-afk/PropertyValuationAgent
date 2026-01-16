@@ -15,18 +15,22 @@ declare global {
 }
 
 export default function GoogleMapView({
-  properties,
+  properties = [],
 }: {
-  properties: Property[];
+  properties?: Property[];
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null);
   const markers = useRef<any[]>([]);
   const [budget, setBudget] = useState(10000000);
 
-  // ---------- LOAD GOOGLE MAPS ----------
+  // ---------- LOAD MAP ----------
   useEffect(() => {
-    if (window.google) {
+    loadMap();
+  }, []);
+
+  async function loadMap() {
+    if (window.google?.maps) {
       initMap();
       return;
     }
@@ -34,46 +38,54 @@ export default function GoogleMapView({
     const script = document.createElement("script");
     script.src = `https://maps.googleapis.com/maps/api/js?key=${
       import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-    }&libraries=places,marker&v=weekly`;
+    }&v=weekly`;
     script.async = true;
     script.onload = initMap;
     document.body.appendChild(script);
-  }, []);
+  }
 
   // ---------- INIT MAP ----------
-  function initMap() {
+  async function initMap() {
     if (!mapRef.current || map.current) return;
 
-    map.current = new window.google.maps.Map(mapRef.current, {
-      center: { lat: 18.5204, lng: 73.8567 }, // Pune default
+    const { Map } = await window.google.maps.importLibrary("maps");
+    await window.google.maps.importLibrary("marker");
+    const { PlaceAutocompleteElement } =
+      await window.google.maps.importLibrary("places");
+
+    map.current = new Map(mapRef.current, {
+      center: { lat: 18.5204, lng: 73.8567 },
       zoom: 13,
       mapId: import.meta.env.VITE_GOOGLE_MAP_ID,
       disableDefaultUI: true,
     });
 
-    initAutocomplete();
+    initAutocomplete(PlaceAutocompleteElement);
     renderMarkers();
   }
 
-  // ---------- AUTOCOMPLETE (CITY / AREA) ----------
-  function initAutocomplete() {
-    const input = document.getElementById(
-      "location-input"
-    ) as HTMLInputElement;
+  // ---------- AUTOCOMPLETE (NEW API) ----------
+  function initAutocomplete(PlaceAutocompleteElement: any) {
+    const container = document.getElementById("autocomplete-container");
+    if (!container) return;
 
-    if (!input) return;
+    container.innerHTML = "";
 
-    const autocomplete = new window.google.maps.places.Autocomplete(input, {
-      types: ["(regions)"],
+    const autocomplete = new PlaceAutocompleteElement({
+      types: ["locality", "sublocality", "administrative_area_level_2"],
     });
 
-    autocomplete.addListener("place_changed", () => {
-      const place = autocomplete.getPlace();
-      if (!place.geometry) return;
+    autocomplete.addEventListener("gmp-placeselect", async (e: any) => {
+      const place = e.place;
+      await place.fetchFields({ fields: ["location"] });
 
-      map.current.panTo(place.geometry.location);
-      map.current.setZoom(14);
+      if (place.location) {
+        map.current.panTo(place.location);
+        map.current.setZoom(14);
+      }
     });
+
+    container.appendChild(autocomplete);
   }
 
   // ---------- MARKERS ----------
@@ -108,20 +120,15 @@ export default function GoogleMapView({
       });
   }
 
-  // ---------- RE-FILTER ON BUDGET ----------
   useEffect(() => {
     if (map.current) renderMarkers();
-  }, [budget]);
+  }, [budget, properties]);
 
   return (
     <div className="w-full h-full relative">
       {/* Controls */}
       <div className="absolute top-4 left-4 z-10 bg-white p-4 rounded-xl shadow-lg w-72">
-        <input
-          id="location-input"
-          placeholder="City / Area"
-          className="w-full mb-3 p-2 border rounded"
-        />
+        <div id="autocomplete-container" className="mb-3" />
 
         <label className="text-sm font-semibold">
           Budget: ₹{(budget / 100000).toFixed(1)}L
@@ -137,7 +144,6 @@ export default function GoogleMapView({
         />
       </div>
 
-      {/* Map */}
       <div ref={mapRef} className="w-full h-full" />
     </div>
   );
