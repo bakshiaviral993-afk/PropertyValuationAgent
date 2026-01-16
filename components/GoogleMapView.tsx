@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { AdvancedMarkerElement } from "@googlemaps/marker";
 import { MarkerClusterer } from "@googlemaps/markerclusterer";
 
 interface MapNode {
@@ -31,7 +30,7 @@ const loadGoogleMaps = (apiKey: string) =>
 const GoogleMapView: React.FC<{ nodes: MapNode[] }> = ({ nodes }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
-  const markers = useRef<AdvancedMarkerElement[]>([]);
+  const markers = useRef<any[]>([]);
   const clusterer = useRef<MarkerClusterer | null>(null);
   const heatmap = useRef<google.maps.visualization.HeatmapLayer | null>(null);
 
@@ -51,6 +50,10 @@ const GoogleMapView: React.FC<{ nodes: MapNode[] }> = ({ nodes }) => {
 
       await loadGoogleMaps(apiKey);
       const google = (window as any).google;
+
+      // ✅ Runtime access (THIS FIXES YOUR BUILD)
+      const AdvancedMarkerElement =
+        google.maps.marker.AdvancedMarkerElement;
 
       if (!map.current) {
         map.current = new google.maps.Map(mapRef.current, {
@@ -77,7 +80,7 @@ const GoogleMapView: React.FC<{ nodes: MapNode[] }> = ({ nodes }) => {
       clusterer.current?.clearMarkers();
       heatmap.current?.setMap(null);
 
-      // Auto-select comparables within 3km
+      // Auto-select comparables (≤ 3km)
       const comparables = nodes
         .filter((n) => !n.isSubject)
         .map(normalize)
@@ -91,7 +94,7 @@ const GoogleMapView: React.FC<{ nodes: MapNode[] }> = ({ nodes }) => {
           return distance <= 3000;
         });
 
-      // Calculate stats
+      // Stats
       const prices = comparables.map((c) => c.price).sort((a, b) => a - b);
       const avg =
         prices.reduce((a, b) => a + b, 0) / Math.max(prices.length, 1);
@@ -114,7 +117,7 @@ const GoogleMapView: React.FC<{ nodes: MapNode[] }> = ({ nodes }) => {
       subjectEl.innerHTML = "SUBJECT";
 
       const subjectMarker = new AdvancedMarkerElement({
-        map: map.current!,
+        map: map.current,
         position: { lat: subjectPos.lat!, lng: subjectPos.lng! },
         content: subjectEl,
         gmpDraggable: true,
@@ -131,7 +134,7 @@ const GoogleMapView: React.FC<{ nodes: MapNode[] }> = ({ nodes }) => {
         el.innerHTML = `₹ ${node.price}`;
 
         const marker = new AdvancedMarkerElement({
-          map: map.current!,
+          map: map.current,
           position: { lat: node.lat!, lng: node.lng! },
           content: el,
         });
@@ -139,9 +142,9 @@ const GoogleMapView: React.FC<{ nodes: MapNode[] }> = ({ nodes }) => {
         markers.current.push(marker);
       });
 
-      // Cluster comparables
+      // Cluster comparables only
       clusterer.current = new MarkerClusterer({
-        map: map.current!,
+        map: map.current,
         markers: markers.current,
       });
 
@@ -152,7 +155,8 @@ const GoogleMapView: React.FC<{ nodes: MapNode[] }> = ({ nodes }) => {
         ),
         radius: 40,
       });
-      heatmap.current.setMap(map.current!);
+
+      heatmap.current.setMap(map.current);
     };
 
     init();
