@@ -44,7 +44,7 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ nodes }) => {
     const newMap = new window.google.maps.Map(mapRef.current, {
       center: { lat: 18.5204, lng: 73.8567 },
       zoom: 14,
-      mapId: 'DEMO_MAP_ID',
+      mapId: '2185f915fc843bc0827abfdd',
     });
 
     setMap(newMap);
