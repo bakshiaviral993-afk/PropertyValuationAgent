@@ -7,10 +7,11 @@
       env: {
         NODE_ENV: 'production',
         API_KEY: 'AIzaSyC9UuJdwheLdlolVmAfktRAWEoKQJ973qI',
-        GOOGLE_MAPS_API_KEY: 'AIzaSyAkqVbMWl9PMQJFtO1BjoS84TPbvnnrRXA'  // ⭐ ADD YOUR GOOGLE MAPS KEY HERE
+        GOOGLE_MAPS_API_KEY: 'AIzaSyC9UuJdwheLdlolVmAfktRAWEoKQJ973qI'
       }
     };
   </script>
+  
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -19,10 +20,20 @@
   <link rel="icon" type="image/svg+xml"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M25 75 L52 45 L79 75' stroke='%2300F6FF' stroke-width='8' fill='none'/></svg>">
   <title>QuantCasa | Professional Property Valuation</title>
+  
+  <!-- Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=Lora:ital,wght@0,400;0,700;1,400&display=swap"
-    rel="stylesheet">
+  
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=Lora:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
+  <!-- ⭐ LOAD GOOGLE MAPS IMMEDIATELY - SIMPLE METHOD -->
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC9UuJdwheLdlolVmAfktRAWEoKQJ973qI&libraries=marker,geometry,visualization&loading=async">
+  </script>
+
+  <!-- ⭐ LOAD MARKER CLUSTERER IMMEDIATELY -->
+  <script async defer src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 
   <script>
     tailwind.config = {
@@ -51,6 +62,7 @@
       }
     }
   </script>
+  
   <style>
     body {
       background-color: #0a0a0f;
@@ -114,6 +126,7 @@
       z-index: 100 !important;
     }
   </style>
+  
   <script type="importmap">
 {
   "imports": {
