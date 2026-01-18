@@ -61,7 +61,7 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({
         area,
         propertyType: result.listings?.[0]?.bhk || 'Residential',
         size: 1100,
-        mode: 'buy'
+        mode: 'buy' // Strict mode for buy valuations only
       });
 
       const formattedMore = more.map(l => ({
@@ -187,6 +187,8 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({
                     <AlertCircle size={48} className="mx-auto mb-4 opacity-50" />
                     <p className="font-bold text-lg">No listings found in fallback mode</p>
                     <p className="text-sm mt-2">Showing market estimate only. Try a more specific location.</p>
+                    {/* NEW: Fallback range based on market trends */}
+                    <p className="text-sm mt-4 font-bold">Estimated market range in this area: {formatPrice(fairValueNum * 0.8)} - {formatPrice(fairValueNum * 1.2)}</p>
                   </div>
                 )}
               </div>
