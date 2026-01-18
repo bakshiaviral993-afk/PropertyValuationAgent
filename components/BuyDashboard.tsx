@@ -150,15 +150,8 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({
           <div className="flex-1 overflow-y-auto pr-2 pb-10 scrollbar-hide">
             <div className="space-y-8">
               {/* Your existing justification/notes block – unchanged */}
-              {(result.valuationJustification || result.notes) && (
-                <div className={`bg-white/5 rounded-[32px] p-8 border border-white/10 border-l-4 shadow-glass-3d ${isAboveBudget ? 'border-l-neo-pink' : 'border-l-neo-neon'}`}>
-                  <h3 className="text-xs font-black text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
-                    <Info size={18} className={isAboveBudget ? 'text-neo-pink' : 'text-neo-neon'} /> Market Context
-                  </h3>
-                  <p className="text-gray-300 leading-relaxed italic text-sm">"{result.valuationJustification} {result.notes}"</p>
-                </div>
-              )}
-
+            
+              <MarketIntelligence result={result} accentColor="neo-neon" />
               {/* NEW: Listings grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {allListings.length > 0 ? (
