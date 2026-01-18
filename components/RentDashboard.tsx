@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { RentResult, RentalListing, AppLang } from '../types';
 import { 
@@ -95,7 +94,7 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
         area,
         propertyType: allListings[0]?.bhk || 'Residential',
         size: 1100,
-        mode: 'rent'
+        mode: 'rent' // Strict mode for rent valuations only
       });
       
       const formattedMore: RentalListing[] = more.map(l => ({
@@ -156,19 +155,19 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
         </div>
         
         <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10 overflow-x-auto scrollbar-hide no-pdf-export">
-          <button onClick={() => setViewMode('dashboard')} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'dashboard' ? 'bg-emerald-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
-            <LayoutGrid size={12} /> Live Deck
+          <button onClick={() => setViewMode('dashboard')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'dashboard' ? 'bg-emerald-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
+            <LayoutGrid size={12} /> Deck
           </button>
-          <button onClick={() => setViewMode('map')} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'map' ? 'bg-emerald-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
-            <MapIcon size={12} /> Map View
+          <button onClick={() => setViewMode('map')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'map' ? 'bg-emerald-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
+            <MapIcon size={12} /> Map
           </button>
-          <button onClick={() => setViewMode('stats')} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'stats' ? 'bg-emerald-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
-            <BarChart3 size={12} /> Statistics
+          <button onClick={() => setViewMode('stats')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'stats' ? 'bg-emerald-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
+            <BarChart3 size={12} /> Stats
           </button>
         </div>
       </div>
 
-      {viewMode === 'stats' && listingStats && <MarketStats stats={listingStats} prices={listingPrices} labelPrefix="Monthly Rent" />}
+      {viewMode === 'stats' && <MarketStats stats={listingStats} prices={listingPrices} labelPrefix="Rent" />}
       {viewMode === 'map' && <GoogleMapView nodes={mapNodes} />}
       {viewMode === 'dashboard' && (
         <>
@@ -222,33 +221,43 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
 
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {allListings.map((item, idx) => {
-                  const itemRentVal = parsePrice(item.rent);
-                  const isMatch = userBudget && itemRentVal <= userBudget * 1.05;
-                  
-                  return (
-                    <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 shadow-glass-3d hover:border-emerald-500/30 transition-all group relative overflow-hidden animate-in zoom-in duration-500">
-                      {isMatch && (
-                        <div className="absolute top-6 right-6 z-10 px-3 py-1 bg-emerald-500 text-white text-[8px] font-black uppercase rounded-full shadow-neo-glow animate-in zoom-in">
-                          Budget Match
+                {allListings.length > 0 ? (
+                  allListings.map((item, idx) => {
+                    const itemRentVal = parsePrice(item.rent);
+                    const isMatch = userBudget && itemRentVal <= userBudget * 1.05;
+                    
+                    return (
+                      <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 shadow-glass-3d hover:border-emerald-500/30 transition-all group relative overflow-hidden animate-in zoom-in duration-500">
+                        {isMatch && (
+                          <div className="absolute top-6 right-6 z-10 px-3 py-1 bg-emerald-500 text-white text-[8px] font-black uppercase rounded-full shadow-neo-glow animate-in zoom-in">
+                            Budget Match
+                          </div>
+                        )}
+                        <AIPropertyImage title={item.title} address={item.address} type={item.bhk} />
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex-1 min-w-0 pr-4">
+                            <h4 className="font-black text-white truncate uppercase">{item.title}</h4>
+                            <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-1 font-bold uppercase tracking-widest truncate"><MapPin size={12}/> {item.address}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="text-xl font-black text-emerald-500">{formatRent(itemRentVal)}</div>
+                          </div>
                         </div>
-                      )}
-                      <AIPropertyImage title={item.title} address={item.address} type={item.bhk} />
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex-1 min-w-0 pr-4">
-                          <h4 className="font-black text-white truncate uppercase">{item.title}</h4>
-                          <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-1 font-bold uppercase tracking-widest truncate"><MapPin size={12}/> {item.address}</p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <div className="text-xl font-black text-emerald-500">{formatRent(itemRentVal)}</div>
-                        </div>
+                        <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-500 hover:border-emerald-500 transition-all">
+                          Verify Source <ExternalLink size={14} />
+                        </a>
                       </div>
-                      <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-500 hover:border-emerald-500 transition-all">
-                        Verify Source <ExternalLink size={14} />
-                      </a>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                ) : (
+                  <div className="col-span-full text-center py-20 text-gray-400 bg-white/5 rounded-[40px] border border-dashed border-white/10">
+                    <AlertCircle size={48} className="mx-auto mb-4 opacity-50" />
+                    <p className="font-bold text-lg">No listings found in fallback mode</p>
+                    <p className="text-sm mt-2">Showing market estimate only. Try a more specific location.</p>
+                    {/* NEW: Fallback range based on market trends */}
+                    <p className="text-sm mt-4 font-bold">Estimated market range in this area: {formatRent(fairValueNum * 0.8)} - {formatRent(fairValueNum * 1.2)}</p>
+                  </div>
+                )}
               </div>
 
               {allListings.length > 0 && (
@@ -272,5 +281,4 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
   );
 };
 
-/* Add default export to fix "Module 'file:///components/RentDashboard' has no default export" error */
 export default RentDashboard;
