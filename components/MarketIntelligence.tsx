@@ -1,10 +1,31 @@
 import React from 'react';
-import { Info, Sparkles, TrendingUp, ShieldCheck } from 'lucide-react';
+import { Info, Sparkles, TrendingUp, ShieldCheck, MessageSquare } from 'lucide-react';
 
 interface MarketIntelligenceProps {
   result: any;
-  accentColor?: string; // tailwind color class prefix (neo-neon, emerald, orange, etc.)
+  accentColor?: string;
 }
+
+const formatPrice = (val: any): string => {
+  if (val === null || val === undefined) return "";
+  const str = String(val);
+  const num = parseFloat(str.replace(/[^0-9.]/g, ''));
+  if (isNaN(num)) return str;
+  if (num >= 10000000) return `₹${(num / 10000000).toFixed(2)} Cr`;
+  if (num >= 100000) return `₹${(num / 100000).toFixed(2)} L`;
+  return `₹${num.toLocaleString('en-IN')}`;
+};
+
+const parsePrice = (val: any): number => {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  const str = String(val);
+  const num = parseFloat(str.replace(/[^0-9.]/g, ''));
+  if (isNaN(num)) return 0;
+  if (str.includes('Cr')) return num * 10000000;
+  if (str.includes('L')) return num * 100000;
+  return num;
+};
 
 const MarketIntelligence: React.FC<MarketIntelligenceProps> = ({
   result,
@@ -23,10 +44,12 @@ const MarketIntelligence: React.FC<MarketIntelligenceProps> = ({
 
   if (!baseText) return null;
 
-  // NEW: Dynamically get the value for negotiation script (handles buy/rent/land/commercial)
+  // Get the value for negotiation script (handles buy/rent/land/commercial)
   const value = result.fairValue || result.rentalValue || result.landValue || result.businessInsights || 'fair value';
-  const lowOffer = formatPrice(parsePrice(value) * 0.8); // 20% below for starting offer
-  const midpoint = value;
+  const valueNum = parsePrice(value);
+  const lowOffer = formatPrice(valueNum * 0.8); // 20% below for starting offer
+  const midpoint = typeof value === 'string' ? value : formatPrice(valueNum);
+  const counterOffer = formatPrice(valueNum * 0.9); // 10% below
 
   return (
     <div
@@ -89,7 +112,7 @@ const MarketIntelligence: React.FC<MarketIntelligenceProps> = ({
         </ul>
       </div>
 
-      {/* NEW: Negotiating Script section */}
+      {/* Negotiating Script section */}
       <div className="mb-4">
         <h4 className="text-[10px] font-black uppercase tracking-widest text-white flex items-center gap-2 mb-2">
           <MessageSquare size={12} /> Negotiation Script
@@ -97,14 +120,14 @@ const MarketIntelligence: React.FC<MarketIntelligenceProps> = ({
         <div className="text-sm text-gray-300 space-y-2">
           <p><strong>Buyer:</strong> "Based on recent comps and market trends, I value this at around {midpoint}. I'd like to offer {lowOffer} cash for a quick close—what do you think?"</p>
           <p><strong>Seller (possible):</strong> "That's low; we have interest at {midpoint}."</p>
-          <p><strong>Buyer:</strong> "Understood, but with current rates stable, let's meet at midway. {formatPrice(parsePrice(value) * 0.9)}, including covering stamp duty?"</p>
+          <p><strong>Buyer:</strong> "Understood, but with current rates stable, let's meet at midway. {counterOffer}, including covering stamp duty?"</p>
           <p className="text-xs text-gray-500 italic">Tip: Use signals above for leverage; always verify title.</p>
         </div>
       </div>
 
       {/* Raw intelligence (AI narrative) */}
       <p className="mt-6 text-gray-400 italic text-sm leading-relaxed">
-        “{baseText}”
+        "{baseText}"
       </p>
     </div>
   );
