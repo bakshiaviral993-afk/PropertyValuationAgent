@@ -13,6 +13,8 @@ import GoogleMapView from './GoogleMapView';
 import { getMoreListings } from '../services/valuationService';
 // @ts-ignore
 import confetti from 'canvas-confetti';
+import MarketIntelligence from './MarketIntelligence';
+
 
 /* Define RentDashboardProps interface to fix "Cannot find name 'RentDashboardProps'" error */
 interface RentDashboardProps {
@@ -212,14 +214,12 @@ const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAn
 
           <div className="flex-1 overflow-y-auto pr-2 pb-10 scrollbar-hide">
             <div className="space-y-8">
-              {(result.valuationJustification || result.notes) && (
-                <div className={`bg-white/5 rounded-[32px] p-8 border border-white/10 border-l-4 shadow-glass-3d ${isAboveBudget ? 'border-l-neo-pink' : 'border-l-emerald-500'}`}>
-                  <h3 className="text-xs font-black text-white mb-4 flex items-center gap-2 uppercase tracking-widest">
-                    <Info size={18} className={isAboveBudget ? 'text-neo-pink' : 'text-emerald-500'} /> Market Context
-                  </h3>
-                  <p className="text-gray-300 leading-relaxed italic text-sm">"{result.valuationJustification} {result.notes}"</p>
-                </div>
-              )}
+              {/* Market Intelligence */}
+    <MarketIntelligence
+      result={result}
+      accentColor={isAboveBudget ? 'neo-pink' : 'emerald-500'}
+    />
+
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {allListings.map((item, idx) => {
