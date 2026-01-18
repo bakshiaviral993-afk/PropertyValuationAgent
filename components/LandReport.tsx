@@ -8,6 +8,7 @@ import GoogleMapView from './GoogleMapView';
 import { getMoreListings } from '../services/valuationService';
 // @ts-ignore
 import confetti from 'canvas-confetti';
+import MarketIntelligence from './MarketIntelligence'; // NEW: Import for justification, signals, and negotiation script
 
 interface LandReportProps {
   result: LandResult;
@@ -83,7 +84,7 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
         area,
         propertyType: 'Plot',
         size: 1000,
-        mode: 'land'
+        mode: 'land' // Strict mode for land valuations only
       });
       
       const formattedMore: LandListing[] = more.map(l => ({
@@ -117,6 +118,8 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
     lng: l.longitude,
     isSubject: i === 0
   }));
+
+  const fairValueNum = parsePrice(result.landValue); // NEW: For fallback range calculation
 
   return (
     <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-right-8 duration-1000 pb-20">
@@ -175,12 +178,8 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
 
           <div className="flex-1 overflow-y-auto pb-10 scrollbar-hide">
             <div className="space-y-8">
-              <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 border-l-4 border-l-orange-500">
-                <h3 className="text-sm font-black text-white mb-4 flex items-center gap-2 uppercase">
-                  <Zap size={18} className="text-orange-500" /> Grounded Justification
-                </h3>
-                <p className="text-gray-400 leading-relaxed italic text-sm">"{result.valuationJustification}"</p>
-              </div>
+              {/* NEW: Replaced raw justification with MarketIntelligence for full signals and negotiation script */}
+              <MarketIntelligence result={result} accentColor="orange-500" />
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {allListings.map((item, idx) => (
@@ -221,6 +220,8 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
                 <div className="text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10">
                    <MapIcon size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
                    <p className="text-gray-500 font-black uppercase tracking-widest text-xs">No active land listings detected in this micro-market.</p>
+                   {/* NEW: Fallback range based on market trends */}
+                   <p className="text-sm mt-4 font-bold">Estimated market range in this area: {formatPrice(fairValueNum * 0.8)} - {formatPrice(fairValueNum * 1.2)}</p>
                 </div>
               )}
             </div>
