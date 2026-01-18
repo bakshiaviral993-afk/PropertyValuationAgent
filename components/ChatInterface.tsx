@@ -10,10 +10,10 @@ interface ChatInterfaceProps {
 }
 
 const TOP_CITIES = [
-  { id: 'mumbai', name: 'Mumbai', areas: ['Andheri', 'Bandra', 'Juhu', 'Powai', 'Worli', 'Lower Parel'] },
-  { id: 'delhi', name: 'Delhi', areas: ['Dwarka', 'Rohini', 'Saket', 'Vasant Kunj', 'Pitampura', 'Janakpuri'] },
+  { id: 'mumbai', name: 'Mumbai', areas: ['Andheri', 'Bandra', 'Juhu', 'Powai', 'Worli', 'Lower Parel','Malabar Hills'] },
+  { id: 'delhi', name: 'Delhi', areas: ['Dwarka', 'Rohini', 'Saket', 'Vasant Kunj', 'Pitampura', 'Janakpuri','Laxmi Nagar'] },
   { id: 'bangalore', name: 'Bangalore', areas: ['Whitefield', 'Koramangala', 'Indiranagar', 'HSR Layout', 'Electronic City', 'Marathahalli'] },
-  { id: 'pune', name: 'Pune', areas: ['Kharadi', 'Hinjewadi', 'Wakad', 'Baner', 'Aundh', 'Koregaon Park'] },
+  { id: 'pune', name: 'Pune', areas: ['Kharadi', 'Hinjewadi', 'Wakad', 'Baner', 'Aundh', 'Koregaon Park','Wagholi'] },
   { id: 'hyderabad', name: 'Hyderabad', areas: ['Gachibowli', 'Madhapur', 'Hitech City', 'Kondapur', 'Banjara Hills', 'Jubilee Hills'] },
   { id: 'chennai', name: 'Chennai', areas: ['Anna Nagar', 'T Nagar', 'Velachery', 'Adyar', 'Porur', 'OMR'] },
   { id: 'kolkata', name: 'Kolkata', areas: ['Salt Lake', 'New Town', 'Ballygunge', 'Alipore', 'Park Street', 'Rajarhat'] },
