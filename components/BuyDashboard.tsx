@@ -12,6 +12,8 @@ import GoogleMapView from './GoogleMapView';
 import { getMoreListings } from '../services/valuationService';
 // @ts-ignore
 import confetti from 'canvas-confetti';
+import MarketIntelligence from './MarketIntelligence';
+
 
 interface BuyDashboardProps {
   result: BuyResult;
