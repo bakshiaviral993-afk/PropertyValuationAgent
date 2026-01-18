@@ -12,6 +12,7 @@ import GoogleMapView from './GoogleMapView';
 import { getMoreListings } from '../services/valuationService';
 // @ts-ignore
 import confetti from 'canvas-confetti';
+import MarketIntelligence from './MarketIntelligence'; // NEW: Import for justification and signals
 
 interface CommercialDashboardProps {
   result: CommercialResult;
@@ -69,7 +70,7 @@ const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
         area,
         propertyType: initialType,
         size: initialSqft,
-        mode: 'commercial'
+        mode: 'commercial' // Strict mode for commercial valuations only
       });
       
       const formattedMore: CommercialListing[] = more.map(l => ({
@@ -104,6 +105,8 @@ const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
     lng: l.longitude,
     isSubject: i === 0 
   }));
+
+  const fairValueNum = parsePrice(currentResult.fairValue); // NEW: For fallback range calculation
 
   return (
     <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 relative pb-20">
@@ -166,6 +169,9 @@ const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
           </div>
 
           <div className="flex-1 overflow-y-auto scrollbar-hide">
+            {/* NEW: Added MarketIntelligence for justification, signals, and negotiation script */}
+            <MarketIntelligence result={currentResult} accentColor="neo-neon" />
+
             <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 border-l-4 border-l-neo-neon mb-8">
               <h3 className="text-xs font-black text-white mb-4 flex items-center gap-2 uppercase tracking-widest"><Info size={18}/> Business Intelligence</h3>
               <p className="text-gray-300 leading-relaxed italic text-sm">"{currentResult.businessInsights}"</p>
@@ -215,6 +221,8 @@ const CommercialDashboard: React.FC<CommercialDashboardProps> = ({
               <div className="col-span-full text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10">
                 <Briefcase size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
                 <p className="text-gray-500 font-black uppercase tracking-widest text-xs">No hyper-local commercial listings found.</p>
+                {/* NEW: Fallback range based on market trends */}
+                <p className="text-sm mt-4 font-bold">Estimated market range in this area: {formatPrice(fairValueNum * 0.8)} - {formatPrice(fairValueNum * 1.2)}</p>
               </div>
             )}
           </div>
