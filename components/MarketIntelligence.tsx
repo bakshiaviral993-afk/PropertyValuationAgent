@@ -23,6 +23,11 @@ const MarketIntelligence: React.FC<MarketIntelligenceProps> = ({
 
   if (!baseText) return null;
 
+  // NEW: Dynamically get the value for negotiation script (handles buy/rent/land/commercial)
+  const value = result.fairValue || result.rentalValue || result.landValue || result.businessInsights || 'fair value';
+  const lowOffer = formatPrice(parsePrice(value) * 0.8); // 20% below for starting offer
+  const midpoint = value;
+
   return (
     <div
       className={`bg-white/5 rounded-[32px] p-8 border border-white/10 border-l-4 border-l-${accentColor} mb-6`}
@@ -84,7 +89,20 @@ const MarketIntelligence: React.FC<MarketIntelligenceProps> = ({
         </ul>
       </div>
 
-      {/* Raw Intelligence (AI narrative) */}
+      {/* NEW: Negotiating Script section */}
+      <div className="mb-4">
+        <h4 className="text-[10px] font-black uppercase tracking-widest text-white flex items-center gap-2 mb-2">
+          <MessageSquare size={12} /> Negotiation Script
+        </h4>
+        <div className="text-sm text-gray-300 space-y-2">
+          <p><strong>Buyer:</strong> "Based on recent comps and market trends, I value this at around {midpoint}. I'd like to offer {lowOffer} cash for a quick close—what do you think?"</p>
+          <p><strong>Seller (possible):</strong> "That's low; we have interest at {midpoint}."</p>
+          <p><strong>Buyer:</strong> "Understood, but with current rates stable, let's meet at midway. {formatPrice(parsePrice(value) * 0.9)}, including covering stamp duty?"</p>
+          <p className="text-xs text-gray-500 italic">Tip: Use signals above for leverage; always verify title.</p>
+        </div>
+      </div>
+
+      {/* Raw intelligence (AI narrative) */}
       <p className="mt-6 text-gray-400 italic text-sm leading-relaxed">
         “{baseText}”
       </p>
