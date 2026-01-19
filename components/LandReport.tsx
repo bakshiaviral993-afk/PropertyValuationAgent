@@ -13,16 +13,7 @@ import MarketIntelligence from './MarketIntelligence'; // NEW: Import for justif
 import ValuationReport from './ValuationReport';
 
 // Add tab button and view:
-{viewMode === 'report' && (
-  <ValuationReport 
-    mode="buy" // or 'rent', 'land', 'commercial'
-    result={result}
-    city={city}
-    area={area}
-    pincode={pincode}
-    userInput={userInput}
-  />
-)}
+
 
 interface LandReportProps {
   result: LandResult;
