@@ -20,16 +20,7 @@ import ValuationReport from './ValuationReport';
 // Just add to any dashboard:
 
 // Add tab button and view:
-{viewMode === 'report' && (
-  <ValuationReport 
-    mode="buy" // or 'rent', 'land', 'commercial'
-    result={result}
-    city={city}
-    area={area}
-    pincode={pincode}
-    userInput={userInput}
-  />
-)}
+
 
 
 interface BuyDashboardProps {
