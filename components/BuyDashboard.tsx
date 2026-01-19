@@ -14,9 +14,10 @@ import { getMoreListings } from '../services/valuationService';
 import confetti from 'canvas-confetti';
 import MarketIntelligence from './MarketIntelligence';
 // Example: How to integrate ValuationReport into BuyDashboard.tsx
+import React, { useState } from 'react';
+import { LayoutGrid, FileText } from 'lucide-react';
 import ValuationReport from './ValuationReport';
 // Just add to any dashboard:
-import ValuationReport from './ValuationReport';
 
 // Add tab button and view:
 {viewMode === 'report' && (
