@@ -18,6 +18,8 @@ import React, { useState } from 'react';
 import { LayoutGrid, FileText } from 'lucide-react';
 import ValuationReport from './ValuationReport';
 // Add tab button and view:
+type ViewMode = 'dashboard' | 'stats' | 'map' | 'report';
+
 
 
 interface CommercialDashboardProps {
