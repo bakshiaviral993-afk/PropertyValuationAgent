@@ -18,16 +18,7 @@ import React, { useState } from 'react';
 import { LayoutGrid, FileText } from 'lucide-react';
 import ValuationReport from './ValuationReport';
 // Add tab button and view:
-{viewMode === 'report' && (
-  <ValuationReport 
-    mode="buy" // or 'rent', 'land', 'commercial'
-    result={result}
-    city={city}
-    area={area}
-    pincode={pincode}
-    userInput={userInput}
-  />
-)}
+
 
 interface CommercialDashboardProps {
   result: CommercialResult;
