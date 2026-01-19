@@ -13,6 +13,20 @@ import { getMoreListings } from '../services/valuationService';
 // @ts-ignore
 import confetti from 'canvas-confetti';
 import MarketIntelligence from './MarketIntelligence'; // NEW: Import for justification and signals
+// Just add to any dashboard:
+import ValuationReport from './ValuationReport';
+
+// Add tab button and view:
+{viewMode === 'report' && (
+  <ValuationReport 
+    mode="buy" // or 'rent', 'land', 'commercial'
+    result={result}
+    city={city}
+    area={area}
+    pincode={pincode}
+    userInput={userInput}
+  />
+)}
 
 interface CommercialDashboardProps {
   result: CommercialResult;
