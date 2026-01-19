@@ -13,6 +13,22 @@ import { getMoreListings } from '../services/valuationService';
 // @ts-ignore
 import confetti from 'canvas-confetti';
 import MarketIntelligence from './MarketIntelligence';
+// Example: How to integrate ValuationReport into BuyDashboard.tsx
+import ValuationReport from './ValuationReport';
+// Just add to any dashboard:
+import ValuationReport from './ValuationReport';
+
+// Add tab button and view:
+{viewMode === 'report' && (
+  <ValuationReport 
+    mode="buy" // or 'rent', 'land', 'commercial'
+    result={result}
+    city={city}
+    area={area}
+    pincode={pincode}
+    userInput={userInput}
+  />
+)}
 
 
 interface BuyDashboardProps {
