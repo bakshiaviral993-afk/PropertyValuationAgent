@@ -1,25 +1,24 @@
+// LandReport.tsx - Fixed Integration
 import React, { useState, useEffect } from 'react';
 import { LandResult, LandListing, AppLang } from '../types';
-import { ExternalLink, Map as MapIcon, ImageIcon, Loader2, Zap, Info, Calculator, RefreshCw, TrendingUp, Plus } from 'lucide-react';
+import { ExternalLink, Map as MapIcon, ImageIcon, Loader2, Zap, Info, Calculator, RefreshCw, TrendingUp, Plus, FileText } from 'lucide-react';
 import { generatePropertyImage } from '../services/geminiService';
 import { speak } from '../services/voiceService';
 import { parsePrice } from '../services/geminiService';
 import GoogleMapView from './GoogleMapView';
 import { getMoreListings } from '../services/valuationService';
-// @ts-ignore
 import confetti from 'canvas-confetti';
-import MarketIntelligence from './MarketIntelligence'; // NEW: Import for justification, signals, and negotiation script
-// Just add to any dashboard:
+import MarketIntelligence from './MarketIntelligence';
 import ValuationReport from './ValuationReport';
-
-// Add tab button and view:
-
 
 interface LandReportProps {
   result: LandResult;
   lang?: AppLang;
   onAnalyzeFinance?: (value: number) => void;
 }
+
+// Define proper type for viewMode
+type ViewMode = 'dashboard' | 'map' | 'report';
 
 const formatPrice = (val: any): string => {
   if (val === null || val === undefined) return "";
@@ -59,7 +58,8 @@ const AIPropertyImage = ({ title, address, type }: { title: string, address: str
 };
 
 const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeFinance }) => {
-  const [viewMode, setViewMode] = useState<'dashboard' | 'map'>('dashboard');
+  // Use the ViewMode type
+  const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
   const [isSearchingPincode, setIsSearchingPincode] = useState(false);
   
   const [allListings, setAllListings] = useState<LandListing[]>(result.listings || []);
@@ -89,7 +89,7 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
         area,
         propertyType: 'Plot',
         size: 1000,
-        mode: 'land' // Strict mode for land valuations only
+        mode: 'land'
       });
       
       const formattedMore: LandListing[] = more.map(l => ({
@@ -124,7 +124,7 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
     isSubject: i === 0
   }));
 
-  const fairValueNum = parsePrice(result.landValue); // NEW: For fallback range calculation
+  const fairValueNum = parsePrice(result.landValue);
 
   return (
     <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-right-8 duration-1000 pb-20">
@@ -146,14 +146,49 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
         </div>
         
         <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10 no-pdf-export overflow-x-auto scrollbar-hide">
-          <button onClick={() => setViewMode('dashboard')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest shrink-0 ${viewMode === 'dashboard' ? 'bg-orange-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>DASHBOARD</button>
-          <button onClick={() => setViewMode('map')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest shrink-0 ${viewMode === 'map' ? 'bg-orange-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>MAP VIEW</button>
+          <button 
+            onClick={() => setViewMode('dashboard')} 
+            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest shrink-0 ${viewMode === 'dashboard' ? 'bg-orange-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}
+          >
+            DASHBOARD
+          </button>
+          <button 
+            onClick={() => setViewMode('map')} 
+            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest shrink-0 ${viewMode === 'map' ? 'bg-orange-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}
+          >
+            MAP VIEW
+          </button>
+          <button 
+            onClick={() => setViewMode('report')} 
+            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest shrink-0 ${viewMode === 'report' ? 'bg-orange-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}
+          >
+            REPORT
+          </button>
         </div>
       </div>
 
-      {viewMode === 'map' ? (
+      {/* Map View */}
+      {viewMode === 'map' && (
         <GoogleMapView nodes={mapNodes} />
-      ) : (
+      )}
+
+      {/* Report View */}
+      {viewMode === 'report' && (
+        <ValuationReport 
+          mode="land"
+          result={result}
+          city={allListings[0]?.address?.split(',').pop()?.trim() || 'Unknown City'}
+          area={allListings[0]?.address?.split(',')[0]?.trim() || ''}
+          pincode={result.pincode || '000000'}
+          userInput={{ 
+            plotSize: 1000,
+            facing: 'East'
+          }}
+        />
+      )}
+
+      {/* Dashboard View */}
+      {viewMode === 'dashboard' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white/5 rounded-[32px] p-6 border border-white/10 border-t-2 border-t-orange-500 flex flex-col justify-between">
@@ -183,7 +218,6 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
 
           <div className="flex-1 overflow-y-auto pb-10 scrollbar-hide">
             <div className="space-y-8">
-              {/* NEW: Replaced raw justification with MarketIntelligence for full signals and negotiation script */}
               <MarketIntelligence result={result} accentColor="orange-500" />
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -225,7 +259,6 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
                 <div className="text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10">
                    <MapIcon size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
                    <p className="text-gray-500 font-black uppercase tracking-widest text-xs">No active land listings detected in this micro-market.</p>
-                   {/* NEW: Fallback range based on market trends */}
                    <p className="text-sm mt-4 font-bold">Estimated market range in this area: {formatPrice(fairValueNum * 0.8)} - {formatPrice(fairValueNum * 1.2)}</p>
                 </div>
               )}
