@@ -121,7 +121,7 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({
           </div>
         </div>
 
-        <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10 overflow-x-auto scrollbar-hide">
+        <div className="flex bg-grey/5 rounded-2xl p-1 border border-white/10 overflow-x-auto scrollbar-hide">
           <button onClick={() => setViewMode('dashboard')} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'dashboard' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
             <LayoutGrid size={12} /> Deck
           </button>
@@ -141,7 +141,7 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({
         <>
           {/* Your existing valuation cards – unchanged */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className={`bg-white/5 rounded-[32px] p-8 border shadow-glass-3d border-t-4 flex flex-col justify-between ${isAboveBudget ? 'border-t-neo-pink' : 'border-t-neo-neon'}`}>
+            <div className={`bg-grey/5 rounded-[32px] p-8 border shadow-glass-3d border-t-4 flex flex-col justify-between ${isAboveBudget ? 'border-t-neo-pink' : 'border-t-neo-neon'}`}>
               <div>
                 <span className="text-[10px] font-black text-neo-neon uppercase block mb-1">Fair Value</span>
                 <div className="text-4xl font-black text-white tracking-tighter">{result.fairValue}</div>
@@ -168,7 +168,7 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({
                   allListings.map((item, idx) => (
                     <div
                       key={idx}
-                      className="bg-white/5 border border-white/10 rounded-[32px] p-6 shadow-glass-3d hover:border-neo-neon/40 transition-all"
+                      className="bg-grey/5 border border-white/10 rounded-[32px] p-6 shadow-glass-3d hover:border-neo-neon/40 transition-all"
                     >
                       <h4 className="font-black text-white truncate">{item.title || 'Property'}</h4>
                       <p className="text-xl font-black text-neo-neon mt-2">{item.price || 'N/A'}</p>
@@ -183,7 +183,7 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({
                           href={item.sourceUrl}
                           target="_blank"
                           rel="noopener"
-                          className="mt-4 inline-block px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-neo-neon hover:text-white transition-all"
+                          className="mt-4 inline-block px-4 py-2 bg-grey/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-neo-neon hover:text-white transition-all"
                         >
                           View Listing
                         </a>
@@ -191,7 +191,7 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({
                     </div>
                   ))
                 ) : (
-                  <div className="col-span-full text-center py-20 text-gray-400 bg-white/5 rounded-[40px] border border-dashed border-white/10">
+                  <div className="col-span-full text-center py-20 text-gray-400 bg-grey/5 rounded-[40px] border border-dashed border-white/10">
                     <AlertCircle size={48} className="mx-auto mb-4 opacity-50" />
                     <p className="font-bold text-lg">No listings found in fallback mode</p>
                     <p className="text-sm mt-2">Showing market estimate only. Try a more specific location.</p>
@@ -208,7 +208,7 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({
                   <button
                     onClick={handleDeepScan}
                     disabled={isDeepScanning}
-                    className="px-12 py-5 bg-white/5 border border-white/10 rounded-full text-xs font-black uppercase tracking-widest text-white hover:bg-neo-neon hover:border-neo-neon transition-all flex items-center gap-3 shadow-neo-glow group active:scale-95 disabled:opacity-50"
+                    className="px-12 py-5 bg-grey/5 border border-white/10 rounded-full text-xs font-black uppercase tracking-widest text-white hover:bg-neo-neon hover:border-neo-neon transition-all flex items-center gap-3 shadow-neo-glow group active:scale-95 disabled:opacity-50"
                   >
                     {isDeepScanning ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} className="group-hover:rotate-90 transition-transform" />}
                     {isDeepScanning ? 'Performing Deep Spatial Scan...' : 'See More Properties'}
