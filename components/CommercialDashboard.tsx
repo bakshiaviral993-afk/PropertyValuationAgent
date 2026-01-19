@@ -14,8 +14,9 @@ import { getMoreListings } from '../services/valuationService';
 import confetti from 'canvas-confetti';
 import MarketIntelligence from './MarketIntelligence'; // NEW: Import for justification and signals
 // Just add to any dashboard:
+import React, { useState } from 'react';
+import { LayoutGrid, FileText } from 'lucide-react';
 import ValuationReport from './ValuationReport';
-
 // Add tab button and view:
 {viewMode === 'report' && (
   <ValuationReport 
