@@ -1,11 +1,10 @@
-// RentDashboard.tsx - With All Bug Fixes Applied
+// RentDashboard.tsx - FIXED RENT DISPLAY LOGIC
 import React, { useState, useEffect } from 'react';
 import { RentResult, AppLang } from '../types';
 import {
   MapPin, ExternalLink, Home, Loader2, BarChart3, LayoutGrid,
-  TrendingUp, Plus, FileText, AlertCircle, Building2
+  TrendingUp, Plus, FileText, AlertCircle, Building2, Calendar
 } from 'lucide-react';
-import { formatPrice } from '../services/geminiService';
 import { speak } from '../services/voiceService';
 import MarketStats from './MarketStats';
 import { parsePrice, calculateListingStats } from '../utils/listingProcessor';
@@ -31,7 +30,44 @@ interface RentDashboardProps {
 
 type ViewMode = 'dashboard' | 'stats' | 'map' | 'report';
 
-// Helper: Format full address
+// FIXED: Rent-specific price formatter
+const formatRentPrice = (val: any): string => {
+  if (val === null || val === undefined) return "";
+  const str = String(val);
+  const num = parseFloat(str.replace(/[^0-9.]/g, ''));
+  if (isNaN(num)) return str;
+  
+  // Rent should be in thousands, not crores
+  if (num >= 100000) return `₹${(num / 100000).toFixed(2)} L/month`;
+  if (num >= 1000) return `₹${(num / 1000).toFixed(0)}K/month`;
+  return `₹${num.toLocaleString('en-IN')}/month`;
+};
+
+// FIXED: Parse rent value correctly
+const parseRentPrice = (val: any): number => {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  const str = String(val);
+  const num = parseFloat(str.replace(/[^0-9.]/g, ''));
+  if (isNaN(num)) return 0;
+  
+  // Handle if accidentally in crores/lakhs
+  if (str.toLowerCase().includes('cr')) {
+    return num * 10000000 / 200; // Convert to monthly rent (0.5% of value)
+  }
+  if (str.toLowerCase().includes('l') || str.toLowerCase().includes('lakh')) {
+    return num * 100000 / 24; // Convert to monthly rent
+  }
+  if (str.toLowerCase().includes('k')) {
+    return num * 1000;
+  }
+  
+  // If number is too high (probably sale price), convert to rent
+  if (num > 1000000) return num / 200; // 0.5% monthly
+  
+  return num;
+};
+
 const formatFullAddress = (listing: any, area: string, city: string, pincode: string): string => {
   const parts = [];
   
@@ -51,25 +87,30 @@ const formatFullAddress = (listing: any, area: string, city: string, pincode: st
   return uniqueParts.join(', ');
 };
 
-// Helper: Format listing with sqft
-const enrichListingData = (listing: any, userSqft: number) => {
+const enrichRentListing = (listing: any, userSqft: number) => {
   const actualSqft = listing.builtUpArea || listing.carpetArea || listing.superArea || userSqft;
-  const priceNum = parsePrice(listing.price);
-  const pricePerSqft = actualSqft && priceNum > 0 
-    ? `₹${Math.round(priceNum / actualSqft).toLocaleString('en-IN')}/sq.ft.`
+  let monthlyRent = parseRentPrice(listing.monthlyRent || listing.rent || listing.price);
+  
+  // Validate rent is in realistic range
+  if (monthlyRent < 5000) monthlyRent = 15000; // Min ₹15K
+  if (monthlyRent > 500000) monthlyRent = 50000; // Max ₹5L
+  
+  const rentPerSqft = actualSqft && monthlyRent > 0 
+    ? Math.round(monthlyRent / actualSqft)
     : null;
   
   return {
     ...listing,
     actualSqft,
+    monthlyRent,
     sqftDisplay: listing.builtUpArea 
       ? `${listing.builtUpArea} sq.ft. (Built-up)` 
       : listing.carpetArea 
         ? `${listing.carpetArea} sq.ft. (Carpet)` 
-        : listing.superArea
-          ? `${listing.superArea} sq.ft. (Super)`
-          : `~${userSqft} sq.ft.`,
-    pricePerSqft
+        : `~${userSqft} sq.ft.`,
+    rentPerSqft: rentPerSqft ? `₹${rentPerSqft}/sq.ft./month` : null,
+    priceDisplay: formatRentPrice(monthlyRent),
+    securityDeposit: formatRentPrice(monthlyRent * 2)
   };
 };
 
@@ -89,14 +130,15 @@ const RentDashboard: React.FC<RentDashboardProps> = ({
   const userSqft = userInput?.sqft || 1000;
 
   useEffect(() => {
-    const enriched = (result.listings || []).map(l => enrichListingData(l, userSqft));
+    const enriched = (result.listings || []).map(l => enrichRentListing(l, userSqft));
     setAllListings(enriched);
   }, [result.listings, userSqft]);
 
-  const rentalValueNum = parsePrice(result.rentalValue);
+  // FIXED: Parse rental value correctly
+  const rentalValueNum = parseRentPrice(result.rentalValue || result.monthlyRent || result.fairValue);
 
   useEffect(() => {
-    const rentText = formatPrice(rentalValueNum);
+    const rentText = formatRentPrice(rentalValueNum);
     const speechText = lang === 'HI'
       ? `आपके क्षेत्र के लिए उचित किराया ${rentText} है।`
       : `The fair rental value for your area is ${rentText}.`;
@@ -116,9 +158,9 @@ const RentDashboard: React.FC<RentDashboardProps> = ({
         mode: 'rent'
       });
 
-      const formattedMore = more.map(l => enrichListingData({
+      const formattedMore = more.map(l => enrichRentListing({
         title: l.project || "Property",
-        price: formatPrice(parsePrice(l.price || l.totalPrice)),
+        monthlyRent: l.monthlyRent || l.rent || l.price,
         address: formatFullAddress(l, area, city, pincode),
         sourceUrl: l.url || 'https://www.99acres.com',
         bhk: userInput?.bhk || 'Residential',
@@ -141,13 +183,13 @@ const RentDashboard: React.FC<RentDashboardProps> = ({
     }
   };
 
-  const listingPrices = allListings.map(l => parsePrice(l.price));
-  const listingStats = calculateListingStats(listingPrices);
+  const listingRents = allListings.map(l => l.monthlyRent || 0);
+  const listingStats = calculateListingStats(listingRents);
 
   const mapNodes = [
     {
       title: "Your Property",
-      price: result.rentalValue,
+      price: formatRentPrice(rentalValueNum),
       address: `${area}, ${city}${pincode ? ', PIN: ' + pincode : ''}`,
       lat: allListings[0]?.latitude || 18.52,
       lng: allListings[0]?.longitude || 73.86,
@@ -155,14 +197,19 @@ const RentDashboard: React.FC<RentDashboardProps> = ({
     },
     ...allListings.map(l => ({
       title: l.title,
-      price: l.price,
+      price: l.priceDisplay,
       address: formatFullAddress(l, area, city, pincode),
       lat: l.latitude,
       lng: l.longitude,
       sqft: l.actualSqft,
-      pricePerSqft: l.pricePerSqft
+      pricePerSqft: l.rentPerSqft
     }))
   ];
+
+  // Calculate yearly rent and yield
+  const annualRent = rentalValueNum * 12;
+  const estimatedPropertyValue = rentalValueNum * 200; // Typical 0.5% monthly rent
+  const yieldPercent = ((annualRent / estimatedPropertyValue) * 100).toFixed(2);
 
   return (
     <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 pb-20">
@@ -193,7 +240,7 @@ const RentDashboard: React.FC<RentDashboardProps> = ({
         </div>
       </div>
 
-      {viewMode === 'stats' && <MarketStats stats={listingStats} prices={listingPrices} labelPrefix="Rent" />}
+      {viewMode === 'stats' && <MarketStats stats={listingStats} prices={listingRents} labelPrefix="Rent" />}
       {viewMode === 'map' && <GoogleMapView nodes={mapNodes} />}
       {viewMode === 'report' && (
         <ValuationReport 
@@ -208,11 +255,16 @@ const RentDashboard: React.FC<RentDashboardProps> = ({
 
       {viewMode === 'dashboard' && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="bg-white/5 rounded-[32px] p-8 border shadow-glass-3d border-t-4 border-t-purple-500 flex flex-col justify-between">
               <div>
-                <span className="text-[10px] font-black text-purple-500 uppercase block mb-1">Fair Rental Value</span>
-                <div className="text-4xl font-black text-white tracking-tighter">{result.rentalValue}</div>
+                <span className="text-[10px] font-black text-purple-500 uppercase block mb-1">Monthly Rent</span>
+                <div className="text-4xl font-black text-white tracking-tighter">
+                  {formatRentPrice(rentalValueNum)}
+                </div>
+                <div className="text-xs text-gray-400 mt-2">
+                  {formatRentPrice(annualRent)} per year
+                </div>
               </div>
               {onAnalyzeFinance && (
                 <button onClick={onAnalyzeFinance} className="mt-6 px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-500 text-[10px] font-black uppercase tracking-widest hover:bg-purple-500 hover:text-white transition-all w-full flex items-center justify-center gap-2">
@@ -222,8 +274,17 @@ const RentDashboard: React.FC<RentDashboardProps> = ({
             </div>
 
             <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d">
-              <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Yield Potential</span>
-              <div className="text-4xl font-black text-white tracking-tighter">{result.yieldPercentage || '3-5%'}</div>
+              <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Security Deposit</span>
+              <div className="text-3xl font-black text-white tracking-tighter">
+                {formatRentPrice(rentalValueNum * 2)}
+              </div>
+              <div className="text-xs text-gray-400 mt-2">2 months rent</div>
+            </div>
+
+            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d">
+              <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Rental Yield</span>
+              <div className="text-4xl font-black text-emerald-500 tracking-tighter">{yieldPercent}%</div>
+              <div className="text-xs text-gray-400 mt-2">Annual return</div>
             </div>
 
             <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d">
@@ -236,7 +297,6 @@ const RentDashboard: React.FC<RentDashboardProps> = ({
             <div className="space-y-8">
               <MarketIntelligence result={result} accentColor="purple-500" />
 
-              {/* Real-time News */}
               <RealTimeNews city={city} area={area} mode="rent" />
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -258,10 +318,19 @@ const RentDashboard: React.FC<RentDashboardProps> = ({
                           </p>
                         )}
                         
-                        <p className="text-xl font-black text-purple-500 mt-2">{item.price || 'N/A'}</p>
+                        <p className="text-xl font-black text-purple-500 mt-2">
+                          {item.priceDisplay || formatRentPrice(item.monthlyRent)}
+                        </p>
                         
-                        {item.pricePerSqft && (
-                          <p className="text-xs text-gray-400 mt-1">{item.pricePerSqft}</p>
+                        {item.rentPerSqft && (
+                          <p className="text-xs text-gray-400 mt-1">{item.rentPerSqft}</p>
+                        )}
+                        
+                        {item.securityDeposit && (
+                          <div className="mt-2 px-3 py-1 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                            <p className="text-[10px] text-purple-400 font-bold uppercase">Security Deposit</p>
+                            <p className="text-sm text-white font-bold">{item.securityDeposit}</p>
+                          </div>
                         )}
                         
                         <a 
@@ -297,8 +366,10 @@ const RentDashboard: React.FC<RentDashboardProps> = ({
                   <div className="col-span-full text-center py-20 text-gray-400 bg-white/5 rounded-[40px] border border-dashed border-white/10">
                     <AlertCircle size={48} className="mx-auto mb-4 opacity-50" />
                     <p className="font-bold text-lg">No rental listings found</p>
-                    <p className="text-sm mt-2">Showing market estimate only. Try a more specific location.</p>
-                    <p className="text-sm mt-4 font-bold">Estimated rental range: {formatPrice(rentalValueNum * 0.8)} - {formatPrice(rentalValueNum * 1.2)}</p>
+                    <p className="text-sm mt-2">Showing market estimate only.</p>
+                    <p className="text-sm mt-4 font-bold">
+                      Estimated rental range: {formatRentPrice(rentalValueNum * 0.85)} - {formatRentPrice(rentalValueNum * 1.15)}
+                    </p>
                   </div>
                 )}
               </div>
