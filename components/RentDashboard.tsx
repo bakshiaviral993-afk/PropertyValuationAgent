@@ -1,281 +1,318 @@
+// RentDashboard.tsx - With All Bug Fixes Applied
 import React, { useState, useEffect } from 'react';
-import { RentResult, RentalListing, AppLang } from '../types';
-import { 
-  MapPin, ExternalLink, Building2, Loader2, BarChart3, LayoutGrid,
-  Receipt, TrendingUp, RefreshCw, Sparkles, CheckCircle, AlertCircle, Map as MapIcon, Info, Plus
+import { RentResult, AppLang } from '../types';
+import {
+  MapPin, ExternalLink, Home, Loader2, BarChart3, LayoutGrid,
+  TrendingUp, Plus, FileText, AlertCircle, Building2
 } from 'lucide-react';
-import { generatePropertyImage, formatRent } from '../services/geminiService';
+import { formatPrice } from '../services/geminiService';
 import { speak } from '../services/voiceService';
 import MarketStats from './MarketStats';
 import { parsePrice, calculateListingStats } from '../utils/listingProcessor';
 import GoogleMapView from './GoogleMapView';
 import { getMoreListings } from '../services/valuationService';
-// @ts-ignore
 import confetti from 'canvas-confetti';
 import MarketIntelligence from './MarketIntelligence';
-// Just add to any dashboard:
-import React, { useState } from 'react';
-import { LayoutGrid, FileText } from 'lucide-react';
 import ValuationReport from './ValuationReport';
+import RealTimeNews from './RealTimeNews';
 
-// Add tab button and view:
-
-
-/* Define RentDashboardProps interface to fix "Cannot find name 'RentDashboardProps'" error */
 interface RentDashboardProps {
   result: RentResult;
   lang?: AppLang;
   onAnalyzeFinance?: () => void;
-  userBudget?: number;
+  city: string;
+  area: string;
+  pincode?: string;
+  userInput?: {
+    bhk?: string;
+    sqft?: number;
+  };
 }
 
-const AIPropertyImage = ({ title, address, type }: { title: string, address: string, type: string }) => {
-  const [imgUrl, setImgUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+type ViewMode = 'dashboard' | 'stats' | 'map' | 'report';
 
-  const RENT_PLACEHOLDERS = [
-    'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&auto=format&fit=crop'
-  ];
-
-  const handleGenerate = async (e: React.MouseEvent) => {
-    e.stopPropagation(); e.preventDefault();
-    setLoading(true);
-    const prompt = `Beautiful interior of a ${type} rental home in ${address}. Bright, minimalist, 4k.`;
-    const url = await generatePropertyImage(prompt);
-    setImgUrl(url);
-    setLoading(false);
-  };
-
-  const placeholder = RENT_PLACEHOLDERS[Math.abs(title.length) % RENT_PLACEHOLDERS.length];
-
-  return (
-    <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white/5 bg-black/40 group mb-4">
-      <img src={imgUrl || placeholder} alt={title} className={`w-full h-full object-cover transition-all duration-1000 ${!imgUrl ? 'opacity-30 grayscale group-hover:opacity-50' : 'opacity-100'}`} />
-      {!imgUrl && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <button onClick={handleGenerate} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-full text-[10px] font-black uppercase hover:scale-105 transition-all">
-            {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} {loading ? 'SYNTHESIZING...' : 'AI PREVIEW'}
-          </button>
-        </div>
-      )}
-    </div>
-  );
+// Helper: Format full address
+const formatFullAddress = (listing: any, area: string, city: string, pincode: string): string => {
+  const parts = [];
+  
+  if (listing.project || listing.title) {
+    parts.push(listing.project || listing.title);
+  }
+  
+  if (listing.locality && listing.locality !== area) {
+    parts.push(listing.locality);
+  }
+  
+  if (area) parts.push(area);
+  if (city) parts.push(city);
+  if (pincode) parts.push(`PIN: ${pincode}`);
+  
+  const uniqueParts = [...new Set(parts.filter(p => p && p.trim()))];
+  return uniqueParts.join(', ');
 };
 
-const RentDashboard: React.FC<RentDashboardProps> = ({ result, lang = 'EN', onAnalyzeFinance, userBudget }) => {
-  const [viewMode, setViewMode] = useState<'dashboard' | 'stats' | 'map'>('dashboard');
-  const [isSearchingPincode, setIsSearchingPincode] = useState(false);
+// Helper: Format listing with sqft
+const enrichListingData = (listing: any, userSqft: number) => {
+  const actualSqft = listing.builtUpArea || listing.carpetArea || listing.superArea || userSqft;
+  const priceNum = parsePrice(listing.price);
+  const pricePerSqft = actualSqft && priceNum > 0 
+    ? `₹${Math.round(priceNum / actualSqft).toLocaleString('en-IN')}/sq.ft.`
+    : null;
   
-  const [allListings, setAllListings] = useState<RentalListing[]>(result.listings || []);
+  return {
+    ...listing,
+    actualSqft,
+    sqftDisplay: listing.builtUpArea 
+      ? `${listing.builtUpArea} sq.ft. (Built-up)` 
+      : listing.carpetArea 
+        ? `${listing.carpetArea} sq.ft. (Carpet)` 
+        : listing.superArea
+          ? `${listing.superArea} sq.ft. (Super)`
+          : `~${userSqft} sq.ft.`,
+    pricePerSqft
+  };
+};
+
+const RentDashboard: React.FC<RentDashboardProps> = ({
+  result,
+  lang = 'EN',
+  onAnalyzeFinance,
+  city,
+  area,
+  pincode = '',
+  userInput
+}) => {
+  const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
+  const [allListings, setAllListings] = useState(result.listings || []);
   const [isDeepScanning, setIsDeepScanning] = useState(false);
 
-  useEffect(() => {
-    setAllListings(result.listings || []);
-  }, [result.listings]);
-
-  const fairValueNum = parsePrice(result.rentalValue);
-  const isAboveBudget = userBudget && fairValueNum > userBudget * 1.1;
+  const userSqft = userInput?.sqft || 1000;
 
   useEffect(() => {
-    const rentText = formatRent(fairValueNum);
-    const speechText = lang === 'HI' 
-      ? `आपके क्षेत्र के लिए अनुमानित किराया ${rentText} प्रति माह है।`
-      : `The estimated rental value for your area is ${rentText} per month.`;
+    const enriched = (result.listings || []).map(l => enrichListingData(l, userSqft));
+    setAllListings(enriched);
+  }, [result.listings, userSqft]);
+
+  const rentalValueNum = parsePrice(result.rentalValue);
+
+  useEffect(() => {
+    const rentText = formatPrice(rentalValueNum);
+    const speechText = lang === 'HI'
+      ? `आपके क्षेत्र के लिए उचित किराया ${rentText} है।`
+      : `The fair rental value for your area is ${rentText}.`;
     speak(speechText, lang === 'HI' ? 'hi-IN' : 'en-IN');
   }, [result.rentalValue, lang]);
 
   const handleDeepScan = async () => {
     if (isDeepScanning) return;
     setIsDeepScanning(true);
-    setIsSearchingPincode(true);
-    
+
     try {
-      const city = allListings[0]?.address?.split(',').pop()?.trim() || 'Unknown City';
-      const area = allListings[0]?.address?.split(',')[0]?.trim() || '';
-      
       const more = await getMoreListings({
         city,
         area,
-        propertyType: allListings[0]?.bhk || 'Residential',
-        size: 1100,
-        mode: 'rent' // Strict mode for rent valuations only
+        propertyType: userInput?.bhk || 'Residential',
+        size: userSqft,
+        mode: 'rent'
       });
-      
-      const formattedMore: RentalListing[] = more.map(l => ({
-        title: l.project,
-        rent: formatRent(parsePrice(l.monthlyRent || l.price)),
-        address: `${l.project}, ${area}, ${city}`,
-        sourceUrl: 'https://www.nobroker.in',
-        bhk: allListings[0]?.bhk || 'Residential',
+
+      const formattedMore = more.map(l => enrichListingData({
+        title: l.project || "Property",
+        price: formatPrice(parsePrice(l.price || l.totalPrice)),
+        address: formatFullAddress(l, area, city, pincode),
+        sourceUrl: l.url || 'https://www.99acres.com',
+        bhk: userInput?.bhk || 'Residential',
         qualityScore: 8,
         latitude: l.latitude,
         longitude: l.longitude,
-        facing: 'Any'
-      }));
+        builtUpArea: l.builtUpArea,
+        carpetArea: l.carpetArea,
+        locality: l.locality
+      }, userSqft));
 
       const uniqueNew = formattedMore.filter(nm => !allListings.some(al => al.title === nm.title));
       setAllListings(prev => [...prev, ...uniqueNew]);
-      
+
       confetti({ particleCount: 100, spread: 50, origin: { y: 0.8 } });
     } catch (e) {
       console.error("Deep Scan Failed:", e);
     } finally {
       setIsDeepScanning(false);
-      setIsSearchingPincode(false);
     }
   };
 
-  const listingPrices = allListings.map(l => parsePrice(l.rent));
+  const listingPrices = allListings.map(l => parsePrice(l.price));
   const listingStats = calculateListingStats(listingPrices);
 
   const mapNodes = [
-    { title: "Grounded Node", price: formatRent(fairValueNum), address: allListings[0]?.address || "Selected Area", lat: allListings[0]?.latitude, lng: allListings[0]?.longitude, isSubject: true },
-    ...allListings.slice(1).map(l => ({
+    {
+      title: "Your Property",
+      price: result.rentalValue,
+      address: `${area}, ${city}${pincode ? ', PIN: ' + pincode : ''}`,
+      lat: allListings[0]?.latitude || 18.52,
+      lng: allListings[0]?.longitude || 73.86,
+      isSubject: true
+    },
+    ...allListings.map(l => ({
       title: l.title,
-      price: formatRent(parsePrice(l.rent)),
-      address: l.address,
+      price: l.price,
+      address: formatFullAddress(l, area, city, pincode),
       lat: l.latitude,
-      lng: l.longitude
+      lng: l.longitude,
+      sqft: l.actualSqft,
+      pricePerSqft: l.pricePerSqft
     }))
   ];
 
   return (
     <div className="h-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 pb-20">
-      {isSearchingPincode && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 bg-emerald-500 text-white rounded-full font-black text-[10px] uppercase tracking-widest shadow-neo-glow flex items-center gap-3 animate-bounce">
-          <RefreshCw size={14} className="animate-spin" /> Updating rental indices...
-        </div>
-      )}
-
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-emerald-100 rounded-2xl border border-emerald-500/20 text-emerald-500 shadow-sm">
+          <div className="p-3 bg-purple-500/10 rounded-2xl text-purple-500 shadow-lg">
             <Building2 size={24} />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Lease Analysis</h2>
-            <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black opacity-60">Verified Valuation Node</p>
+            <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Rent Analysis</h2>
+            <p className="text-[10px] text-gray-500 uppercase font-black opacity-60">{area}, {city}</p>
           </div>
         </div>
-        
-        <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10 overflow-x-auto scrollbar-hide no-pdf-export">
-          <button onClick={() => setViewMode('dashboard')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'dashboard' ? 'bg-emerald-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
+
+        <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10 overflow-x-auto scrollbar-hide">
+          <button onClick={() => setViewMode('dashboard')} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'dashboard' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
             <LayoutGrid size={12} /> Deck
           </button>
-          <button onClick={() => setViewMode('map')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'map' ? 'bg-emerald-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
-            <MapIcon size={12} /> Map
+          <button onClick={() => setViewMode('map')} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'map' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
+            <MapPin size={12} /> Map
           </button>
-          <button onClick={() => setViewMode('stats')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shrink-0 ${viewMode === 'stats' ? 'bg-emerald-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
+          <button onClick={() => setViewMode('stats')} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'stats' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
             <BarChart3 size={12} /> Stats
+          </button>
+          <button onClick={() => setViewMode('report')} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'report' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
+            <FileText size={12} /> Report
           </button>
         </div>
       </div>
 
       {viewMode === 'stats' && <MarketStats stats={listingStats} prices={listingPrices} labelPrefix="Rent" />}
       {viewMode === 'map' && <GoogleMapView nodes={mapNodes} />}
+      {viewMode === 'report' && (
+        <ValuationReport 
+          mode="rent"
+          result={result}
+          city={city}
+          area={area}
+          pincode={pincode}
+          userInput={userInput}
+        />
+      )}
+
       {viewMode === 'dashboard' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className={`bg-white/5 rounded-[32px] p-8 border shadow-glass-3d border-t-4 flex flex-col justify-between transition-all ${isAboveBudget ? 'border-t-neo-pink border-neo-pink/20' : 'border-t-emerald-500 border-white/10'}`}>
+            <div className="bg-white/5 rounded-[32px] p-8 border shadow-glass-3d border-t-4 border-t-purple-500 flex flex-col justify-between">
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Receipt size={14} className={isAboveBudget ? 'text-neo-pink' : 'text-emerald-500'} />
-                  <span className={`text-[10px] font-black uppercase tracking-widest block ${isAboveBudget ? 'text-neo-pink' : 'text-emerald-500'}`}>Est. Monthly Rent</span>
-                </div>
-                <div className="text-4xl font-black text-white tracking-tighter">
-                  {formatRent(fairValueNum)}
-                </div>
-                <div className="mt-2 flex items-center gap-2">
-                   {isAboveBudget ? (
-                     <span className="px-3 py-1 bg-neo-pink/10 text-neo-pink text-[8px] font-black uppercase rounded-lg flex items-center gap-1.5 border border-neo-pink/20">
-                       <AlertCircle size={10} /> Above Target
-                     </span>
-                   ) : (
-                     <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 text-[8px] font-black uppercase rounded-lg flex items-center gap-1.5 border border-emerald-500/20">
-                       <CheckCircle size={10} /> Within Budget
-                     </span>
-                   )}
-                </div>
+                <span className="text-[10px] font-black text-purple-500 uppercase block mb-1">Fair Rental Value</span>
+                <div className="text-4xl font-black text-white tracking-tighter">{result.rentalValue}</div>
               </div>
               {onAnalyzeFinance && (
-                <button onClick={() => { setIsSearchingPincode(true); setTimeout(() => { onAnalyzeFinance(); setIsSearchingPincode(false); }, 800); }} className="mt-6 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-400 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all w-full flex items-center justify-center gap-2">
-                  <TrendingUp size={12}/> Fiscal Simulator
+                <button onClick={onAnalyzeFinance} className="mt-6 px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-500 text-[10px] font-black uppercase tracking-widest hover:bg-purple-500 hover:text-white transition-all w-full flex items-center justify-center gap-2">
+                  <TrendingUp size={12} /> ROI Calculator
                 </button>
               )}
             </div>
-            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d border-t-4 border-t-blue-500">
-              <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest block mb-2">Projected Yield</span>
-              <div className="text-4xl font-black text-white tracking-tighter">{result.yieldPercentage || "3.5%"}</div>
-              <p className="text-[9px] text-gray-500 mt-2 font-bold uppercase">Asset Efficiency Signal</p>
+
+            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d">
+              <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Yield Potential</span>
+              <div className="text-4xl font-black text-white tracking-tighter">{result.yieldPercentage || '3-5%'}</div>
             </div>
-            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d border-t-4 border-t-orange-500">
-              <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest block mb-2">Confidence Score</span>
-              <div className="text-4xl font-black text-white tracking-tighter">{result.confidenceScore}%</div>
-              <p className="text-[9px] text-gray-500 mt-2 font-bold uppercase">Grounding Probability</p>
+
+            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d">
+              <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Listings Found</span>
+              <div className="text-4xl font-black text-white tracking-tighter">{allListings.length}</div>
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto pr-2 pb-10 scrollbar-hide">
             <div className="space-y-8">
-              {/* Market Intelligence */}
-    <MarketIntelligence
-      result={result}
-      accentColor={isAboveBudget ? 'neo-pink' : 'emerald-500'}
-    />
+              <MarketIntelligence result={result} accentColor="purple-500" />
 
+              {/* Real-time News */}
+              <RealTimeNews city={city} area={area} mode="rent" />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {allListings.length > 0 ? (
                   allListings.map((item, idx) => {
-                    const itemRentVal = parsePrice(item.rent);
-                    const isMatch = userBudget && itemRentVal <= userBudget * 1.05;
+                    const fullAddress = formatFullAddress(item, area, city, pincode);
+                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
                     
                     return (
-                      <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 shadow-glass-3d hover:border-emerald-500/30 transition-all group relative overflow-hidden animate-in zoom-in duration-500">
-                        {isMatch && (
-                          <div className="absolute top-6 right-6 z-10 px-3 py-1 bg-emerald-500 text-white text-[8px] font-black uppercase rounded-full shadow-neo-glow animate-in zoom-in">
-                            Budget Match
-                          </div>
+                      <div
+                        key={idx}
+                        className="bg-white/5 border border-white/10 rounded-[32px] p-6 shadow-glass-3d hover:border-purple-500/40 transition-all"
+                      >
+                        <h4 className="font-black text-white truncate">{item.title || 'Property'}</h4>
+                        
+                        {item.actualSqft && (
+                          <p className="text-sm text-blue-400 font-bold mt-1">
+                            {item.sqftDisplay}
+                          </p>
                         )}
-                        <AIPropertyImage title={item.title} address={item.address} type={item.bhk} />
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex-1 min-w-0 pr-4">
-                            <h4 className="font-black text-white truncate uppercase">{item.title}</h4>
-                            <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-1 font-bold uppercase tracking-widest truncate"><MapPin size={12}/> {item.address}</p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <div className="text-xl font-black text-emerald-500">{formatRent(itemRentVal)}</div>
-                          </div>
-                        </div>
-                        <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-500 hover:border-emerald-500 transition-all">
-                          Verify Source <ExternalLink size={14} />
+                        
+                        <p className="text-xl font-black text-purple-500 mt-2">{item.price || 'N/A'}</p>
+                        
+                        {item.pricePerSqft && (
+                          <p className="text-xs text-gray-400 mt-1">{item.pricePerSqft}</p>
+                        )}
+                        
+                        <a 
+                          href={mapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-gray-400 hover:text-blue-400 transition-colors mt-2 block underline decoration-dotted cursor-pointer line-clamp-2"
+                          title="View on Google Maps"
+                        >
+                          📍 {fullAddress}
                         </a>
+                        
+                        {item.latitude && item.longitude && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Lat: {item.latitude.toFixed(4)} | Lng: {item.longitude.toFixed(4)}
+                          </p>
+                        )}
+                        
+                        {item.sourceUrl && (
+                          <a
+                            href={item.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-4 inline-block px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-purple-500 hover:text-white transition-all"
+                          >
+                            View Full Listing →
+                          </a>
+                        )}
                       </div>
                     );
                   })
                 ) : (
                   <div className="col-span-full text-center py-20 text-gray-400 bg-white/5 rounded-[40px] border border-dashed border-white/10">
                     <AlertCircle size={48} className="mx-auto mb-4 opacity-50" />
-                    <p className="font-bold text-lg">No listings found in fallback mode</p>
+                    <p className="font-bold text-lg">No rental listings found</p>
                     <p className="text-sm mt-2">Showing market estimate only. Try a more specific location.</p>
-                    {/* NEW: Fallback range based on market trends */}
-                    <p className="text-sm mt-4 font-bold">Estimated market range in this area: {formatRent(fairValueNum * 0.8)} - {formatRent(fairValueNum * 1.2)}</p>
+                    <p className="text-sm mt-4 font-bold">Estimated rental range: {formatPrice(rentalValueNum * 0.8)} - {formatPrice(rentalValueNum * 1.2)}</p>
                   </div>
                 )}
               </div>
 
               {allListings.length > 0 && (
                 <div className="flex flex-col items-center gap-6 py-10">
-                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em]">Extended Lease Network Detected</p>
-                  <button 
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em]">Extended Rental Network Detected</p>
+                  <button
                     onClick={handleDeepScan}
                     disabled={isDeepScanning}
-                    className="px-12 py-5 bg-white/5 border border-white/10 rounded-full text-xs font-black uppercase tracking-widest text-white hover:bg-emerald-500 hover:border-emerald-500 transition-all flex items-center gap-3 shadow-neo-glow group active:scale-95 disabled:opacity-50"
+                    className="px-12 py-5 bg-white/5 border border-white/10 rounded-full text-xs font-black uppercase tracking-widest text-white hover:bg-purple-500 hover:border-purple-500 transition-all flex items-center gap-3 shadow-lg group active:scale-95 disabled:opacity-50"
                   >
                     {isDeepScanning ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} className="group-hover:rotate-90 transition-transform" />}
-                    {isDeepScanning ? 'Performing Deep Spatial Scan...' : 'See More Properties'}
+                    {isDeepScanning ? 'Scanning Rental Market...' : 'See More Rentals'}
                   </button>
                 </div>
               )}
