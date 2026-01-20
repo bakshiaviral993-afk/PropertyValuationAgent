@@ -1,37 +1,44 @@
-import { create } from "zustand";
+// src/components/store/usePropertyMapStore.ts
+// Update your property type to include new fields
 
-/**
- * Shared state between Map and Property List
- * Single source of truth
- */
+import { create } from 'zustand';
 
-export type Property = {
+export interface Property {
   id: string;
-  lat: number;
-  lng: number;
-  price: number;
   address: string;
-};
+  price: number;
+  latitude: number;
+  longitude: number;
+  
+  // NEW: Add these fields for bug fixes
+  sqft?: number;              // Actual square footage
+  builtUpArea?: number;       // Built-up area
+  carpetArea?: number;        // Carpet area
+  superArea?: number;         // Super area
+  fullAddress?: string;       // Complete formatted address
+  locality?: string;          // Locality name
+  subLocality?: string;       // Sub-locality
+  project?: string;           // Project/property name
+  title?: string;             // Property title
+  pricePerSqft?: number;      // Calculated price per sqft
+  mapsUrl?: string;           // Google Maps URL
+  sourceUrl?: string;         // Original listing URL
+}
 
-type PropertyMapState = {
-  visibleProperties: Property[];
-  hoveredId: string | null;
+interface PropertyMapStore {
+  properties: Property[];
   selectedId: string | null;
-
-  setVisibleProperties: (properties: Property[]) => void;
-  setHoveredId: (id: string | null) => void;
+  hoveredId: string | null;
+  setProperties: (properties: Property[]) => void;
   setSelectedId: (id: string | null) => void;
-};
+  setHoveredId: (id: string | null) => void;
+}
 
-export const usePropertyMapStore = create<PropertyMapState>((set) => ({
-  visibleProperties: [],
-  hoveredId: null,
+export const usePropertyMapStore = create<PropertyMapStore>((set) => ({
+  properties: [],
   selectedId: null,
-
-  setVisibleProperties: (properties) =>
-    set({ visibleProperties: properties }),
-
-  setHoveredId: (id) => set({ hoveredId: id }),
-
+  hoveredId: null,
+  setProperties: (properties) => set({ properties }),
   setSelectedId: (id) => set({ selectedId: id }),
+  setHoveredId: (id) => set({ hoveredId: id }),
 }));
