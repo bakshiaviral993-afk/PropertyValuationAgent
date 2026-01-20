@@ -1,3 +1,4 @@
+// src/services/valuationService.ts - Updated with Bug Fixes
 import { callLLMWithFallback } from "./llmFallback";
 import { parsePrice } from "../utils/listingProcessor";
 
@@ -38,44 +39,167 @@ export interface ValuationResultBase {
   tenantDemandScore?: number;
 }
 
-async function performSearchWithRadius(req: ValuationRequestBase, radiusDescription: string, bhk?: string): Promise<any> {
+// NEW: Helper to format complete address
+function formatCompleteAddress(listing: any, area: string, city: string, pincode: string): string {
+  const parts = [];
+  
+  if (listing.project || listing.title) {
+    parts.push(listing.project || listing.title);
+  }
+  
+  if (listing.locality && listing.locality !== area) {
+    parts.push(listing.locality);
+  }
+  
+  if (listing.subLocality && listing.subLocality !== listing.locality) {
+    parts.push(listing.subLocality);
+  }
+  
+  if (area) parts.push(area);
+  if (city) parts.push(city);
+  if (pincode) parts.push(`PIN: ${pincode}`);
+  
+  // Remove duplicates and empty values
+  const uniqueParts = [...new Set(parts.filter(p => p && p.trim()))];
+  return uniqueParts.join(', ');
+}
+
+// NEW: Enrich listing with complete data
+function enrichListing(listing: any, area: string, city: string, pincode: string, userSqft: number): any {
+  // Extract actual sqft from various possible fields
+  const actualSqft = listing.builtUpArea || 
+                     listing.carpetArea || 
+                     listing.superArea || 
+                     listing.size_sqft ||
+                     listing.plotArea ||
+                     userSqft;
+  
+  // Calculate price per sqft
+  const priceNum = parsePrice(listing.price);
+  const pricePerSqft = actualSqft && priceNum > 0 
+    ? Math.round(priceNum / actualSqft)
+    : null;
+  
+  // Determine sqft display string
+  let sqftDisplay = '';
+  if (listing.builtUpArea) {
+    sqftDisplay = `${listing.builtUpArea} sq.ft. (Built-up)`;
+  } else if (listing.carpetArea) {
+    sqftDisplay = `${listing.carpetArea} sq.ft. (Carpet)`;
+  } else if (listing.superArea) {
+    sqftDisplay = `${listing.superArea} sq.ft. (Super)`;
+  } else if (listing.size_sqft) {
+    sqftDisplay = `${listing.size_sqft} sq.ft.`;
+  } else {
+    sqftDisplay = `~${userSqft} sq.ft.`;
+  }
+  
+  return {
+    ...listing,
+    // Full formatted address
+    fullAddress: formatCompleteAddress(listing, area, city, pincode),
+    // Actual sqft data
+    actualSqft,
+    sqftDisplay,
+    pricePerSqft: pricePerSqft ? `₹${pricePerSqft.toLocaleString('en-IN')}/sq.ft.` : null,
+    // Ensure coordinates exist
+    latitude: listing.latitude || listing.lat || null,
+    longitude: listing.longitude || listing.lng || null,
+    // Google Maps URL
+    mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formatCompleteAddress(listing, area, city, pincode))}`
+  };
+}
+
+async function performSearchWithRadius(
+  req: ValuationRequestBase, 
+  radiusDescription: string, 
+  bhk?: string
+): Promise<any> {
+  // UPDATED PROMPT: Request more detailed data including sqft and locality
   const prompt = `Valuation Expert: Estimate value for ${bhk || req.propertyType} (${req.size} sqft) in ${req.area}, ${req.city}.
   Strategy: ${radiusDescription}. 
-  Mandatory: Output valid JSON with "listings" array. Each listing MUST have "latitude" and "longitude" numbers.
-  Output JSON: {"fairValue": number, "rangeLow": number, "rangeHigh": number, "listings": [{"title": string, "price": string, "address": string, "latitude": number, "longitude": number}]}`;
+  
+  CRITICAL REQUIREMENTS:
+  1. Each listing MUST have "latitude" and "longitude" as numbers
+  2. Include "builtUpArea" or "carpetArea" or "size_sqft" for actual property size
+  3. Include "locality" or "subLocality" for complete address
+  4. Include "project" or "title" for property name
+  5. Include full address components
+  
+  Output JSON: {
+    "fairValue": number, 
+    "rangeLow": number, 
+    "rangeHigh": number, 
+    "valuationJustification": "detailed explanation",
+    "listings": [{
+      "title": string,
+      "project": string,
+      "price": string,
+      "address": string,
+      "locality": string,
+      "subLocality": string,
+      "builtUpArea": number,
+      "carpetArea": number,
+      "size_sqft": number,
+      "latitude": number,
+      "longitude": number,
+      "url": string
+    }]
+  }`;
 
   const { text, source } = await callLLMWithFallback(prompt, { temperature: 0.1 });
+  
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
+    
     const data = JSON.parse(jsonMatch[0]);
     data.fairValue = parsePrice(data.fairValue);
     data.llmSource = source;
+    
+    // NEW: Enrich all listings with complete data
+    if (data.listings && Array.isArray(data.listings)) {
+      data.listings = data.listings.map((listing: any) => 
+        enrichListing(listing, req.area || '', req.city, req.pincode || '', req.size)
+      );
+    }
+    
     return data;
   } catch (e) {
+    console.error('JSON parse error:', e);
     return null;
   }
 }
 
-export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string }): Promise<ValuationResultBase> {
+export async function getBuyValuation(
+  req: ValuationRequestBase & { bhk?: string }
+): Promise<ValuationResultBase> {
   // Stage 1: Pincode
   let result = await performSearchWithRadius(req, `STRICT Pincode: ${req.pincode}`, req.bhk);
 
   // Stage 2: 5KM expansion (Now triggers on empty listings too)
   if (!result || result.fairValue < 100000 || !result.listings || result.listings.length === 0) {
     console.log("Empty listing signal. Expanding crawl radius...");
-    result = await performSearchWithRadius(req, `Expanded 5KM Radius around ${req.area}, ${req.city}`, req.bhk);
+    result = await performSearchWithRadius(
+      req, 
+      `Expanded 5KM Radius around ${req.area}, ${req.city}`, 
+      req.bhk
+    );
     if (result) result.isExpanded = true;
   }
 
   // Stage 3: Macro expansion (Final LLM search attempt)
   if (!result || result.fairValue < 100000 || !result.listings || result.listings.length === 0) {
     console.log("Micro-market signal dead. Transitioning to city-wide data nodes.");
-    result = await performSearchWithRadius(req, `Macro Search for ${req.city} city averages`, req.bhk);
+    result = await performSearchWithRadius(
+      req, 
+      `Macro Search for ${req.city} city averages`, 
+      req.bhk
+    );
     if (result) result.isMacro = true;
   }
 
-  // Fallback protection is handled in api/llm.ts Stage 3, but we ensure structure here
+  // Fallback protection
   const finalResult = result || { fairValue: 0, listings: [] };
 
   return {
@@ -84,52 +208,163 @@ export async function getBuyValuation(req: ValuationRequestBase & { bhk?: string
     rangeHigh: parsePrice(finalResult.rangeHigh) || finalResult.fairValue * 1.1,
     pricePerUnit: finalResult.fairValue / (req.size || 1),
     confidence: finalResult.fairValue > 0 ? 'medium' : 'low',
-    source: finalResult.llmSource === 'market_fallback' ? 'market_fallback' : (finalResult.isExpanded || finalResult.isMacro ? 'radius_expansion' : 'live_scrape'),
-    notes: finalResult.isExpanded ? "Search expanded to 5km micro-market due to sparse local listings." : (finalResult.isMacro ? "Macro-city indices applied." : "Grounded via local data node."),
+    source: finalResult.llmSource === 'market_fallback' 
+      ? 'market_fallback' 
+      : (finalResult.isExpanded || finalResult.isMacro ? 'radius_expansion' : 'live_scrape'),
+    notes: finalResult.isExpanded 
+      ? "Search expanded to 5km micro-market due to sparse local listings." 
+      : (finalResult.isMacro ? "Macro-city indices applied." : "Grounded via local data node."),
     comparables: finalResult.listings || [],
     valuationJustification: finalResult.valuationJustification || "Spatial crawl completed."
   };
 }
 
-export async function getRentValuationInternal(req: ValuationRequestBase): Promise<ValuationResultBase> {
+export async function getRentValuationInternal(
+  req: ValuationRequestBase
+): Promise<ValuationResultBase> {
   const result = await performSearchWithRadius(req, `Leasehold crawl for ${req.area}`, undefined);
-  if (!result || result.fairValue < 1000) return { estimatedValue: 0, rangeLow: 0, rangeHigh: 0, pricePerUnit: 0, confidence: 'low', source: 'neural_calibration', notes: "Insufficient signal." };
+  
+  if (!result || result.fairValue < 1000) {
+    return { 
+      estimatedValue: 0, 
+      rangeLow: 0, 
+      rangeHigh: 0, 
+      pricePerUnit: 0, 
+      confidence: 'low', 
+      source: 'neural_calibration', 
+      notes: "Insufficient signal.",
+      comparables: []
+    };
+  }
+  
   return {
     estimatedValue: result.fairValue,
-    rangeLow: result.fairValue * 0.9, rangeHigh: result.fairValue * 1.1,
+    rangeLow: result.fairValue * 0.9, 
+    rangeHigh: result.fairValue * 1.1,
     pricePerUnit: result.fairValue / (req.size || 1),
-    confidence: 'medium', source: 'live_scrape', notes: "Verified leasehold index.", comparables: result.listings
+    confidence: 'medium', 
+    source: 'live_scrape', 
+    notes: "Verified leasehold index.", 
+    comparables: result.listings || []
   };
 }
 
-export async function getLandValuationInternal(req: ValuationRequestBase): Promise<ValuationResultBase> {
+export async function getLandValuationInternal(
+  req: ValuationRequestBase
+): Promise<ValuationResultBase> {
   const result = await performSearchWithRadius(req, `Plot district search for ${req.city}`, undefined);
-  if (!result || result.fairValue < 100000) return { estimatedValue: 0, rangeLow: 0, rangeHigh: 0, pricePerUnit: 0, confidence: 'low', source: 'neural_calibration', notes: "Land data opaque." };
+  
+  if (!result || result.fairValue < 100000) {
+    return { 
+      estimatedValue: 0, 
+      rangeLow: 0, 
+      rangeHigh: 0, 
+      pricePerUnit: 0, 
+      confidence: 'low', 
+      source: 'neural_calibration', 
+      notes: "Land data opaque.",
+      comparables: []
+    };
+  }
+  
   return {
     estimatedValue: result.fairValue,
-    rangeLow: result.fairValue * 0.85, rangeHigh: result.fairValue * 1.15,
+    rangeLow: result.fairValue * 0.85, 
+    rangeHigh: result.fairValue * 1.15,
     pricePerUnit: result.fairValue / (req.size || 1),
-    confidence: 'medium', source: 'live_scrape', notes: "Land node synced.", comparables: result.listings
+    confidence: 'medium', 
+    source: 'live_scrape', 
+    notes: "Land node synced.", 
+    comparables: result.listings || []
   };
 }
 
-export async function getCommercialValuationInternal(req: ValuationRequestBase): Promise<ValuationResultBase> {
+export async function getCommercialValuationInternal(
+  req: ValuationRequestBase
+): Promise<ValuationResultBase> {
   const result = await performSearchWithRadius(req, `CBD search for ${req.city}`, undefined);
-  if (!result || result.fairValue < 100000) return { estimatedValue: 0, rangeLow: 0, rangeHigh: 0, pricePerUnit: 0, confidence: 'low', source: 'neural_calibration', notes: "Commercial indices missing." };
+  
+  if (!result || result.fairValue < 100000) {
+    return { 
+      estimatedValue: 0, 
+      rangeLow: 0, 
+      rangeHigh: 0, 
+      pricePerUnit: 0, 
+      confidence: 'low', 
+      source: 'neural_calibration', 
+      notes: "Commercial indices missing.",
+      comparables: []
+    };
+  }
+  
   return {
     estimatedValue: result.fairValue,
-    rangeLow: result.fairValue * 0.9, rangeHigh: result.fairValue * 1.1,
+    rangeLow: result.fairValue * 0.9, 
+    rangeHigh: result.fairValue * 1.1,
     pricePerUnit: result.fairValue / (req.size || 1),
-    confidence: 'medium', source: 'live_scrape', notes: "Commercial asset pulse active.", comparables: result.listings
+    confidence: 'medium', 
+    source: 'live_scrape', 
+    notes: "Commercial asset pulse active.", 
+    comparables: result.listings || []
   };
 }
 
-export async function getMoreListings(req: ValuationRequestBase & { mode: 'sale' | 'rent' | 'land' | 'commercial' }): Promise<any[]> {
-  const prompt = `EXHAUSTIVE SEARCH: 15+ real ${req.mode} listings in ${req.city}, ${req.area}. 
-  JSON: {"listings": [{"project": string, "price": any, "size_sqft": number, "latitude": number, "longitude": number}]}`;
+// UPDATED: getMoreListings with enriched data
+export async function getMoreListings(
+  req: ValuationRequestBase & { mode: 'buy' | 'rent' | 'land' | 'commercial' }
+): Promise<any[]> {
+  const modeKeywords = {
+    buy: 'sale purchase',
+    rent: 'rental lease',
+    land: 'plot land',
+    commercial: 'commercial office retail'
+  };
+  
+  const prompt = `EXHAUSTIVE SEARCH: Find 15+ real ${modeKeywords[req.mode]} listings in ${req.city}, ${req.area}. 
+  
+  MANDATORY FIELDS PER LISTING:
+  - "project" or "title": Property name
+  - "price": Price as string
+  - "size_sqft" or "builtUpArea": Actual area
+  - "locality": Specific locality name
+  - "latitude": number (required)
+  - "longitude": number (required)
+  - "url": Source URL
+  
+  Output JSON: {
+    "listings": [{
+      "project": string,
+      "title": string,
+      "price": string,
+      "size_sqft": number,
+      "builtUpArea": number,
+      "carpetArea": number,
+      "locality": string,
+      "subLocality": string,
+      "latitude": number,
+      "longitude": number,
+      "url": string
+    }]
+  }`;
+  
   const { text } = await callLLMWithFallback(prompt, { temperature: 0.1 });
+  
   try {
-    const data = JSON.parse(text.match(/\{[\s\S]*\}/)![0]);
-    return data.listings || [];
-  } catch { return []; }
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return [];
+    
+    const data = JSON.parse(jsonMatch[0]);
+    const listings = data.listings || [];
+    
+    // Enrich all listings
+    return listings.map((listing: any) => 
+      enrichListing(listing, req.area || '', req.city, req.pincode || '', req.size)
+    );
+  } catch (e) {
+    console.error('Failed to parse more listings:', e);
+    return [];
+  }
 }
+
+// NEW: Export helper functions for use in components
+export { formatCompleteAddress, enrichListing };
