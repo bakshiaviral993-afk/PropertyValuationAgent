@@ -1,7 +1,7 @@
-// LandReport.tsx - Fixed Integration
+// LandReport.tsx - Complete Bug Fixes Applied
 import React, { useState, useEffect } from 'react';
 import { LandResult, LandListing, AppLang } from '../types';
-import { ExternalLink, Map as MapIcon, ImageIcon, Loader2, Zap, Info, Calculator, RefreshCw, TrendingUp, Plus, FileText } from 'lucide-react';
+import { ExternalLink, Map as MapIcon, ImageIcon, Loader2, Zap, Info, Calculator, RefreshCw, TrendingUp, Plus, FileText, AlertCircle } from 'lucide-react';
 import { generatePropertyImage } from '../services/geminiService';
 import { speak } from '../services/voiceService';
 import { parsePrice } from '../services/geminiService';
@@ -10,14 +10,21 @@ import { getMoreListings } from '../services/valuationService';
 import confetti from 'canvas-confetti';
 import MarketIntelligence from './MarketIntelligence';
 import ValuationReport from './ValuationReport';
+import RealTimeNews from './RealTimeNews';
 
 interface LandReportProps {
   result: LandResult;
   lang?: AppLang;
   onAnalyzeFinance?: (value: number) => void;
+  city?: string;
+  area?: string;
+  pincode?: string;
+  userInput?: {
+    plotSize?: number;
+    facing?: string;
+  };
 }
 
-// Define proper type for viewMode
 type ViewMode = 'dashboard' | 'map' | 'report';
 
 const formatPrice = (val: any): string => {
@@ -28,6 +35,44 @@ const formatPrice = (val: any): string => {
   if (num >= 10000000) return `₹${(num / 10000000).toFixed(2)} Cr`;
   if (num >= 100000) return `₹${(num / 100000).toFixed(2)} L`;
   return `₹${num.toLocaleString('en-IN')}`;
+};
+
+const formatFullAddress = (listing: any, area: string, city: string, pincode: string): string => {
+  const parts = [];
+  
+  if (listing.project || listing.title) {
+    parts.push(listing.project || listing.title);
+  }
+  
+  if (listing.locality && listing.locality !== area) {
+    parts.push(listing.locality);
+  }
+  
+  if (area) parts.push(area);
+  if (city) parts.push(city);
+  if (pincode) parts.push(`PIN: ${pincode}`);
+  
+  const uniqueParts = [...new Set(parts.filter(p => p && p.trim()))];
+  return uniqueParts.join(', ');
+};
+
+const enrichLandListing = (listing: any, area: string, city: string, pincode: string, userPlotSize: number) => {
+  const actualSize = listing.size_sqyd || listing.plotSize || userPlotSize;
+  const priceNum = parsePrice(listing.price);
+  const pricePerSqyd = actualSize && priceNum > 0 
+    ? `₹${Math.round(priceNum / actualSize).toLocaleString('en-IN')}/sq.yd.`
+    : null;
+  
+  return {
+    ...listing,
+    fullAddress: formatFullAddress(listing, area, city, pincode),
+    actualSize,
+    sizeDisplay: listing.size_sqyd 
+      ? `${listing.size_sqyd} sq.yd.` 
+      : `~${userPlotSize} sq.yd.`,
+    pricePerSqyd,
+    mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formatFullAddress(listing, area, city, pincode))}`
+  };
 };
 
 const AIPropertyImage = ({ title, address, type }: { title: string, address: string, type: string }) => {
@@ -57,17 +102,30 @@ const AIPropertyImage = ({ title, address, type }: { title: string, address: str
   );
 };
 
-const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeFinance }) => {
-  // Use the ViewMode type
+const LandReport: React.FC<LandReportProps> = ({ 
+  result, 
+  lang = 'EN', 
+  onAnalyzeFinance,
+  city = '',
+  area = '',
+  pincode = '',
+  userInput
+}) => {
   const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
   const [isSearchingPincode, setIsSearchingPincode] = useState(false);
-  
   const [allListings, setAllListings] = useState<LandListing[]>(result.listings || []);
   const [isDeepScanning, setIsDeepScanning] = useState(false);
 
+  const userPlotSize = userInput?.plotSize || 1000;
+  const extractedCity = city || allListings[0]?.address?.split(',').pop()?.trim() || 'Unknown City';
+  const extractedArea = area || allListings[0]?.address?.split(',')[0]?.trim() || '';
+
   useEffect(() => {
-    setAllListings(result.listings || []);
-  }, [result.listings]);
+    const enriched = (result.listings || []).map(l => 
+      enrichLandListing(l, extractedArea, extractedCity, pincode, userPlotSize)
+    );
+    setAllListings(enriched);
+  }, [result.listings, userPlotSize]);
 
   useEffect(() => {
     const landValueStr = typeof result.landValue === 'string' ? result.landValue : formatPrice(result.landValue);
@@ -81,27 +139,26 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
     setIsSearchingPincode(true);
     
     try {
-      const city = allListings[0]?.address?.split(',').pop()?.trim() || 'Unknown City';
-      const area = allListings[0]?.address?.split(',')[0]?.trim() || '';
-      
       const more = await getMoreListings({
-        city,
-        area,
+        city: extractedCity,
+        area: extractedArea,
         propertyType: 'Plot',
-        size: 1000,
+        size: userPlotSize,
         mode: 'land'
       });
       
-      const formattedMore: LandListing[] = more.map(l => ({
+      const formattedMore = more.map(l => enrichLandListing({
         title: l.project || "Land Parcel",
         price: formatPrice(l.totalPrice || l.price),
-        size: `${l.size_sqyd || 1000} sqyd`,
-        address: `${l.project}, ${area}, ${city}`,
-        sourceUrl: 'https://www.99acres.com',
+        size: `${l.size_sqyd || userPlotSize} sqyd`,
+        address: l.address || '',
+        sourceUrl: l.url || 'https://www.99acres.com',
         latitude: l.latitude,
         longitude: l.longitude,
-        facing: 'East'
-      }));
+        facing: userInput?.facing || 'East',
+        size_sqyd: l.size_sqyd,
+        locality: l.locality
+      }, extractedArea, extractedCity, pincode, userPlotSize));
 
       const uniqueNew = formattedMore.filter(nm => !allListings.some(al => al.title === nm.title));
       setAllListings(prev => [...prev, ...uniqueNew]);
@@ -118,10 +175,12 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
   const mapNodes = allListings.map((l, i) => ({
     title: l.title,
     price: l.price,
-    address: l.address,
+    address: l.fullAddress || l.address,
     lat: l.latitude,
     lng: l.longitude,
-    isSubject: i === 0
+    isSubject: i === 0,
+    sqft: l.actualSize,
+    pricePerSqft: l.pricePerSqyd
   }));
 
   const fairValueNum = parsePrice(result.landValue);
@@ -146,48 +205,31 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
         </div>
         
         <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10 no-pdf-export overflow-x-auto scrollbar-hide">
-          <button 
-            onClick={() => setViewMode('dashboard')} 
-            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest shrink-0 ${viewMode === 'dashboard' ? 'bg-orange-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}
-          >
+          <button onClick={() => setViewMode('dashboard')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest shrink-0 ${viewMode === 'dashboard' ? 'bg-orange-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
             DASHBOARD
           </button>
-          <button 
-            onClick={() => setViewMode('map')} 
-            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest shrink-0 ${viewMode === 'map' ? 'bg-orange-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}
-          >
+          <button onClick={() => setViewMode('map')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest shrink-0 ${viewMode === 'map' ? 'bg-orange-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
             MAP VIEW
           </button>
-          <button 
-            onClick={() => setViewMode('report')} 
-            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest shrink-0 ${viewMode === 'report' ? 'bg-orange-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}
-          >
+          <button onClick={() => setViewMode('report')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest shrink-0 ${viewMode === 'report' ? 'bg-orange-500 text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
             REPORT
           </button>
         </div>
       </div>
 
-      {/* Map View */}
-      {viewMode === 'map' && (
-        <GoogleMapView nodes={mapNodes} />
-      )}
-
-      {/* Report View */}
+      {viewMode === 'map' && <GoogleMapView nodes={mapNodes} />}
+      
       {viewMode === 'report' && (
         <ValuationReport 
           mode="land"
           result={result}
-          city={allListings[0]?.address?.split(',').pop()?.trim() || 'Unknown City'}
-          area={allListings[0]?.address?.split(',')[0]?.trim() || ''}
-          pincode={result.pincode || '000000'}
-          userInput={{ 
-            plotSize: 1000,
-            facing: 'East'
-          }}
+          city={extractedCity}
+          area={extractedArea}
+          pincode={pincode}
+          userInput={userInput}
         />
       )}
 
-      {/* Dashboard View */}
       {viewMode === 'dashboard' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -220,21 +262,48 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
             <div className="space-y-8">
               <MarketIntelligence result={result} accentColor="orange-500" />
 
+              {/* Real-time News */}
+              <RealTimeNews city={extractedCity} area={extractedArea} mode="land" />
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {allListings.map((item, idx) => (
-                  <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 group shadow-glass-3d animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 50}ms` }}>
-                    <AIPropertyImage title={item.title} address={item.address} type="Plot" />
-                    <div className="mb-4">
-                      <h4 className="font-black text-white truncate uppercase">{item.title}</h4>
-                      <p className="text-[10px] text-gray-500 truncate font-bold tracking-widest mt-1 uppercase">{item.address}</p>
-                      <div className="mt-4 flex justify-between items-center pt-4 border-t border-white/5">
-                        <span className="text-xl font-black text-orange-500">{typeof item.price === 'string' ? item.price : formatPrice(item.price)}</span>
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{item.size}</span>
+                {allListings.map((item, idx) => {
+                  const fullAddress = item.fullAddress || formatFullAddress(item, extractedArea, extractedCity, pincode);
+                  const mapsUrl = item.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
+                  
+                  return (
+                    <div key={idx} className="bg-white/5 border border-white/10 rounded-[32px] p-6 group shadow-glass-3d animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 50}ms` }}>
+                      <AIPropertyImage title={item.title} address={fullAddress} type="Plot" />
+                      <div className="mb-4">
+                        <h4 className="font-black text-white truncate uppercase">{item.title}</h4>
+                        
+                        {item.actualSize && (
+                          <p className="text-sm text-blue-400 font-bold mt-1">
+                            {item.sizeDisplay}
+                          </p>
+                        )}
+                        
+                        <p className="text-xl font-black text-orange-500 mt-2">
+                          {typeof item.price === 'string' ? item.price : formatPrice(item.price)}
+                        </p>
+                        
+                        {item.pricePerSqyd && (
+                          <p className="text-xs text-gray-400 mt-1">{item.pricePerSqyd}</p>
+                        )}
+                        
+                        <a 
+                          href={mapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-gray-400 hover:text-blue-400 transition-colors mt-2 block underline decoration-dotted cursor-pointer line-clamp-2"
+                          title="View on Google Maps"
+                        >
+                          📍 {fullAddress}
+                        </a>
                       </div>
+                      <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-4 rounded-2xl bg-white/5 text-white text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:bg-orange-500 transition-all border border-white/10">Verify Listing <ExternalLink size={14} /></a>
                     </div>
-                    <a href={item.sourceUrl} target="_blank" rel="noopener" className="w-full py-4 rounded-2xl bg-white/5 text-white text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:bg-orange-500 transition-all border border-white/10">Verify Listing <ExternalLink size={14} /></a>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {allListings.length > 0 && (
@@ -259,7 +328,7 @@ const LandReport: React.FC<LandReportProps> = ({ result, lang = 'EN', onAnalyzeF
                 <div className="text-center py-20 bg-white/5 rounded-[40px] border border-dashed border-white/10">
                    <MapIcon size={48} className="mx-auto text-gray-600 mb-6 opacity-20" />
                    <p className="text-gray-500 font-black uppercase tracking-widest text-xs">No active land listings detected in this micro-market.</p>
-                   <p className="text-sm mt-4 font-bold">Estimated market range in this area: {formatPrice(fairValueNum * 0.8)} - {formatPrice(fairValueNum * 1.2)}</p>
+                   <p className="text-sm mt-4 font-bold">Estimated market range: {formatPrice(fairValueNum * 0.8)} - {formatPrice(fairValueNum * 1.2)}</p>
                 </div>
               )}
             </div>
