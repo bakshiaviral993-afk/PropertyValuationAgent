@@ -1,12 +1,11 @@
-// BuyDashboard.tsx - Fixed Integration
+// BuyDashboard.tsx - With All Bug Fixes
 import React, { useState, useEffect } from 'react';
 import { BuyResult, AppLang } from '../types';
 import {
   MapPin, ExternalLink, Home, Loader2, BarChart3, LayoutGrid,
-  Receipt, TrendingUp, RefreshCw, Sparkles, CheckCircle, AlertCircle, 
-  Map as MapIcon, Info, Plus, FileText
+  TrendingUp, Plus, FileText, AlertCircle
 } from 'lucide-react';
-import { generatePropertyImage, formatPrice } from '../services/geminiService';
+import { formatPrice } from '../services/geminiService';
 import { speak } from '../services/voiceService';
 import MarketStats from './MarketStats';
 import { parsePrice, calculateListingStats } from '../utils/listingProcessor';
@@ -23,10 +22,57 @@ interface BuyDashboardProps {
   userBudget?: number;
   city: string;
   area: string;
+  pincode?: string;
+  userInput?: {
+    bhk?: string;
+    sqft?: number;
+  };
 }
 
-// Define proper type for viewMode
 type ViewMode = 'dashboard' | 'stats' | 'map' | 'report';
+
+// Helper: Format full address
+const formatFullAddress = (listing: any, area: string, city: string, pincode: string): string => {
+  const parts = [];
+  
+  if (listing.project || listing.title) {
+    parts.push(listing.project || listing.title);
+  }
+  
+  if (listing.locality && listing.locality !== area) {
+    parts.push(listing.locality);
+  }
+  
+  if (area) parts.push(area);
+  if (city) parts.push(city);
+  if (pincode) parts.push(`PIN: ${pincode}`);
+  
+  // Remove duplicates
+  const uniqueParts = [...new Set(parts.filter(p => p && p.trim()))];
+  return uniqueParts.join(', ');
+};
+
+// Helper: Format listing with sqft
+const enrichListingData = (listing: any, userSqft: number) => {
+  const actualSqft = listing.builtUpArea || listing.carpetArea || listing.superArea || userSqft;
+  const priceNum = parsePrice(listing.price);
+  const pricePerSqft = actualSqft && priceNum > 0 
+    ? `₹${Math.round(priceNum / actualSqft).toLocaleString('en-IN')}/sq.ft.`
+    : null;
+  
+  return {
+    ...listing,
+    actualSqft,
+    sqftDisplay: listing.builtUpArea 
+      ? `${listing.builtUpArea} sq.ft. (Built-up)` 
+      : listing.carpetArea 
+        ? `${listing.carpetArea} sq.ft. (Carpet)` 
+        : listing.superArea
+          ? `${listing.superArea} sq.ft. (Super)`
+          : `~${userSqft} sq.ft.`,
+    pricePerSqft
+  };
+};
 
 const BuyDashboard: React.FC<BuyDashboardProps> = ({
   result,
@@ -34,16 +80,21 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({
   onAnalyzeFinance,
   userBudget,
   city,
-  area
+  area,
+  pincode = '',
+  userInput
 }) => {
-  // Use the ViewMode type
   const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
   const [allListings, setAllListings] = useState(result.listings || []);
   const [isDeepScanning, setIsDeepScanning] = useState(false);
 
+  const userSqft = userInput?.sqft || 1000;
+
   useEffect(() => {
-    setAllListings(result.listings || []);
-  }, [result.listings]);
+    // Enrich listings with full data
+    const enriched = (result.listings || []).map(l => enrichListingData(l, userSqft));
+    setAllListings(enriched);
+  }, [result.listings, userSqft]);
 
   const fairValueNum = parsePrice(result.fairValue);
   const isAboveBudget = userBudget && fairValueNum > userBudget * 1.1;
@@ -64,21 +115,24 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({
       const more = await getMoreListings({
         city,
         area,
-        propertyType: result.listings?.[0]?.bhk || 'Residential',
-        size: 1100,
+        propertyType: userInput?.bhk || 'Residential',
+        size: userSqft,
         mode: 'buy'
       });
 
-      const formattedMore = more.map(l => ({
+      const formattedMore = more.map(l => enrichListingData({
         title: l.project || "Property",
         price: formatPrice(parsePrice(l.price || l.totalPrice)),
-        address: `${l.project}, ${area}, ${city}`,
-        sourceUrl: 'https://www.99acres.com',
-        bhk: result.listings?.[0]?.bhk || 'Residential',
+        address: formatFullAddress(l, area, city, pincode),
+        sourceUrl: l.url || 'https://www.99acres.com',
+        bhk: userInput?.bhk || 'Residential',
         qualityScore: 8,
         latitude: l.latitude,
-        longitude: l.longitude
-      }));
+        longitude: l.longitude,
+        builtUpArea: l.builtUpArea,
+        carpetArea: l.carpetArea,
+        locality: l.locality
+      }, userSqft));
 
       const uniqueNew = formattedMore.filter(nm => !allListings.some(al => al.title === nm.title));
       setAllListings(prev => [...prev, ...uniqueNew]);
@@ -95,13 +149,22 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({
   const listingStats = calculateListingStats(listingPrices);
 
   const mapNodes = [
-    { title: "Subject Property", price: result.fairValue, address: `${area}, ${city}`, lat: allListings[0]?.latitude || 18.52, lng: allListings[0]?.longitude || 73.86, isSubject: true },
+    {
+      title: "Your Property",
+      price: result.fairValue,
+      address: `${area}, ${city}${pincode ? ', PIN: ' + pincode : ''}`,
+      lat: allListings[0]?.latitude || 18.52,
+      lng: allListings[0]?.longitude || 73.86,
+      isSubject: true
+    },
     ...allListings.map(l => ({
       title: l.title,
       price: l.price,
-      address: l.address,
+      address: formatFullAddress(l, area, city, pincode),
       lat: l.latitude,
-      lng: l.longitude
+      lng: l.longitude,
+      sqft: l.actualSqft,
+      pricePerSqft: l.pricePerSqft
     }))
   ];
 
@@ -119,62 +182,36 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({
         </div>
 
         <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10 overflow-x-auto scrollbar-hide">
-          <button 
-            onClick={() => setViewMode('dashboard')} 
-            className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'dashboard' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}
-          >
+          <button onClick={() => setViewMode('dashboard')} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'dashboard' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
             <LayoutGrid size={12} /> Deck
           </button>
-          <button 
-            onClick={() => setViewMode('map')} 
-            className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'map' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}
-          >
-            <MapIcon size={12} /> Map
+          <button onClick={() => setViewMode('map')} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'map' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
+            <MapPin size={12} /> Map
           </button>
-          <button 
-            onClick={() => setViewMode('stats')} 
-            className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'stats' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}
-          >
+          <button onClick={() => setViewMode('stats')} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'stats' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
             <BarChart3 size={12} /> Stats
           </button>
-          <button 
-            onClick={() => setViewMode('report')} 
-            className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'report' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}
-          >
+          <button onClick={() => setViewMode('report')} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest flex items-center gap-2 ${viewMode === 'report' ? 'bg-neo-neon text-white shadow-neo-glow' : 'text-gray-400 hover:text-white'}`}>
             <FileText size={12} /> Report
           </button>
         </div>
       </div>
 
-      {/* Stats View */}
-      {viewMode === 'stats' && (
-        <MarketStats stats={listingStats} prices={listingPrices} labelPrefix="Price" />
-      )}
-
-      {/* Map View */}
-      {viewMode === 'map' && (
-        <GoogleMapView nodes={mapNodes} />
-      )}
-
-      {/* Report View */}
+      {viewMode === 'stats' && <MarketStats stats={listingStats} prices={listingPrices} labelPrefix="Price" />}
+      {viewMode === 'map' && <GoogleMapView nodes={mapNodes} />}
       {viewMode === 'report' && (
         <ValuationReport 
           mode="buy"
           result={result}
           city={city}
           area={area}
-          pincode={result.pincode || '400001'}
-          userInput={{ 
-            bhk: result.listings?.[0]?.bhk || '2 BHK',
-            sqft: 1000 
-          }}
+          pincode={pincode}
+          userInput={userInput}
         />
       )}
 
-      {/* Dashboard View */}
       {viewMode === 'dashboard' && (
         <>
-          {/* Valuation cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className={`bg-white/5 rounded-[32px] p-8 border shadow-glass-3d border-t-4 flex flex-col justify-between ${isAboveBudget ? 'border-t-neo-pink' : 'border-t-neo-neon'}`}>
               <div>
@@ -203,34 +240,63 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({
             <div className="space-y-8">
               <MarketIntelligence result={result} accentColor="neo-neon" />
 
-              {/* Listings grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {allListings.length > 0 ? (
-                  allListings.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="bg-white/5 border border-white/10 rounded-[32px] p-6 shadow-glass-3d hover:border-neo-neon/40 transition-all"
-                    >
-                      <h4 className="font-black text-white truncate">{item.title || 'Property'}</h4>
-                      <p className="text-xl font-black text-neo-neon mt-2">{item.price || 'N/A'}</p>
-                      <p className="text-sm text-gray-400 mt-1">{item.address || 'Location not available'}</p>
-                      {item.latitude && item.longitude && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          Lat: {item.latitude.toFixed(4)} | Lng: {item.longitude.toFixed(4)}
-                        </p>
-                      )}
-                      {item.sourceUrl && (
-                        <a
-                          href={item.sourceUrl}
+                  allListings.map((item, idx) => {
+                    const fullAddress = formatFullAddress(item, area, city, pincode);
+                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
+                    
+                    return (
+                      <div
+                        key={idx}
+                        className="bg-white/5 border border-white/10 rounded-[32px] p-6 shadow-glass-3d hover:border-neo-neon/40 transition-all"
+                      >
+                        <h4 className="font-black text-white truncate">{item.title || 'Property'}</h4>
+                        
+                        {/* Show actual SQFT */}
+                        {item.actualSqft && (
+                          <p className="text-sm text-blue-400 font-bold mt-1">
+                            {item.sqftDisplay}
+                          </p>
+                        )}
+                        
+                        <p className="text-xl font-black text-neo-neon mt-2">{item.price || 'N/A'}</p>
+                        
+                        {/* Price per sqft */}
+                        {item.pricePerSqft && (
+                          <p className="text-xs text-gray-400 mt-1">{item.pricePerSqft}</p>
+                        )}
+                        
+                        {/* Full clickable address */}
+                        <a 
+                          href={mapsUrl}
                           target="_blank"
-                          rel="noopener"
-                          className="mt-4 inline-block px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-neo-neon hover:text-white transition-all"
+                          rel="noopener noreferrer"
+                          className="text-sm text-gray-400 hover:text-blue-400 transition-colors mt-2 block underline decoration-dotted cursor-pointer line-clamp-2"
+                          title="View on Google Maps"
                         >
-                          View Listing
+                          📍 {fullAddress}
                         </a>
-                      )}
-                    </div>
-                  ))
+                        
+                        {item.latitude && item.longitude && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Lat: {item.latitude.toFixed(4)} | Lng: {item.longitude.toFixed(4)}
+                          </p>
+                        )}
+                        
+                        {item.sourceUrl && (
+                          <a
+                            href={item.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-4 inline-block px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-neo-neon hover:text-white transition-all"
+                          >
+                            View Full Listing →
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })
                 ) : (
                   <div className="col-span-full text-center py-20 text-gray-400 bg-white/5 rounded-[40px] border border-dashed border-white/10">
                     <AlertCircle size={48} className="mx-auto mb-4 opacity-50" />
@@ -243,14 +309,14 @@ const BuyDashboard: React.FC<BuyDashboardProps> = ({
 
               {allListings.length > 0 && (
                 <div className="flex flex-col items-center gap-6 py-10">
-                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em]">Extended Lease Network Detected</p>
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em]">Extended Property Network Detected</p>
                   <button
                     onClick={handleDeepScan}
                     disabled={isDeepScanning}
                     className="px-12 py-5 bg-white/5 border border-white/10 rounded-full text-xs font-black uppercase tracking-widest text-white hover:bg-neo-neon hover:border-neo-neon transition-all flex items-center gap-3 shadow-neo-glow group active:scale-95 disabled:opacity-50"
                   >
                     {isDeepScanning ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} className="group-hover:rotate-90 transition-transform" />}
-                    {isDeepScanning ? 'Performing Deep Spatial Scan...' : 'See More Properties'}
+                    {isDeepScanning ? 'Scanning Market Data...' : 'See More Properties'}
                   </button>
                 </div>
               )}
