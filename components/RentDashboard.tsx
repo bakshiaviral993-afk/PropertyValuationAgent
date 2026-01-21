@@ -1,4 +1,4 @@
-// RentDashboard.tsx - FIXED RENT DISPLAY LOGIC
+// RentDashboard.tsx - FIXED RENT DISPLAY LOGIC (Complete)
 import React, { useState, useEffect } from 'react';
 import { RentResult, AppLang } from '../types';
 import {
@@ -41,6 +41,14 @@ const formatRentPrice = (val: any): string => {
   if (num >= 100000) return `₹${(num / 100000).toFixed(2)} L/month`;
   if (num >= 1000) return `₹${(num / 1000).toFixed(0)}K/month`;
   return `₹${num.toLocaleString('en-IN')}/month`;
+};
+
+// Helper to format annual rent without /month suffix
+const formatAnnualRent = (val: number): string => {
+  if (val >= 10000000) return `₹${(val / 10000000).toFixed(2)} Cr`;
+  if (val >= 100000) return `₹${(val / 100000).toFixed(2)} L`;
+  if (val >= 1000) return `₹${(val / 1000).toFixed(0)}K`;
+  return `₹${val.toLocaleString('en-IN')}`;
 };
 
 // FIXED: Parse rent value correctly
@@ -256,14 +264,15 @@ const RentDashboard: React.FC<RentDashboardProps> = ({
       {viewMode === 'dashboard' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {/* FIXED: Monthly Rent Card - No Overlap */}
             <div className="bg-white/5 rounded-[32px] p-8 border shadow-glass-3d border-t-4 border-t-purple-500 flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-black text-purple-500 uppercase block mb-1">Monthly Rent</span>
-                <div className="text-4xl font-black text-white tracking-tighter">
+              <div className="flex flex-col space-y-3">
+                <span className="text-[10px] font-black text-purple-500 uppercase tracking-wider">Monthly Rent</span>
+                <div className="text-4xl font-black text-white tracking-tighter leading-none">
                   {formatRentPrice(rentalValueNum)}
                 </div>
-                <div className="text-xs text-gray-400 mt-2">
-                  {formatRentPrice(annualRent)} per year
+                <div className="text-sm text-gray-400 font-semibold pt-1">
+                  {formatAnnualRent(annualRent)} per year
                 </div>
               </div>
               {onAnalyzeFinance && (
