@@ -1,92 +1,95 @@
-import { SaleListing, RentalListing } from '../types';
+// src/utils/listingProcessor.ts
 
-/**
- * Robust price parser with range handling and unit detection.
- * Handles: "₹3.5 Cr", "45 - 50 Lakhs", "12,000", "1.2 Crore"
- */
-export const parsePrice = (priceStr: any): number => {
-  if (priceStr === null || priceStr === undefined || priceStr === '') return 0;
+// Price parsing helper
+export function parsePrice(p: any): number {
+  if (typeof p === 'number') return p;
+  if (!p) return 0;
+  const str = String(p);
+  const num = parseFloat(str.replace(/[^0-9.]/g, ''));
+  if (isNaN(num)) return 0;
   
-  const s = String(priceStr)
-    .replace(/[^0-9.\-lLcrkCR]/g, ' ')
-    .trim()
-    .toLowerCase();
+  // Handle crores and lakhs
+  if (str.toLowerCase().includes('cr')) {
+    return num * 10000000;
+  }
+  if (str.toLowerCase().includes('l') || str.toLowerCase().includes('lakh')) {
+    return num * 100000;
+  }
+  if (str.toLowerCase().includes('k')) {
+    return num * 1000;
+  }
+  
+  return num;
+}
 
-  // Handle ranges: take the median of the range for statistical accuracy
-  if (s.includes('-') || s.includes('–')) {
-    const parts = s.split(/[-–]/);
-    const low = parsePrice(parts[0]);
-    const high = parsePrice(parts[1]);
-    return low > 0 && high > 0 ? (low + high) / 2 : low || high;
+// Calculate statistics from a list of prices
+export function calculateListingStats(prices: number[]) {
+  if (!prices || prices.length === 0) {
+    return {
+      min: 0,
+      max: 0,
+      avg: 0,
+      median: 0,
+      count: 0
+    };
   }
 
-  const numMatch = s.match(/(\d+(?:\.\d+)?)/);
-  if (!numMatch) return 0;
-  
-  let value = parseFloat(numMatch[1]);
-  
-  // Unit multipliers
-  if (s.includes('cr') || s.includes('crore')) value *= 10000000;
-  else if (s.includes('l') || s.includes('lakh')) value *= 100000;
-  else if (s.includes('k') || s.includes('thousand')) value *= 1000;
-  
-  return Math.round(value);
-};
+  const validPrices = prices.filter(p => p > 0);
+  if (validPrices.length === 0) {
+    return {
+      min: 0,
+      max: 0,
+      avg: 0,
+      median: 0,
+      count: 0
+    };
+  }
 
-export interface PropertyStats {
-  mean: number;
-  median: number;
-  min: number;
-  max: number;
-  stdDev: number;
-  variance: number;
-  count: number;
-  quartiles: {
-    q1: number;
-    q2: number;
-    q3: number;
+  const sorted = [...validPrices].sort((a, b) => a - b);
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  const sum = sorted.reduce((acc, p) => acc + p, 0);
+  const avg = sum / sorted.length;
+  
+  const mid = Math.floor(sorted.length / 2);
+  const median = sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
+
+  return {
+    min,
+    max,
+    avg,
+    median,
+    count: validPrices.length
   };
 }
 
-export const calculateListingStats = (prices: number[]): PropertyStats | null => {
-  if (prices.length === 0) return null;
-  
-  const sorted = [...prices].sort((a, b) => a - b);
-  const count = prices.length;
-  const sum = prices.reduce((a, b) => a + b, 0);
-  const mean = sum / count;
-  
-  const median = count % 2 === 0 
-    ? (sorted[count / 2 - 1] + sorted[count / 2]) / 2 
-    : sorted[Math.floor(count / 2)];
-    
-  const getQuartile = (p: number) => {
-    const pos = (count - 1) * p;
-    const base = Math.floor(pos);
-    const rest = pos - base;
-    return sorted[base + 1] !== undefined 
-      ? sorted[base] + rest * (sorted[base + 1] - sorted[base])
-      : sorted[base];
-  };
+// Format price for display
+export function formatPrice(price: number): string {
+  if (price >= 10000000) {
+    return `₹${(price / 10000000).toFixed(2)} Cr`;
+  }
+  if (price >= 100000) {
+    return `₹${(price / 100000).toFixed(2)} L`;
+  }
+  if (price >= 1000) {
+    return `₹${(price / 1000).toFixed(0)}K`;
+  }
+  return `₹${price.toLocaleString('en-IN')}`;
+}
 
-  const variance = prices.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / count;
+// Extract BHK from property description
+export function extractBHK(text: string): string | null {
+  const bhkMatch = text.match(/(\d+)\s*(bhk|bedroom)/i);
+  return bhkMatch ? `${bhkMatch[1]} BHK` : null;
+}
 
-  return {
-    mean,
-    median,
-    min: sorted[0],
-    max: sorted[count - 1],
-    stdDev: Math.sqrt(variance),
-    variance,
-    count,
-    quartiles: { 
-      q1: getQuartile(0.25), 
-      q2: median, 
-      q3: getQuartile(0.75) 
-    }
-  };
-};
-
-export const calculateAge = (constructionYear: number): number => {
-  return new Date().getFullYear() - constructionYear;
-};
+// Extract square footage from text
+export function extractSqft(text: string): number | null {
+  const sqftMatch = text.match(/(\d+(?:,\d+)?)\s*(?:sq\.?\s*ft|sqft|square\s*feet)/i);
+  if (sqftMatch) {
+    return parseInt(sqftMatch[1].replace(/,/g, ''));
+  }
+  return null;
+}
