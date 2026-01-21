@@ -219,14 +219,6 @@ export async function getBuyValuation(
   };
 }
 
-export async function getRentValuationInternal(
-  req: ValuationRequestBase
-): Promise<ValuationResultBase> {
- // valuationService.ts - FIXED RENT LOGIC
-// Update the rent-specific functions in your valuationService.ts
-
-// Helper function to format rent properly
-const formatRentValue = (val: any): string => {
   if (val === null || val === undefined) return "";
   const str = String(val);
   const num = parseFloat(str.replace(/[^0-9.]/g, ''));
