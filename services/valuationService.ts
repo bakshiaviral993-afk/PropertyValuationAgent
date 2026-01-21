@@ -1,6 +1,27 @@
 // src/services/valuationService.ts - Updated with Bug Fixes
 import { callLLMWithFallback } from "./llmFallback";
-import { parsePrice } from "../utils/listingProcessor";
+
+// Price parsing helper (defined locally to avoid import issues)
+export function parsePrice(p: any): number {
+  if (typeof p === 'number') return p;
+  if (!p) return 0;
+  const str = String(p);
+  const num = parseFloat(str.replace(/[^0-9.]/g, ''));
+  if (isNaN(num)) return 0;
+  
+  // Handle crores and lakhs
+  if (str.toLowerCase().includes('cr')) {
+    return num * 10000000;
+  }
+  if (str.toLowerCase().includes('l') || str.toLowerCase().includes('lakh')) {
+    return num * 100000;
+  }
+  if (str.toLowerCase().includes('k')) {
+    return num * 1000;
+  }
+  
+  return num;
+}
 
 export interface ValuationRequestBase {
   city: string;
