@@ -264,15 +264,17 @@ const RentDashboard: React.FC<RentDashboardProps> = ({
       {viewMode === 'dashboard' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {/* FIXED: Monthly Rent Card - No Overlap */}
-            <div className="bg-white/5 rounded-[32px] p-8 border shadow-glass-3d border-t-4 border-t-purple-500 flex flex-col justify-between">
-              <div className="flex flex-col space-y-3">
-                <span className="text-[10px] font-black text-purple-500 uppercase tracking-wider">Monthly Rent</span>
-                <div className="text-4xl font-black text-white tracking-tighter leading-none">
-                  {formatRentPrice(rentalValueNum)}
-                </div>
-                <div className="text-sm text-gray-400 font-semibold pt-1">
-                  {formatAnnualRent(annualRent)} per year
+            {/* FIXED: Monthly Rent Card - No Overlap with Clear Separation */}
+            <div className="bg-white/5 rounded-[32px] p-8 border shadow-glass-3d border-t-4 border-t-purple-500 flex flex-col justify-between min-h-[220px]">
+              <div className="flex flex-col gap-4">
+                <span className="text-[10px] font-black text-purple-500 uppercase tracking-wider block">Monthly Rent</span>
+                <div className="flex flex-col gap-2">
+                  <div className="text-4xl font-black text-white tracking-tighter leading-tight block">
+                    {formatRentPrice(rentalValueNum)}
+                  </div>
+                  <div className="text-sm text-gray-400 font-medium block mt-1">
+                    {formatAnnualRent(annualRent)} per year
+                  </div>
                 </div>
               </div>
               {onAnalyzeFinance && (
@@ -282,23 +284,29 @@ const RentDashboard: React.FC<RentDashboardProps> = ({
               )}
             </div>
 
-            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d">
-              <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Security Deposit</span>
-              <div className="text-3xl font-black text-white tracking-tighter">
-                {formatRentPrice(rentalValueNum * 2)}
+            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d flex flex-col min-h-[220px]">
+              <div className="flex flex-col gap-4">
+                <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider block">Security Deposit</span>
+                <div className="text-3xl font-black text-white tracking-tighter leading-tight block">
+                  {formatRentPrice(rentalValueNum * 2)}
+                </div>
+                <div className="text-xs text-gray-400 block mt-1">2 months rent</div>
               </div>
-              <div className="text-xs text-gray-400 mt-2">2 months rent</div>
             </div>
 
-            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d">
-              <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Rental Yield</span>
-              <div className="text-4xl font-black text-emerald-500 tracking-tighter">{yieldPercent}%</div>
-              <div className="text-xs text-gray-400 mt-2">Annual return</div>
+            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d flex flex-col min-h-[220px]">
+              <div className="flex flex-col gap-4">
+                <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider block">Rental Yield</span>
+                <div className="text-4xl font-black text-emerald-500 tracking-tighter leading-tight block">{yieldPercent}%</div>
+                <div className="text-xs text-gray-400 block mt-1">Annual return</div>
+              </div>
             </div>
 
-            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d">
-              <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Listings Found</span>
-              <div className="text-4xl font-black text-white tracking-tighter">{allListings.length}</div>
+            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d flex flex-col min-h-[220px]">
+              <div className="flex flex-col gap-4">
+                <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider block">Listings Found</span>
+                <div className="text-4xl font-black text-white tracking-tighter leading-tight block">{allListings.length}</div>
+              </div>
             </div>
           </div>
 
