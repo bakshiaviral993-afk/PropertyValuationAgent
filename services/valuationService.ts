@@ -219,6 +219,8 @@ export async function getBuyValuation(
   };
 }
 
+// Helper function to format rent properly
+const formatRentValue = (val: any): string => {
   if (val === null || val === undefined) return "";
   const str = String(val);
   const num = parseFloat(str.replace(/[^0-9.]/g, ''));
@@ -431,9 +433,6 @@ export async function getRentValuationInternal(
   };
 }
 
-// Export the new functions
-export { formatRentValue, enrichRentListing, performRentSearchWithRadius };
-
 export async function getCommercialValuationInternal(
   req: ValuationRequestBase
 ): Promise<ValuationResultBase> {
@@ -521,5 +520,5 @@ export async function getMoreListings(
   }
 }
 
-// NEW: Export helper functions for use in components
-export { formatCompleteAddress, enrichListing };
+// Export helper functions for use in components
+export { formatCompleteAddress, enrichListing, formatRentValue, enrichRentListing, performRentSearchWithRadius };
