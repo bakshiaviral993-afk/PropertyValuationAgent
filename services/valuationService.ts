@@ -1,6 +1,136 @@
-// src/services/valuationService.ts - Updated with Bug Fixes
+// src/services/valuationService.ts - Standalone version
 import { callLLMWithFallback } from "./llmFallback";
-import { parsePrice } from "../utils/listingProcessor";
+
+// ============================================================================
+// UTILITY FUNCTIONS (Defined locally to avoid import issues)
+// ============================================================================
+
+function parsePrice(p: any): number {
+  if (typeof p === 'number') return p;
+  if (!p) return 0;
+  const str = String(p);
+  const num = parseFloat(str.replace(/[^0-9.]/g, ''));
+  if (isNaN(num)) return 0;
+  
+  // Handle crores and lakhs
+  if (str.toLowerCase().includes('cr')) {
+    return num * 10000000;
+  }
+  if (str.toLowerCase().includes('l') || str.toLowerCase().includes('lakh')) {
+    return num * 100000;
+  }
+  if (str.toLowerCase().includes('k')) {
+    return num * 1000;
+  }
+  
+  return num;
+}
+
+const formatRentValue = (val: any): string => {
+  if (val === null || val === undefined) return "";
+  const str = String(val);
+  const num = parseFloat(str.replace(/[^0-9.]/g, ''));
+  if (isNaN(num)) return str;
+  
+  // Rent should NEVER be in crores
+  if (num >= 100000) return `₹${(num / 100000).toFixed(2)} L/month`;
+  if (num >= 1000) return `₹${(num / 1000).toFixed(0)}K/month`;
+  return `₹${num.toLocaleString('en-IN')}/month`;
+};
+
+function formatCompleteAddress(listing: any, area: string, city: string, pincode: string): string {
+  const parts = [];
+  
+  if (listing.project || listing.title) {
+    parts.push(listing.project || listing.title);
+  }
+  
+  if (listing.locality && listing.locality !== area) {
+    parts.push(listing.locality);
+  }
+  
+  if (listing.subLocality && listing.subLocality !== listing.locality) {
+    parts.push(listing.subLocality);
+  }
+  
+  if (area) parts.push(area);
+  if (city) parts.push(city);
+  if (pincode) parts.push(`PIN: ${pincode}`);
+  
+  // Remove duplicates and empty values
+  const uniqueParts = [...new Set(parts.filter(p => p && p.trim()))];
+  return uniqueParts.join(', ');
+}
+
+function enrichListing(listing: any, area: string, city: string, pincode: string, userSqft: number): any {
+  // Extract actual sqft from various possible fields
+  const actualSqft = listing.builtUpArea || 
+                     listing.carpetArea || 
+                     listing.superArea || 
+                     listing.size_sqft ||
+                     listing.plotArea ||
+                     userSqft;
+  
+  // Calculate price per sqft
+  const priceNum = parsePrice(listing.price);
+  const pricePerSqft = actualSqft && priceNum > 0 
+    ? Math.round(priceNum / actualSqft)
+    : null;
+  
+  // Determine sqft display string
+  let sqftDisplay = '';
+  if (listing.builtUpArea) {
+    sqftDisplay = `${listing.builtUpArea} sq.ft. (Built-up)`;
+  } else if (listing.carpetArea) {
+    sqftDisplay = `${listing.carpetArea} sq.ft. (Carpet)`;
+  } else if (listing.superArea) {
+    sqftDisplay = `${listing.superArea} sq.ft. (Super)`;
+  } else if (listing.size_sqft) {
+    sqftDisplay = `${listing.size_sqft} sq.ft.`;
+  } else {
+    sqftDisplay = `~${userSqft} sq.ft.`;
+  }
+  
+  return {
+    ...listing,
+    fullAddress: formatCompleteAddress(listing, area, city, pincode),
+    actualSqft,
+    sqftDisplay,
+    pricePerSqft: pricePerSqft ? `₹${pricePerSqft.toLocaleString('en-IN')}/sq.ft.` : null,
+    latitude: listing.latitude || listing.lat || null,
+    longitude: listing.longitude || listing.lng || null,
+    mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formatCompleteAddress(listing, area, city, pincode))}`
+  };
+}
+
+function enrichRentListing(listing: any, area: string, city: string, pincode: string, userSqft: number) {
+  const actualSqft = listing.builtUpArea || listing.carpetArea || listing.superArea || userSqft;
+  const monthlyRent = parseFloat(listing.monthlyRent || 0);
+  
+  const rentPerSqft = actualSqft && monthlyRent > 0 
+    ? Math.round(monthlyRent / actualSqft)
+    : null;
+  
+  return {
+    ...listing,
+    fullAddress: formatCompleteAddress(listing, area, city, pincode),
+    actualSqft,
+    sqftDisplay: listing.builtUpArea 
+      ? `${listing.builtUpArea} sq.ft. (Built-up)` 
+      : listing.carpetArea 
+        ? `${listing.carpetArea} sq.ft. (Carpet)` 
+        : `~${userSqft} sq.ft.`,
+    rentPerSqft: rentPerSqft ? `₹${rentPerSqft}/sq.ft./month` : null,
+    monthlyRent: monthlyRent,
+    price: formatRentValue(monthlyRent),
+    securityDeposit: formatRentValue(monthlyRent * 2),
+    mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formatCompleteAddress(listing, area, city, pincode))}`
+  };
+}
+
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
 
 export interface ValuationRequestBase {
   city: string;
@@ -39,83 +169,15 @@ export interface ValuationResultBase {
   tenantDemandScore?: number;
 }
 
-// NEW: Helper to format complete address
-function formatCompleteAddress(listing: any, area: string, city: string, pincode: string): string {
-  const parts = [];
-  
-  if (listing.project || listing.title) {
-    parts.push(listing.project || listing.title);
-  }
-  
-  if (listing.locality && listing.locality !== area) {
-    parts.push(listing.locality);
-  }
-  
-  if (listing.subLocality && listing.subLocality !== listing.locality) {
-    parts.push(listing.subLocality);
-  }
-  
-  if (area) parts.push(area);
-  if (city) parts.push(city);
-  if (pincode) parts.push(`PIN: ${pincode}`);
-  
-  // Remove duplicates and empty values
-  const uniqueParts = [...new Set(parts.filter(p => p && p.trim()))];
-  return uniqueParts.join(', ');
-}
-
-// NEW: Enrich listing with complete data
-function enrichListing(listing: any, area: string, city: string, pincode: string, userSqft: number): any {
-  // Extract actual sqft from various possible fields
-  const actualSqft = listing.builtUpArea || 
-                     listing.carpetArea || 
-                     listing.superArea || 
-                     listing.size_sqft ||
-                     listing.plotArea ||
-                     userSqft;
-  
-  // Calculate price per sqft
-  const priceNum = parsePrice(listing.price);
-  const pricePerSqft = actualSqft && priceNum > 0 
-    ? Math.round(priceNum / actualSqft)
-    : null;
-  
-  // Determine sqft display string
-  let sqftDisplay = '';
-  if (listing.builtUpArea) {
-    sqftDisplay = `${listing.builtUpArea} sq.ft. (Built-up)`;
-  } else if (listing.carpetArea) {
-    sqftDisplay = `${listing.carpetArea} sq.ft. (Carpet)`;
-  } else if (listing.superArea) {
-    sqftDisplay = `${listing.superArea} sq.ft. (Super)`;
-  } else if (listing.size_sqft) {
-    sqftDisplay = `${listing.size_sqft} sq.ft.`;
-  } else {
-    sqftDisplay = `~${userSqft} sq.ft.`;
-  }
-  
-  return {
-    ...listing,
-    // Full formatted address
-    fullAddress: formatCompleteAddress(listing, area, city, pincode),
-    // Actual sqft data
-    actualSqft,
-    sqftDisplay,
-    pricePerSqft: pricePerSqft ? `₹${pricePerSqft.toLocaleString('en-IN')}/sq.ft.` : null,
-    // Ensure coordinates exist
-    latitude: listing.latitude || listing.lat || null,
-    longitude: listing.longitude || listing.lng || null,
-    // Google Maps URL
-    mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formatCompleteAddress(listing, area, city, pincode))}`
-  };
-}
+// ============================================================================
+// CORE SEARCH FUNCTIONS
+// ============================================================================
 
 async function performSearchWithRadius(
   req: ValuationRequestBase, 
   radiusDescription: string, 
   bhk?: string
 ): Promise<any> {
-  // UPDATED PROMPT: Request more detailed data including sqft and locality
   const prompt = `Valuation Expert: Estimate value for ${bhk || req.propertyType} (${req.size} sqft) in ${req.area}, ${req.city}.
   Strategy: ${radiusDescription}. 
   
@@ -157,7 +219,6 @@ async function performSearchWithRadius(
     data.fairValue = parsePrice(data.fairValue);
     data.llmSource = source;
     
-    // NEW: Enrich all listings with complete data
     if (data.listings && Array.isArray(data.listings)) {
       data.listings = data.listings.map((listing: any) => 
         enrichListing(listing, req.area || '', req.city, req.pincode || '', req.size)
@@ -171,74 +232,11 @@ async function performSearchWithRadius(
   }
 }
 
-export async function getBuyValuation(
-  req: ValuationRequestBase & { bhk?: string }
-): Promise<ValuationResultBase> {
-  // Stage 1: Pincode
-  let result = await performSearchWithRadius(req, `STRICT Pincode: ${req.pincode}`, req.bhk);
-
-  // Stage 2: 5KM expansion (Now triggers on empty listings too)
-  if (!result || result.fairValue < 100000 || !result.listings || result.listings.length === 0) {
-    console.log("Empty listing signal. Expanding crawl radius...");
-    result = await performSearchWithRadius(
-      req, 
-      `Expanded 5KM Radius around ${req.area}, ${req.city}`, 
-      req.bhk
-    );
-    if (result) result.isExpanded = true;
-  }
-
-  // Stage 3: Macro expansion (Final LLM search attempt)
-  if (!result || result.fairValue < 100000 || !result.listings || result.listings.length === 0) {
-    console.log("Micro-market signal dead. Transitioning to city-wide data nodes.");
-    result = await performSearchWithRadius(
-      req, 
-      `Macro Search for ${req.city} city averages`, 
-      req.bhk
-    );
-    if (result) result.isMacro = true;
-  }
-
-  // Fallback protection
-  const finalResult = result || { fairValue: 0, listings: [] };
-
-  return {
-    estimatedValue: finalResult.fairValue,
-    rangeLow: parsePrice(finalResult.rangeLow) || finalResult.fairValue * 0.9,
-    rangeHigh: parsePrice(finalResult.rangeHigh) || finalResult.fairValue * 1.1,
-    pricePerUnit: finalResult.fairValue / (req.size || 1),
-    confidence: finalResult.fairValue > 0 ? 'medium' : 'low',
-    source: finalResult.llmSource === 'market_fallback' 
-      ? 'market_fallback' 
-      : (finalResult.isExpanded || finalResult.isMacro ? 'radius_expansion' : 'live_scrape'),
-    notes: finalResult.isExpanded 
-      ? "Search expanded to 5km micro-market due to sparse local listings." 
-      : (finalResult.isMacro ? "Macro-city indices applied." : "Grounded via local data node."),
-    comparables: finalResult.listings || [],
-    valuationJustification: finalResult.valuationJustification || "Spatial crawl completed."
-  };
-}
-
-// Helper function to format rent properly
-const formatRentValue = (val: any): string => {
-  if (val === null || val === undefined) return "";
-  const str = String(val);
-  const num = parseFloat(str.replace(/[^0-9.]/g, ''));
-  if (isNaN(num)) return str;
-  
-  // Rent should NEVER be in crores
-  if (num >= 100000) return `₹${(num / 100000).toFixed(2)} L/month`;
-  if (num >= 1000) return `₹${(num / 1000).toFixed(0)}K/month`;
-  return `₹${num.toLocaleString('en-IN')}/month`;
-};
-
-// FIXED: Rent-specific search with proper prompt
 async function performRentSearchWithRadius(
   req: ValuationRequestBase, 
   radiusDescription: string, 
   bhk?: string
 ): Promise<any> {
-  // CRITICAL: Rent-specific prompt
   const prompt = `Rental Valuation Expert: Estimate MONTHLY RENT for ${bhk || req.propertyType} (${req.size} sqft) in ${req.area}, ${req.city}.
   
   CRITICAL REQUIREMENTS FOR RENT:
@@ -281,48 +279,37 @@ async function performRentSearchWithRadius(
     
     const data = JSON.parse(jsonMatch[0]);
     
-    // CRITICAL: Validate rent is in proper range
     let monthlyRent = parseFloat(data.monthlyRent || data.fairValue || data.rentalValue || 0);
     
-    // Fix if LLM returns crores/lakhs by mistake
     if (monthlyRent > 10000000) {
-      // Likely returned purchase price, divide by 200 for 0.5% monthly rent
       monthlyRent = monthlyRent / 200;
     } else if (monthlyRent > 1000000) {
-      // Likely returned annual rent, divide by 12
       monthlyRent = monthlyRent / 12;
     }
     
-    // Ensure rent is in realistic range (₹5K to ₹5L per month)
     if (monthlyRent < 5000) monthlyRent = 5000;
     if (monthlyRent > 500000) monthlyRent = 500000;
     
     data.monthlyRent = monthlyRent;
-    data.fairValue = monthlyRent; // For compatibility
+    data.fairValue = monthlyRent;
     data.llmSource = source;
-    
-    // Calculate rent per sqft (should be ₹10-100 range typically)
     data.rentPerSqft = Math.round(monthlyRent / (req.size || 1000));
-    
-    // Calculate security deposit (2-3 months)
     data.securityDeposit = monthlyRent * 2;
     
-    // Enrich all listings with rent-specific data
     if (data.listings && Array.isArray(data.listings)) {
       data.listings = data.listings.map((listing: any) => {
         let listingRent = parseFloat(listing.monthlyRent || listing.rent || listing.price || 0);
         
-        // Fix rent if wrong
         if (listingRent > 10000000) listingRent = listingRent / 200;
         else if (listingRent > 1000000) listingRent = listingRent / 12;
         
-        if (listingRent < 5000) listingRent = 15000; // Default fallback
+        if (listingRent < 5000) listingRent = 15000;
         if (listingRent > 500000) listingRent = 50000;
         
         return enrichRentListing({
           ...listing,
           monthlyRent: listingRent,
-          price: formatRentValue(listingRent) // Format for display
+          price: formatRentValue(listingRent)
         }, req.area || '', req.city, req.pincode || '', req.size);
       });
     }
@@ -334,41 +321,59 @@ async function performRentSearchWithRadius(
   }
 }
 
-// FIXED: Rent listing enrichment
-function enrichRentListing(listing: any, area: string, city: string, pincode: string, userSqft: number) {
-  const actualSqft = listing.builtUpArea || listing.carpetArea || listing.superArea || userSqft;
-  const monthlyRent = parseFloat(listing.monthlyRent || 0);
-  
-  // Calculate rent per sqft (typically ₹10-100 per sqft)
-  const rentPerSqft = actualSqft && monthlyRent > 0 
-    ? Math.round(monthlyRent / actualSqft)
-    : null;
-  
+// ============================================================================
+// EXPORTED VALUATION FUNCTIONS
+// ============================================================================
+
+export async function getBuyValuation(
+  req: ValuationRequestBase & { bhk?: string }
+): Promise<ValuationResultBase> {
+  let result = await performSearchWithRadius(req, `STRICT Pincode: ${req.pincode}`, req.bhk);
+
+  if (!result || result.fairValue < 100000 || !result.listings || result.listings.length === 0) {
+    console.log("Empty listing signal. Expanding crawl radius...");
+    result = await performSearchWithRadius(
+      req, 
+      `Expanded 5KM Radius around ${req.area}, ${req.city}`, 
+      req.bhk
+    );
+    if (result) result.isExpanded = true;
+  }
+
+  if (!result || result.fairValue < 100000 || !result.listings || result.listings.length === 0) {
+    console.log("Micro-market signal dead. Transitioning to city-wide data nodes.");
+    result = await performSearchWithRadius(
+      req, 
+      `Macro Search for ${req.city} city averages`, 
+      req.bhk
+    );
+    if (result) result.isMacro = true;
+  }
+
+  const finalResult = result || { fairValue: 0, listings: [] };
+
   return {
-    ...listing,
-    fullAddress: formatCompleteAddress(listing, area, city, pincode),
-    actualSqft,
-    sqftDisplay: listing.builtUpArea 
-      ? `${listing.builtUpArea} sq.ft. (Built-up)` 
-      : listing.carpetArea 
-        ? `${listing.carpetArea} sq.ft. (Carpet)` 
-        : `~${userSqft} sq.ft.`,
-    rentPerSqft: rentPerSqft ? `₹${rentPerSqft}/sq.ft./month` : null,
-    monthlyRent: monthlyRent,
-    price: formatRentValue(monthlyRent), // Formatted display
-    securityDeposit: formatRentValue(monthlyRent * 2),
-    mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formatCompleteAddress(listing, area, city, pincode))}`
+    estimatedValue: finalResult.fairValue,
+    rangeLow: parsePrice(finalResult.rangeLow) || finalResult.fairValue * 0.9,
+    rangeHigh: parsePrice(finalResult.rangeHigh) || finalResult.fairValue * 1.1,
+    pricePerUnit: finalResult.fairValue / (req.size || 1),
+    confidence: finalResult.fairValue > 0 ? 'medium' : 'low',
+    source: finalResult.llmSource === 'market_fallback' 
+      ? 'market_fallback' 
+      : (finalResult.isExpanded || finalResult.isMacro ? 'radius_expansion' : 'live_scrape'),
+    notes: finalResult.isExpanded 
+      ? "Search expanded to 5km micro-market due to sparse local listings." 
+      : (finalResult.isMacro ? "Macro-city indices applied." : "Grounded via local data node."),
+    comparables: finalResult.listings || [],
+    valuationJustification: finalResult.valuationJustification || "Spatial crawl completed."
   };
 }
 
-// UPDATED: getRentValuationInternal with proper logic
 export async function getRentValuationInternal(
   req: ValuationRequestBase & { bhk?: string }
 ): Promise<ValuationResultBase> {
-  // Stage 1: Pincode
   let result = await performRentSearchWithRadius(req, `STRICT Pincode: ${req.pincode}`, req.bhk);
 
-  // Stage 2: 5KM expansion
   if (!result || result.monthlyRent < 5000 || !result.listings || result.listings.length === 0) {
     console.log("Empty rental listings. Expanding search radius...");
     result = await performRentSearchWithRadius(
@@ -379,7 +384,6 @@ export async function getRentValuationInternal(
     if (result) result.isExpanded = true;
   }
 
-  // Stage 3: City-wide rental market data
   if (!result || result.monthlyRent < 5000 || !result.listings || result.listings.length === 0) {
     console.log("Using city-wide rental market averages.");
     result = await performRentSearchWithRadius(
@@ -390,11 +394,9 @@ export async function getRentValuationInternal(
     if (result) result.isMacro = true;
   }
 
-  // Fallback: Calculate from typical rent ratios
   if (!result || result.monthlyRent < 5000) {
-    // Fallback: Use 0.3% of typical property value as monthly rent
-    const estimatedPropertyValue = req.size * 8000; // ₹8K per sqft average
-    const monthlyRent = estimatedPropertyValue * 0.003; // 0.3% per month
+    const estimatedPropertyValue = req.size * 8000;
+    const monthlyRent = estimatedPropertyValue * 0.003;
     
     return {
       estimatedValue: monthlyRent,
@@ -433,6 +435,40 @@ export async function getRentValuationInternal(
   };
 }
 
+export async function getLandValuationInternal(
+  req: ValuationRequestBase & { bhk?: string }
+): Promise<ValuationResultBase> {
+  let result = await performSearchWithRadius(req, `Plot/Land search for ${req.area}, ${req.city}`, req.bhk);
+
+  if (!result || result.fairValue < 100000 || !result.listings || result.listings.length === 0) {
+    console.log("Expanding land search radius...");
+    result = await performSearchWithRadius(
+      req, 
+      `Expanded land search around ${req.city}`, 
+      req.bhk
+    );
+    if (result) result.isExpanded = true;
+  }
+
+  const finalResult = result || { fairValue: 0, listings: [] };
+
+  return {
+    estimatedValue: finalResult.fairValue,
+    rangeLow: parsePrice(finalResult.rangeLow) || finalResult.fairValue * 0.85,
+    rangeHigh: parsePrice(finalResult.rangeHigh) || finalResult.fairValue * 1.15,
+    pricePerUnit: finalResult.fairValue / (req.size || 1),
+    confidence: finalResult.fairValue > 0 ? 'medium' : 'low',
+    source: finalResult.llmSource === 'market_fallback' 
+      ? 'market_fallback' 
+      : (finalResult.isExpanded ? 'radius_expansion' : 'live_scrape'),
+    notes: finalResult.isExpanded 
+      ? "Land search expanded to wider region." 
+      : "Plot valuation completed.",
+    comparables: finalResult.listings || [],
+    valuationJustification: finalResult.valuationJustification || "Land analysis completed."
+  };
+}
+
 export async function getCommercialValuationInternal(
   req: ValuationRequestBase
 ): Promise<ValuationResultBase> {
@@ -463,7 +499,6 @@ export async function getCommercialValuationInternal(
   };
 }
 
-// UPDATED: getMoreListings with enriched data
 export async function getMoreListings(
   req: ValuationRequestBase & { mode: 'buy' | 'rent' | 'land' | 'commercial' }
 ): Promise<any[]> {
@@ -510,7 +545,6 @@ export async function getMoreListings(
     const data = JSON.parse(jsonMatch[0]);
     const listings = data.listings || [];
     
-    // Enrich all listings
     return listings.map((listing: any) => 
       enrichListing(listing, req.area || '', req.city, req.pincode || '', req.size)
     );
@@ -520,5 +554,5 @@ export async function getMoreListings(
   }
 }
 
-// Export helper functions for use in components
-export { formatCompleteAddress, enrichListing, formatRentValue, enrichRentListing, performRentSearchWithRadius };
+// Export utility functions for backward compatibility
+export { formatCompleteAddress, enrichListing, formatRentValue, enrichRentListing };
