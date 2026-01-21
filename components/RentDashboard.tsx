@@ -264,48 +264,52 @@ const RentDashboard: React.FC<RentDashboardProps> = ({
       {viewMode === 'dashboard' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {/* FIXED: Monthly Rent Card - No Overlap with Clear Separation */}
-            <div className="bg-white/5 rounded-[32px] p-8 border shadow-glass-3d border-t-4 border-t-purple-500 flex flex-col justify-between min-h-[220px]">
-              <div className="flex flex-col gap-4">
-                <span className="text-[10px] font-black text-purple-500 uppercase tracking-wider block">Monthly Rent</span>
-                <div className="flex flex-col gap-2">
-                  <div className="text-4xl font-black text-white tracking-tighter leading-tight block">
+            {/* FIXED: Monthly Rent Card - Absolute Fix for Overlap */}
+            <div className="bg-white/5 rounded-[32px] p-8 border shadow-glass-3d border-t-4 border-t-purple-500 flex flex-col justify-between min-h-[240px] overflow-hidden">
+              <div className="flex flex-col gap-3 w-full">
+                <span className="text-[10px] font-black text-purple-500 uppercase tracking-wider">Monthly Rent</span>
+                <div className="w-full">
+                  <div className="text-4xl font-black text-white tracking-tighter mb-3 w-full break-words">
                     {formatRentPrice(rentalValueNum)}
                   </div>
-                  <div className="text-sm text-gray-400 font-medium block mt-1">
+                  <div className="text-sm text-gray-400 font-medium w-full">
                     {formatAnnualRent(annualRent)} per year
                   </div>
                 </div>
               </div>
               {onAnalyzeFinance && (
-                <button onClick={onAnalyzeFinance} className="mt-6 px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-500 text-[10px] font-black uppercase tracking-widest hover:bg-purple-500 hover:text-white transition-all w-full flex items-center justify-center gap-2">
+                <button onClick={onAnalyzeFinance} className="mt-4 px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-500 text-[10px] font-black uppercase tracking-widest hover:bg-purple-500 hover:text-white transition-all w-full flex items-center justify-center gap-2">
                   <TrendingUp size={12} /> ROI Calculator
                 </button>
               )}
             </div>
 
-            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d flex flex-col min-h-[220px]">
-              <div className="flex flex-col gap-4">
-                <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider block">Security Deposit</span>
-                <div className="text-3xl font-black text-white tracking-tighter leading-tight block">
-                  {formatRentPrice(rentalValueNum * 2)}
+            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d flex flex-col min-h-[240px] overflow-hidden">
+              <div className="flex flex-col gap-3 w-full">
+                <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Security Deposit</span>
+                <div className="w-full">
+                  <div className="text-3xl font-black text-white tracking-tighter mb-3 w-full break-words">
+                    {formatRentPrice(rentalValueNum * 2)}
+                  </div>
+                  <div className="text-xs text-gray-400 w-full">2 months rent</div>
                 </div>
-                <div className="text-xs text-gray-400 block mt-1">2 months rent</div>
               </div>
             </div>
 
-            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d flex flex-col min-h-[220px]">
-              <div className="flex flex-col gap-4">
-                <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider block">Rental Yield</span>
-                <div className="text-4xl font-black text-emerald-500 tracking-tighter leading-tight block">{yieldPercent}%</div>
-                <div className="text-xs text-gray-400 block mt-1">Annual return</div>
+            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d flex flex-col min-h-[240px] overflow-hidden">
+              <div className="flex flex-col gap-3 w-full">
+                <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Rental Yield</span>
+                <div className="w-full">
+                  <div className="text-4xl font-black text-emerald-500 tracking-tighter mb-3 w-full">{yieldPercent}%</div>
+                  <div className="text-xs text-gray-400 w-full">Annual return</div>
+                </div>
               </div>
             </div>
 
-            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d flex flex-col min-h-[220px]">
-              <div className="flex flex-col gap-4">
-                <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider block">Listings Found</span>
-                <div className="text-4xl font-black text-white tracking-tighter leading-tight block">{allListings.length}</div>
+            <div className="bg-white/5 rounded-[32px] p-8 border border-white/10 shadow-glass-3d flex flex-col min-h-[240px] overflow-hidden">
+              <div className="flex flex-col gap-3 w-full">
+                <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Listings Found</span>
+                <div className="text-4xl font-black text-white tracking-tighter w-full">{allListings.length}</div>
               </div>
             </div>
           </div>
@@ -354,8 +358,8 @@ const RentDashboard: React.FC<RentDashboardProps> = ({
                           href={mapsUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-gray-400 hover:text-blue-400 transition-colors mt-2 block underline decoration-dotted cursor-pointer line-clamp-2"
-                          title="View on Google Maps"
+                          className="text-xs text-gray-400 hover:text-blue-400 transition-colors mt-3 block underline decoration-dotted cursor-pointer"
+                          title={fullAddress}
                         >
                           📍 {fullAddress}
                         </a>
