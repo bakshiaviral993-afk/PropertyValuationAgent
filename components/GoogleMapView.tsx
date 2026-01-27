@@ -22,15 +22,20 @@ interface GoogleMapViewProps {
   showEssentials?: boolean;
 }
 
-const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  try {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  } catch (error) {
+    console.error('Distance calculation error:', error);
+    return 0;
+  }
 };
 
 const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
@@ -47,11 +52,15 @@ const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
           resolve();
         }
       }, 100);
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        reject(new Error('Timeout waiting for Google Maps'));
+      }, 10000);
       return;
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry,drawing,visualization`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
     script.async = true;
     script.defer = true;
     script.onload = () => resolve();
@@ -71,57 +80,45 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({
   const gMapRef = useRef<any>(null);
   const [mapReady, setMapReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const directionsRendererRef = useRef<any>(null);
+  const [errorType, setErrorType] = useState<'billing' | 'api' | 'key' | 'data' | 'other' | null>(null);
 
   useEffect(() => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => console.warn("Location permission denied")
-    );
-  }, []);
-
-  const calculateRoute = (destination: { lat: number; lng: number }) => {
-    if (!userLoc || !gMapRef.current) return;
-
-    const google = (window as any).google;
-    if (!google?.maps?.DirectionsService) return;
-
-    const directionsService = new google.maps.DirectionsService();
-    
-    if (!directionsRendererRef.current) {
-      directionsRendererRef.current = new google.maps.DirectionsRenderer({
-        map: gMapRef.current,
-        polylineOptions: {
-          strokeColor: '#00F6FF',
-          strokeWeight: 4
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          try {
+            setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+            console.log('[Location] User location set:', pos.coords.latitude, pos.coords.longitude);
+          } catch (error) {
+            console.error('[Location] Error setting user location:', error);
+          }
+        },
+        (error) => {
+          console.warn('[Location] Permission denied or error:', error);
         }
-      });
+      );
     }
-
-    directionsService.route(
-      {
-        origin: userLoc,
-        destination: destination,
-        travelMode: google.maps.TravelMode.DRIVING
-      },
-      (result: any, status: string) => {
-        if (status === 'OK') {
-          directionsRendererRef.current.setDirections(result);
-          console.log('[Directions] Route calculated');
-        }
-      }
-    );
-  };
+  }, []);
 
   useEffect(() => {
     const initMap = async () => {
-      if (!mapRef.current) return;
+      if (!mapRef.current) {
+        console.log('[Map] Map ref not ready');
+        return;
+      }
 
       try {
+        // Validate nodes data
+        if (!Array.isArray(nodes)) {
+          throw new Error('Nodes must be an array');
+        }
+
         const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
         
         if (!apiKey) {
-          setLoadError('⚠️ API key not found. Add VITE_GOOGLE_MAPS_API_KEY to your .env file');
+          setErrorType('key');
+          setLoadError('API key not found in environment variables');
+          console.error('[Map] No API key found');
           return;
         }
 
@@ -130,25 +127,61 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({
         
         const google = (window as any).google;
         if (!google?.maps) {
-          throw new Error('Google Maps failed to load');
+          throw new Error('Google Maps object not available');
         }
 
         console.log('[Map] Google Maps loaded successfully');
 
-        const validNodes = nodes.map((node, i) => {
-          const lat = node.lat ?? node.latitude;
-          const lng = node.lng ?? node.longitude;
-          return { ...node, lat, lng, id: i };
-        }).filter(n => n.lat !== undefined && n.lng !== undefined && !isNaN(n.lat) && !isNaN(n.lng));
+        // Validate and filter nodes with better error handling
+        const validNodes = nodes
+          .map((node, i) => {
+            try {
+              if (!node || typeof node !== 'object') {
+                console.warn(`[Map] Invalid node at index ${i}:`, node);
+                return null;
+              }
 
-        console.log(`[Map] Plotting ${validNodes.length} nodes`);
+              const lat = typeof node.lat === 'number' ? node.lat : 
+                         typeof node.latitude === 'number' ? node.latitude : null;
+              const lng = typeof node.lng === 'number' ? node.lng : 
+                         typeof node.longitude === 'number' ? node.longitude : null;
+              
+              if (lat === null || lng === null || isNaN(lat) || isNaN(lng)) {
+                console.warn(`[Map] Invalid coordinates at index ${i}:`, { lat, lng });
+                return null;
+              }
+
+              return {
+                ...node,
+                lat,
+                lng,
+                id: i,
+                title: String(node.title || 'Unknown'),
+                price: node.price || '0',
+                address: String(node.address || 'No address')
+              };
+            } catch (error) {
+              console.error(`[Map] Error processing node ${i}:`, error);
+              return null;
+            }
+          })
+          .filter((n): n is NonNullable<typeof n> => n !== null);
+
+        console.log(`[Map] Valid nodes: ${validNodes.length} out of ${nodes.length}`);
+
+        if (validNodes.length === 0) {
+          setErrorType('data');
+          setLoadError('No valid location data found in nodes');
+          return;
+        }
 
         if (!gMapRef.current) {
           const initialCenter = center || 
-            (validNodes.length > 0 ? { lat: validNodes[0].lat!, lng: validNodes[0].lng! } : 
+            (validNodes.length > 0 ? { lat: validNodes[0].lat, lng: validNodes[0].lng } : 
             { lat: 18.5204, lng: 73.8567 });
           
-          // IMPORTANT: Don't use mapId to avoid billing requirements
+          console.log('[Map] Creating map with center:', initialCenter);
+
           gMapRef.current = new google.maps.Map(mapRef.current, {
             center: initialCenter,
             zoom: 14,
@@ -169,6 +202,7 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({
           
           setMapReady(true);
           setLoadError(null);
+          setErrorType(null);
           console.log('[Map] Map initialized successfully');
         }
 
@@ -176,144 +210,156 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({
         const bounds = new google.maps.LatLngBounds();
 
         // Clear old markers
-        markersRef.current.forEach(m => m.setMap(null));
+        markersRef.current.forEach(m => {
+          try {
+            m.setMap(null);
+          } catch (error) {
+            console.error('[Map] Error clearing marker:', error);
+          }
+        });
         markersRef.current = [];
 
         // User location marker
-        if (userLoc) {
-          const userMarker = new google.maps.Marker({
-            map,
-            position: userLoc,
-            title: "Your Location",
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 10,
-              fillColor: "#FF6B9D",
-              fillOpacity: 1,
-              strokeWeight: 3,
-              strokeColor: "#ffffff"
-            },
-            zIndex: 1000
-          });
-          markersRef.current.push(userMarker);
-          bounds.extend(userLoc);
+        if (userLoc && typeof userLoc.lat === 'number' && typeof userLoc.lng === 'number') {
+          try {
+            const userMarker = new google.maps.Marker({
+              map,
+              position: userLoc,
+              title: "Your Location",
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 10,
+                fillColor: "#FF6B9D",
+                fillOpacity: 1,
+                strokeWeight: 3,
+                strokeColor: "#ffffff"
+              },
+              zIndex: 1000
+            });
+            markersRef.current.push(userMarker);
+            bounds.extend(userLoc);
+            console.log('[Map] User location marker added');
+          } catch (error) {
+            console.error('[Map] Error adding user marker:', error);
+          }
         }
 
         // Property and Essential markers
         validNodes.forEach((node, idx) => {
-          const pos = { lat: node.lat!, lng: node.lng! };
-          
-          let markerIcon;
-          let labelText = '';
-          
-          if (node.isEssential) {
-            markerIcon = {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 10,
-              fillColor: node.markerColor || '#FCD34D',
-              fillOpacity: 1,
-              strokeWeight: 3,
-              strokeColor: "#ffffff"
-            };
-            labelText = node.essentialType?.charAt(0).toUpperCase() || 'E';
-          } else {
-            markerIcon = undefined;
-            const priceStr = typeof node.price === 'string' ? node.price : `₹${node.price}`;
-            labelText = priceStr.length > 10 ? priceStr.substring(0, 9) + ".." : priceStr;
+          try {
+            const pos = { lat: node.lat, lng: node.lng };
+            
+            let markerIcon;
+            let labelText = '';
+            
+            if (node.isEssential) {
+              markerIcon = {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 10,
+                fillColor: node.markerColor || '#FCD34D',
+                fillOpacity: 1,
+                strokeWeight: 3,
+                strokeColor: "#ffffff"
+              };
+              labelText = node.essentialType?.charAt(0).toUpperCase() || 'E';
+            } else {
+              const priceStr = typeof node.price === 'string' ? node.price : `₹${node.price}`;
+              labelText = priceStr.length > 10 ? priceStr.substring(0, 9) + ".." : priceStr;
+            }
+
+            const marker = new google.maps.Marker({
+              map,
+              position: pos,
+              title: node.title,
+              icon: markerIcon,
+              label: {
+                text: labelText,
+                color: "#ffffff",
+                fontSize: markerIcon ? "12px" : "10px",
+                fontWeight: "900"
+              },
+              zIndex: node.isEssential ? 500 : (node.isSubject ? 900 : 100)
+            });
+
+            markersRef.current.push(marker);
+            bounds.extend(pos);
+
+            const dist = userLoc && typeof userLoc.lat === 'number' && typeof userLoc.lng === 'number'
+              ? getDistance(userLoc.lat, userLoc.lng, pos.lat, pos.lng)
+              : null;
+            
+            let infoContent;
+            if (node.isEssential) {
+              infoContent = `
+                <div style="padding: 12px; min-width: 200px; background: #0a0a0f; color: white; border-radius: 8px;">
+                  <div style="font-weight: 900; color: ${node.markerColor || '#FCD34D'}; font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">${node.essentialType || 'Essential Service'}</div>
+                  <div style="font-weight: 900; font-size: 14px; color: #ffffff; margin: 4px 0;">${node.title}</div>
+                  <div style="color: #64748b; font-size: 10px; margin-bottom: 8px;">${node.address}</div>
+                  ${node.rating ? `<div style="color: #FCD34D; font-size: 10px; font-weight: 900; margin-bottom: 4px;">⭐ ${node.rating}</div>` : ''}
+                  ${node.contact ? `<div style="color: #00F6FF; font-size: 10px; font-weight: 900; margin-bottom: 4px;">📞 ${node.contact}</div>` : ''}
+                  ${dist !== null ? `<div style="color: #FF6B9D; font-size: 9px; font-weight: 900;">${dist.toFixed(1)} KM AWAY</div>` : ''}
+                </div>
+              `;
+            } else {
+              const priceDisplay = typeof node.price === 'string' ? node.price : `₹${node.price}`;
+              infoContent = `
+                <div style="padding: 12px; min-width: 180px; background: #0a0a0f; color: white; border-radius: 8px;">
+                  <div style="font-weight: 900; color: #585FD8; font-size: 10px; text-transform: uppercase;">${node.title}</div>
+                  <div style="font-weight: 900; font-size: 16px; color: #00F6FF; margin: 4px 0;">${priceDisplay}</div>
+                  <div style="color: #64748b; font-size: 10px; margin-bottom: 8px;">${node.address}</div>
+                  ${dist !== null ? `<div style="color: #FF6B9D; font-size: 9px; font-weight: 900;">${dist.toFixed(1)} KM AWAY</div>` : ''}
+                </div>
+              `;
+            }
+
+            const infoWindow = new google.maps.InfoWindow({
+              content: infoContent
+            });
+
+            marker.addListener("click", () => {
+              infoWindow.open(map, marker);
+            });
+
+            console.log(`[Map] Marker ${idx + 1}: ${node.title} added successfully`);
+          } catch (error) {
+            console.error(`[Map] Error creating marker ${idx}:`, error);
           }
-
-          const marker = new google.maps.Marker({
-            map,
-            position: pos,
-            title: node.title,
-            icon: markerIcon,
-            label: markerIcon ? {
-              text: labelText,
-              color: "#ffffff",
-              fontSize: "12px",
-              fontWeight: "900"
-            } : {
-              text: labelText,
-              color: "#ffffff",
-              fontSize: "10px",
-              fontWeight: "900"
-            },
-            zIndex: node.isEssential ? 500 : (node.isSubject ? 900 : 100)
-          });
-
-          markersRef.current.push(marker);
-          bounds.extend(pos);
-
-          const dist = userLoc ? getDistance(userLoc.lat, userLoc.lng, pos.lat, pos.lng) : null;
-          
-          let infoContent;
-          if (node.isEssential) {
-            infoContent = `
-              <div style="padding: 12px; min-width: 200px; background: #0a0a0f; color: white; border-radius: 8px;">
-                <div style="font-weight: 900; color: ${node.markerColor || '#FCD34D'}; font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">${node.essentialType || 'Essential Service'}</div>
-                <div style="font-weight: 900; font-size: 14px; color: #ffffff; margin: 4px 0;">${node.title}</div>
-                <div style="color: #64748b; font-size: 10px; margin-bottom: 8px;">${node.address}</div>
-                ${node.rating ? `<div style="color: #FCD34D; font-size: 10px; font-weight: 900; margin-bottom: 4px;">⭐ ${node.rating}</div>` : ''}
-                ${node.contact ? `<div style="color: #00F6FF; font-size: 10px; font-weight: 900; margin-bottom: 4px;">📞 ${node.contact}</div>` : ''}
-                ${dist !== null ? `<div style="color: #FF6B9D; font-size: 9px; font-weight: 900; margin-bottom: 8px;">${dist.toFixed(1)} KM AWAY</div>` : ''}
-                ${userLoc ? `<button onclick="window.getDirections(${pos.lat}, ${pos.lng})" style="width: 100%; padding: 8px; background: #00F6FF; color: #0a0a0f; border: none; border-radius: 6px; cursor: pointer; font-weight: 900; font-size: 11px;">🚗 GET DIRECTIONS</button>` : ''}
-              </div>
-            `;
-          } else {
-            const priceDisplay = typeof node.price === 'string' ? node.price : `₹${node.price}`;
-            infoContent = `
-              <div style="padding: 12px; min-width: 200px; background: #0a0a0f; color: white; border-radius: 8px;">
-                <div style="font-weight: 900; color: #585FD8; font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">${node.title}</div>
-                <div style="font-weight: 900; font-size: 18px; color: #00F6FF; margin: 4px 0;">${priceDisplay}</div>
-                <div style="color: #64748b; font-size: 10px; margin-bottom: 8px;">${node.address}</div>
-                ${dist !== null ? `<div style="color: #FF6B9D; font-size: 9px; font-weight: 900; margin-bottom: 8px;">${dist.toFixed(1)} KM AWAY</div>` : ''}
-                ${userLoc ? `<button onclick="window.getDirections(${pos.lat}, ${pos.lng})" style="width: 100%; padding: 8px; background: #00F6FF; color: #0a0a0f; border: none; border-radius: 6px; cursor: pointer; font-weight: 900; font-size: 11px;">🚗 GET DIRECTIONS</button>` : ''}
-              </div>
-            `;
-          }
-
-          const infoWindow = new google.maps.InfoWindow({
-            content: infoContent
-          });
-
-          marker.addListener("click", () => {
-            infoWindow.open(map, marker);
-          });
-
-          console.log(`[Map] Marker ${idx + 1}: ${node.title} ${node.isEssential ? '(Essential)' : '(Property)'}`);
         });
-
-        // Global function for directions
-        (window as any).getDirections = (lat: number, lng: number) => {
-          calculateRoute({ lat, lng });
-        };
 
         // Fit bounds
         if (validNodes.length > 0 || userLoc) {
-          map.fitBounds(bounds);
-          google.maps.event.addListenerOnce(map, "idle", () => {
-            if (map.getZoom() > 16) map.setZoom(16);
-          });
-          console.log('[Map] Bounds fitted');
+          try {
+            map.fitBounds(bounds);
+            google.maps.event.addListenerOnce(map, "idle", () => {
+              try {
+                if (map.getZoom() > 16) map.setZoom(16);
+              } catch (error) {
+                console.error('[Map] Error setting zoom:', error);
+              }
+            });
+            console.log('[Map] Bounds fitted successfully');
+          } catch (error) {
+            console.error('[Map] Error fitting bounds:', error);
+          }
         }
 
       } catch (error: any) {
-        console.error('[Map] Error:', error);
+        console.error('[Map] Initialization error:', error);
         
-        // Specific error handling
-        if (error.message?.includes('BillingNotEnabled') || error.message?.includes('billing')) {
-          setLoadError(`🚫 BILLING NOT ENABLED
-
-Even with free credits, you must enable billing:
-
-1. Go to: console.cloud.google.com
-2. Click "Billing" in sidebar
-3. Link/Create billing account
-4. Link it to your project
-
-Your API key is valid but billing is required!`);
+        const errorMsg = error.message || String(error);
+        
+        if (errorMsg.includes('BillingNotEnabled')) {
+          setErrorType('billing');
+          setLoadError('Billing not enabled on your Google Cloud project');
+        } else if (errorMsg.includes('ApiNotActivated')) {
+          setErrorType('api');
+          setLoadError('Maps JavaScript API not enabled');
+        } else if (errorMsg.includes('Nodes must be an array') || errorMsg.includes('No valid location data')) {
+          setErrorType('data');
+          setLoadError(errorMsg);
         } else {
-          setLoadError(error.message || 'Failed to load map');
+          setErrorType('other');
+          setLoadError(errorMsg || 'Failed to load map');
         }
         setMapReady(false);
       }
@@ -322,40 +368,95 @@ Your API key is valid but billing is required!`);
     initMap();
   }, [nodes, center, userLoc]);
 
-  const propertyCount = nodes.filter(n => !n.isEssential).length;
-  const essentialCount = nodes.filter(n => n.isEssential).length;
+  const propertyCount = Array.isArray(nodes) ? nodes.filter(n => n && !n.isEssential).length : 0;
+  const essentialCount = Array.isArray(nodes) ? nodes.filter(n => n && n.isEssential).length : 0;
+
+  const renderErrorMessage = () => {
+    if (errorType === 'data') {
+      return (
+        <div className="space-y-4">
+          <div className="text-6xl mb-4">📊</div>
+          <h3 className="text-2xl font-black text-white">Invalid Data</h3>
+          <p className="text-sm text-gray-400">{loadError}</p>
+          
+          <div className="text-left bg-black/60 p-6 rounded-2xl border border-orange-500/30 space-y-3">
+            <p className="text-orange-400 font-black text-sm">📋 CHECK YOUR DATA:</p>
+            
+            <div className="space-y-2 text-xs text-gray-300">
+              <p className="font-bold text-white">Required fields for each node:</p>
+              <code className="block bg-black/50 p-3 rounded text-green-400 font-mono text-xs">
+{`{
+  title: string,
+  price: string | number,
+  address: string,
+  lat: number,  // or latitude
+  lng: number   // or longitude
+}`}
+              </code>
+              
+              <p className="text-gray-400 pt-2">Check that all nodes have valid lat/lng coordinates</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (errorType === 'billing') {
+      return (
+        <div className="space-y-4">
+          <div className="text-6xl mb-4">💳</div>
+          <h3 className="text-2xl font-black text-white">Billing Not Enabled</h3>
+          <p className="text-sm text-gray-400">Enable billing at console.cloud.google.com/billing</p>
+        </div>
+      );
+    }
+
+    if (errorType === 'api') {
+      return (
+        <div className="space-y-4">
+          <div className="text-6xl mb-4">🔌</div>
+          <h3 className="text-2xl font-black text-white">API Not Enabled</h3>
+          <p className="text-sm text-gray-400">Enable Maps JavaScript API in Google Cloud Console</p>
+        </div>
+      );
+    }
+
+    if (errorType === 'key') {
+      return (
+        <div className="space-y-4">
+          <div className="text-6xl mb-4">🔑</div>
+          <h3 className="text-2xl font-black text-white">API Key Missing</h3>
+          <p className="text-sm text-gray-400">Add VITE_GOOGLE_MAPS_API_KEY to your .env file</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="text-6xl mb-4">⚠️</div>
+        <h3 className="text-2xl font-black text-white">Map Loading Failed</h3>
+        <div className="text-left bg-black/60 p-4 rounded-2xl border border-gray-500/30">
+          <p className="text-xs text-gray-400 font-mono break-words">{loadError}</p>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="relative w-full h-[550px] rounded-[48px] border border-white/10 group shadow-neo-glow transition-all hover:border-white/20">
       <div ref={mapRef} className="w-full h-full rounded-[48px]" />
       
       {loadError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-neo-bg/95 backdrop-blur-xl rounded-[48px] z-50">
-          <div className="text-center p-8 max-w-lg">
-            <div className="text-6xl mb-4">⚠️</div>
-            <h3 className="text-xl font-black text-white mb-4">Map Loading Failed</h3>
-            <div className="text-left bg-black/60 p-6 rounded-2xl border border-red-500/30">
-              <pre className="text-xs text-gray-300 whitespace-pre-wrap font-mono leading-relaxed">
-                {loadError}
-              </pre>
-            </div>
-            <div className="mt-6 text-xs text-gray-400">
-              <p className="mb-2">📋 <strong>Quick Checklist:</strong></p>
-              <div className="text-left space-y-1 bg-black/40 p-4 rounded-lg">
-                <p>✓ API key exists in .env file</p>
-                <p>✓ Billing account linked to project</p>
-                <p>✓ Maps JavaScript API enabled</p>
-                <p>✓ No domain restrictions on API key</p>
-              </div>
-            </div>
+        <div className="absolute inset-0 flex items-center justify-center bg-neo-bg/95 backdrop-blur-xl rounded-[48px] z-50 p-8">
+          <div className="text-center max-w-2xl">
+            {renderErrorMessage()}
           </div>
         </div>
       )}
       
-      {/* Status Badge */}
       <div className="absolute top-8 left-8 bg-neo-bg/90 backdrop-blur-xl p-5 rounded-[32px] border border-white/10 shadow-neo-glow pointer-events-none z-10">
         <div className="flex items-center gap-3 mb-2">
-          <div className={`w-2 h-2 rounded-full ${mapReady ? 'bg-neo-neon animate-pulse' : 'bg-red-500'}`} />
+          <div className={`w-2 h-2 rounded-full ${mapReady ? 'bg-neo-neon animate-pulse' : loadError ? 'bg-red-500' : 'bg-yellow-500'}`} />
           <span className="text-[10px] font-black text-neo-neon uppercase tracking-widest">
             {loadError ? 'Error' : mapReady ? 'Map Active' : 'Loading...'}
           </span>
@@ -370,7 +471,6 @@ Your API key is valid but billing is required!`);
         )}
       </div>
 
-      {/* Legend */}
       {showEssentials && essentialCount > 0 && !loadError && (
         <div className="absolute bottom-8 left-8 right-8 bg-neo-bg/90 backdrop-blur-xl p-4 rounded-[24px] border border-white/10 shadow-neo-glow pointer-events-none z-10">
           <div className="flex flex-wrap gap-3 text-[9px] font-black uppercase tracking-widest">
