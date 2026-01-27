@@ -1,8 +1,19 @@
-
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
-import { PropertyStats } from '../utils/listingProcessor';
 import { Binary, TrendingUp, Info, Activity, Sigma } from 'lucide-react';
+
+interface PropertyStats {
+  mean: number;
+  median: number;
+  stdDev: number;
+  count: number;
+  min: number;
+  max: number;
+  quartiles: {
+    q1: number;
+    q3: number;
+  };
+}
 
 interface MarketStatsProps {
   stats: PropertyStats;
@@ -10,28 +21,108 @@ interface MarketStatsProps {
   labelPrefix?: string;
 }
 
-const formatValue = (val: number) => {
-  if (val >= 10000000) return `₹${(val / 10000000).toFixed(2)}Cr`;
-  if (val >= 100000) return `₹${(val / 100000).toFixed(1)}L`;
-  return `₹${val.toLocaleString()}`;
+// SAFE formatting function - prevents toLocaleString errors
+const formatValue = (val: any): string => {
+  try {
+    // Handle invalid inputs
+    if (val === null || val === undefined || val === '') {
+      return '₹0';
+    }
+
+    // Convert to number
+    const numVal = typeof val === 'string' ? parseFloat(val.replace(/[^0-9.-]/g, '')) : val;
+    
+    // Check if valid number
+    if (typeof numVal !== 'number' || isNaN(numVal) || !isFinite(numVal)) {
+      return '₹0';
+    }
+
+    // Format based on size
+    if (numVal >= 10000000) {
+      return `₹${(numVal / 10000000).toFixed(2)}Cr`;
+    }
+    if (numVal >= 100000) {
+      return `₹${(numVal / 100000).toFixed(1)}L`;
+    }
+    
+    return `₹${Math.round(numVal).toLocaleString('en-IN')}`;
+  } catch (error) {
+    console.error('[Format] Error formatting value:', val, error);
+    return '₹0';
+  }
 };
 
-const MarketStats: React.FC<MarketStatsProps> = ({ stats, prices, labelPrefix = "Price" }) => {
-  // Create histogram data
+// Safe number validator
+const safeNumber = (val: any, fallback: number = 0): number => {
+  try {
+    if (val === null || val === undefined || val === '') {
+      return fallback;
+    }
+    const num = typeof val === 'string' ? parseFloat(val) : val;
+    return (typeof num === 'number' && !isNaN(num) && isFinite(num)) ? num : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const MarketStats: React.FC<MarketStatsProps> = ({ stats, prices = [], labelPrefix = "Price" }) => {
+  // Validate and sanitize inputs
+  const safeStats = {
+    mean: safeNumber(stats?.mean, 0),
+    median: safeNumber(stats?.median, 0),
+    stdDev: safeNumber(stats?.stdDev, 0),
+    count: safeNumber(stats?.count, 0),
+    min: safeNumber(stats?.min, 0),
+    max: safeNumber(stats?.max, 0),
+    quartiles: {
+      q1: safeNumber(stats?.quartiles?.q1, 0),
+      q3: safeNumber(stats?.quartiles?.q3, 0)
+    }
+  };
+
+  // Filter valid prices
+  const validPrices = Array.isArray(prices) 
+    ? prices.filter(p => typeof p === 'number' && !isNaN(p) && isFinite(p) && p > 0)
+    : [];
+
+  console.log('[MarketStats] Valid prices:', validPrices.length, 'out of', prices?.length || 0);
+
+  // Create histogram data safely
   const binCount = 6;
-  const range = stats.max - stats.min;
-  const binSize = range / binCount;
+  const range = safeStats.max - safeStats.min;
+  const binSize = range > 0 ? range / binCount : 1;
   
   const histogramData = Array.from({ length: binCount }).map((_, i) => {
-    const start = stats.min + (i * binSize);
-    const end = start + binSize;
-    const count = prices.filter(p => p >= start && (i === binCount - 1 ? p <= end : p < end)).length;
-    return {
-      name: formatValue(start),
-      count,
-      range: `${formatValue(start)} - ${formatValue(end)}`
-    };
+    try {
+      const start = safeStats.min + (i * binSize);
+      const end = start + binSize;
+      const count = validPrices.filter(p => {
+        return p >= start && (i === binCount - 1 ? p <= end : p < end);
+      }).length;
+      
+      return {
+        name: formatValue(start),
+        count,
+        range: `${formatValue(start)} - ${formatValue(end)}`
+      };
+    } catch (error) {
+      console.error('[MarketStats] Error creating bin', i, error);
+      return {
+        name: '₹0',
+        count: 0,
+        range: '₹0 - ₹0'
+      };
+    }
   });
+
+  // Calculate volatility safely
+  const volatility = safeStats.mean > 0 
+    ? (safeStats.stdDev > safeStats.mean * 0.2 ? 'High' : 'Low')
+    : 'Unknown';
+
+  const deviationPercent = safeStats.mean > 0 && safeStats.quartiles.q3 > safeStats.quartiles.q1
+    ? Math.round((safeStats.quartiles.q3 - safeStats.quartiles.q1) / safeStats.mean * 100)
+    : 0;
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -41,7 +132,7 @@ const MarketStats: React.FC<MarketStatsProps> = ({ stats, prices, labelPrefix = 
             <Sigma size={16} />
             <span className="text-[10px] font-black uppercase tracking-widest">Mean Value</span>
           </div>
-          <div className="text-2xl font-black text-white">{formatValue(stats.mean)}</div>
+          <div className="text-2xl font-black text-white">{formatValue(safeStats.mean)}</div>
           <div className="text-[10px] text-gray-500 font-bold uppercase mt-1">Global Average</div>
         </div>
 
@@ -50,7 +141,7 @@ const MarketStats: React.FC<MarketStatsProps> = ({ stats, prices, labelPrefix = 
             <Activity size={16} />
             <span className="text-[10px] font-black uppercase tracking-widest">Median Pulse</span>
           </div>
-          <div className="text-2xl font-black text-white">{formatValue(stats.median)}</div>
+          <div className="text-2xl font-black text-white">{formatValue(safeStats.median)}</div>
           <div className="text-[10px] text-gray-500 font-bold uppercase mt-1">Mid-Point Signal</div>
         </div>
 
@@ -59,7 +150,7 @@ const MarketStats: React.FC<MarketStatsProps> = ({ stats, prices, labelPrefix = 
             <TrendingUp size={16} />
             <span className="text-[10px] font-black uppercase tracking-widest">Std Deviation</span>
           </div>
-          <div className="text-2xl font-black text-white">{formatValue(stats.stdDev)}</div>
+          <div className="text-2xl font-black text-white">{formatValue(safeStats.stdDev)}</div>
           <div className="text-[10px] text-gray-500 font-bold uppercase mt-1">Volatility Factor</div>
         </div>
 
@@ -68,7 +159,7 @@ const MarketStats: React.FC<MarketStatsProps> = ({ stats, prices, labelPrefix = 
             <Binary size={16} />
             <span className="text-[10px] font-black uppercase tracking-widest">Sample Size</span>
           </div>
-          <div className="text-2xl font-black text-white">{stats.count}</div>
+          <div className="text-2xl font-black text-white">{safeStats.count}</div>
           <div className="text-[10px] text-gray-500 font-bold uppercase mt-1">Verified Nodes</div>
         </div>
       </div>
@@ -109,8 +200,12 @@ const MarketStats: React.FC<MarketStatsProps> = ({ stats, prices, labelPrefix = 
                   if (active && payload && payload.length) {
                     return (
                       <div className="bg-neo-bg border border-white/10 p-4 rounded-2xl shadow-neo-glow backdrop-blur-xl">
-                        <p className="text-[10px] font-black text-neo-neon uppercase mb-1 tracking-widest">{payload[0].payload.range}</p>
-                        <p className="text-xl font-black text-white">{payload[0].value} <span className="text-xs text-gray-500 font-bold">Listings</span></p>
+                        <p className="text-[10px] font-black text-neo-neon uppercase mb-1 tracking-widest">
+                          {payload[0].payload.range}
+                        </p>
+                        <p className="text-xl font-black text-white">
+                          {safeNumber(payload[0].value, 0)} <span className="text-xs text-gray-500 font-bold">Listings</span>
+                        </p>
                       </div>
                     );
                   }
@@ -126,7 +221,18 @@ const MarketStats: React.FC<MarketStatsProps> = ({ stats, prices, labelPrefix = 
                   />
                 ))}
               </Bar>
-              <ReferenceLine x={histogramData[Math.floor(binCount / 2)].name} stroke="#FF6B9D" strokeDasharray="4 4" label={{ position: 'top', value: 'MEDIAN', fill: '#FF6B9D', fontSize: 10, fontWeight: '900' }} />
+              <ReferenceLine 
+                x={histogramData[Math.floor(binCount / 2)]?.name || ''} 
+                stroke="#FF6B9D" 
+                strokeDasharray="4 4" 
+                label={{ 
+                  position: 'top', 
+                  value: 'MEDIAN', 
+                  fill: '#FF6B9D', 
+                  fontSize: 10, 
+                  fontWeight: '900' 
+                }} 
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -137,8 +243,8 @@ const MarketStats: React.FC<MarketStatsProps> = ({ stats, prices, labelPrefix = 
         <div>
           <h4 className="text-xs font-black text-neo-neon uppercase tracking-widest mb-1">Statistical Confidence Analysis</h4>
           <p className="text-xs text-gray-400 leading-relaxed">
-            The market displays a <span className="text-white font-bold">{stats.stdDev > stats.mean * 0.2 ? 'High' : 'Low'} volatility</span> pattern. 
-            The spread between {formatValue(stats.quartiles.q1)} (Q1) and {formatValue(stats.quartiles.q3)} (Q3) suggests a {Math.round((stats.quartiles.q3 - stats.quartiles.q1) / stats.mean * 100)}% standard deviation 
+            The market displays a <span className="text-white font-bold">{volatility} volatility</span> pattern. 
+            The spread between {formatValue(safeStats.quartiles.q1)} (Q1) and {formatValue(safeStats.quartiles.q3)} (Q3) suggests a {deviationPercent}% standard deviation 
             within the immediate sector.
           </p>
         </div>
