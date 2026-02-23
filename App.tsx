@@ -31,6 +31,8 @@ import {
 } from 'lucide-react';
 import { callLLMWithFallback } from './services/llmFallback';
 import OnboardingTour from './components/OnboardingTour';
+import PriceAlertPanel from './components/PriceAlertPanel';
+import { usePriceAlerts, parseRawPrice as parseAlertPrice } from './hooks/usePriceAlerts';
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 interface WatchlistItem {
@@ -679,6 +681,10 @@ const App: React.FC = () => {
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'info' | 'warning' }>>([]);
   const [dealScore, setDealScore] = useState<number | null>(null);
   const [showTour, setShowTour] = useState(false);
+  const [showAlertPanel, setShowAlertPanel] = useState(false);
+
+  // Price alerts hook
+  const { unreadCount, checkPrice, alerts } = usePriceAlerts();
 
   const [buyData, setBuyData] = useState<BuyResult | null>(null);
   const [rentData, setRentData] = useState<RentResult | null>(null);
@@ -781,11 +787,20 @@ const App: React.FC = () => {
           addToast('📡 Search radius expanded to find best comparables', 'info');
         }
         setBuyData(result);
-        setDealScore(computeDealScore(result, 'buy'));
+        const score = computeDealScore(result, 'buy');
+        setDealScore(score);
+        // Check price alerts
+        const price = parseAlertPrice(result.fairValue);
+        const hits = checkPrice(data.city, data.area || '', 'buy', price);
+        if (hits.some(h => h.triggered)) addToast('🔔 A price alert was triggered! Check your alerts.', 'warning');
       } else if (mode === 'rent') {
         const result = await getRentAnalysis(data as RentRequest);
         setRentData(result);
-        setDealScore(computeDealScore(result, 'rent'));
+        const score = computeDealScore(result, 'rent');
+        setDealScore(score);
+        const price = parseAlertPrice(result.rentalValue);
+        const hits = checkPrice(data.city, data.area || '', 'rent', price);
+        if (hits.some(h => h.triggered)) addToast('🔔 A price alert was triggered! Check your alerts.', 'warning');
       } else if (mode === 'land') {
         const result = await getLandValuationAnalysis(data as LandRequest);
         setLandData(result);
@@ -924,7 +939,20 @@ const App: React.FC = () => {
             </button>
           )}
 
-          {/* Tour trigger */}
+          {/* Price Alerts bell */}
+          <button
+            data-tour="alerts-btn"
+            onClick={() => setShowAlertPanel(true)}
+            className="relative w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-gray-400 hover:text-white transition-all border border-white/10 hover:border-orange-400/40"
+            title="Price Alerts"
+          >
+            <Bell size={18}/>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-orange-500 text-white text-[9px] font-black rounded-full flex items-center justify-center animate-bounce">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
           <button
             onClick={() => setShowTour(true)}
             className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-2xl bg-neo-neon/10 text-neo-neon hover:bg-neo-neon/20 transition-all border border-neo-neon/20 text-[11px] font-black uppercase tracking-wider"
@@ -1169,6 +1197,20 @@ const App: React.FC = () => {
 
       {/* ── BETA BANNER ── */}
       {stage === 'results' && <BetaBanner />}
+
+      {/* ── PRICE ALERT PANEL ── */}
+      {showAlertPanel && (
+        <PriceAlertPanel
+          onClose={() => setShowAlertPanel(false)}
+          prefill={locationContext.city ? {
+            city: locationContext.city,
+            area: locationContext.area,
+            mode: mode as any,
+            currentPrice: getInitialFinanceValue(),
+            label: `${mode === 'buy' ? 'Buy' : mode === 'rent' ? 'Rent' : 'Land'} · ${locationContext.area || locationContext.city}`,
+          } : undefined}
+        />
+      )}
 
       {/* ── ONBOARDING TOUR ── */}
       {showTour && (
