@@ -32,7 +32,7 @@ import {
 import { callLLMWithFallback } from './services/llmFallback';
 import OnboardingTour from './components/OnboardingTour';
 import PriceAlertPanel from './components/PriceAlertPanel';
-import { usePriceAlerts, parseRawPrice as parseAlertPrice } from './hooks/usePriceAlerts';
+import { usePriceAlerts, parseRawPrice as parseAlertPrice } from './components/hooks/usePriceAlerts';
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 interface WatchlistItem {
