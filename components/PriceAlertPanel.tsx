@@ -8,7 +8,7 @@ import {
 import {
   PriceAlert, AlertCondition, AlertMode,
   usePriceAlerts, formatPrice, parseRawPrice
-} from '../hooks/usePriceAlerts';
+} from './hooks/usePriceAlerts';
 
 // ─── PROPS ────────────────────────────────────────────────────────────────────
 interface PriceAlertPanelProps {
