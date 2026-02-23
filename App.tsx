@@ -30,6 +30,7 @@ import {
   BrainCircuit, Wallet, LineChart, AreaChart, Maximize2
 } from 'lucide-react';
 import { callLLMWithFallback } from './services/llmFallback';
+import OnboardingTour from './components/OnboardingTour';
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 interface WatchlistItem {
@@ -539,7 +540,8 @@ const FloatingActions: React.FC<{
   onPulse: () => void;
   onSearch: () => void;
   watchlistCount: number;
-}> = ({ onROI, onWatchlist, onPulse, onSearch, watchlistCount }) => {
+  tourAttr?: string;
+}> = ({ onROI, onWatchlist, onPulse, onSearch, watchlistCount, tourAttr }) => {
   const [open, setOpen] = useState(false);
 
   const actions = [
@@ -553,7 +555,7 @@ const FloatingActions: React.FC<{
   ];
 
   return (
-    <div className="fixed bottom-6 right-6 z-[200] flex flex-col-reverse items-end gap-3">
+    <div className="fixed bottom-6 right-6 z-[200] flex flex-col-reverse items-end gap-3" data-tour={tourAttr}>
       {open && actions.map((a, i) => (
         <div key={i} className="flex items-center gap-3 animate-in slide-in-from-bottom-2" style={{ animationDelay: `${i * 50}ms` }}>
           <span className="text-[11px] font-black text-white bg-black/80 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-white/10 whitespace-nowrap">{a.label}</span>
@@ -676,6 +678,7 @@ const App: React.FC = () => {
   });
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'info' | 'warning' }>>([]);
   const [dealScore, setDealScore] = useState<number | null>(null);
+  const [showTour, setShowTour] = useState(false);
 
   const [buyData, setBuyData] = useState<BuyResult | null>(null);
   const [rentData, setRentData] = useState<RentResult | null>(null);
@@ -695,6 +698,17 @@ const App: React.FC = () => {
     const consent = localStorage.getItem('quantcasa_dpdp_consent');
     if (!consent) setShowConsentModal(true);
   }, []);
+
+  // Show tour for first-time users when they reach results
+  useEffect(() => {
+    if (stage === 'results') {
+      const tourDone = localStorage.getItem('qc_tour_done');
+      if (!tourDone) {
+        const t = setTimeout(() => setShowTour(true), 800);
+        return () => clearTimeout(t);
+      }
+    }
+  }, [stage]);
 
   // ── HELPERS ──
   const addToast = useCallback((message: string, type: 'success' | 'info' | 'warning' = 'info') => {
@@ -852,7 +866,7 @@ const App: React.FC = () => {
 
         {/* Deal score badge in header when results shown */}
         {stage === 'results' && dealScore !== null && (
-          <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-white/5 border border-white/10 rounded-2xl">
+          <div data-tour="deal-score" className="hidden md:flex items-center gap-3 px-4 py-2 bg-white/5 border border-white/10 rounded-2xl">
             <DealScoreRing score={dealScore} size="sm"/>
             <div>
               <p className="text-[9px] text-gray-500 uppercase tracking-widest font-semibold">Deal Score</p>
@@ -886,6 +900,7 @@ const App: React.FC = () => {
 
           {/* Watchlist */}
           <button
+            data-tour="watchlist-btn"
             onClick={() => setShowWatchlist(true)}
             className="relative w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-gray-400 hover:text-white transition-all border border-white/10 hover:border-purple-400/40"
           >
@@ -909,6 +924,16 @@ const App: React.FC = () => {
             </button>
           )}
 
+          {/* Tour trigger */}
+          <button
+            onClick={() => setShowTour(true)}
+            className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-2xl bg-neo-neon/10 text-neo-neon hover:bg-neo-neon/20 transition-all border border-neo-neon/20 text-[11px] font-black uppercase tracking-wider"
+            title="Take the Feature Tour"
+          >
+            <Sparkles size={13}/>
+            Tour
+          </button>
+
           {/* About */}
           <button
             onClick={() => setShowAbout(true)}
@@ -931,7 +956,9 @@ const App: React.FC = () => {
       </header>
 
       {/* ── MARKET TICKER ── */}
-      <MarketTicker/>
+      <div data-tour="ticker">
+        <MarketTicker/>
+      </div>
 
       {/* ── SEARCH NOTIFICATION ── */}
       {searchNotification && (
@@ -1143,6 +1170,14 @@ const App: React.FC = () => {
       {/* ── BETA BANNER ── */}
       {stage === 'results' && <BetaBanner />}
 
+      {/* ── ONBOARDING TOUR ── */}
+      {showTour && (
+        <OnboardingTour
+          onComplete={() => { setShowTour(false); addToast('🎉 Tour complete! You\'re ready to find your perfect property.', 'success'); }}
+          onSkip={() => setShowTour(false)}
+        />
+      )}
+
       {/* ── FEEDBACK MODAL ── */}
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
@@ -1157,6 +1192,7 @@ const App: React.FC = () => {
         onPulse={() => setShowMarketPulse(true)}
         onSearch={() => setShowSmartSearch(true)}
         watchlistCount={watchlist.length}
+        tourAttr="fab"
       />
 
       {/* ── TOAST NOTIFICATIONS ── */}
